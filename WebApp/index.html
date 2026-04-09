@@ -231,10 +231,10 @@
                 <!-- ── Row 2: Plant Profile Card (4 cols) ── -->
                 <div class="md:col-span-4 flex flex-col gap-6">
                     <div class="bg-surface-container-high rounded-xl p-6 relative overflow-hidden flex-1 group">
-                        <img
+                        <img id="plant-img"
                             class="absolute inset-0 w-full h-full object-cover opacity-20 grayscale group-hover:grayscale-0 transition-all duration-700"
                             alt="Close up of a large vibrant green Monstera Deliciosa leaf"
-                            src="https://lh3.googleusercontent.com/aida-public/AB6AXuDW-QSeHjYN4ZSQ_jSCK_uiaxkiZo6wlBTlq4-tNQMSGNpsKHPGKUYm-7Nk4PPSGz7bnqsesYm_rnU0lVnFNOTa790al5TpJIFEroeuAFzr46l_856XNhf3oo6JzW2rCbdaQ1V9ZYxj6Sy1WWEh4btHSXXcm9l6kmoo83F_K7VAPL2LS7kedAcalx5Uhw7rkIMsNDhmeFG9g1xYvD6-R8hdntTRmGYvCoXtzvNPDSCGTrGzFJSLuGH3V11FN8PZfHrFz3Mk07E5COa-"
+                            src=""
                         />
                         <div class="relative z-10 flex flex-col h-full justify-between">
                             <div>
@@ -246,8 +246,44 @@
                                         <span class="material-symbols-outlined text-[18px]">sync</span>
                                     </button>
                                 </div>
-                                <h3 class="font-headline text-2xl font-bold text-on-surface">Monstera Deliciosa</h3>
-                                <p class="text-sm text-on-surface-variant">Profile: Tropical Forest Floor</p>
+                                    <h3 id="plant-name"
+                                    class="font-headline text-2xl font-bold text-on-surface tracking-tight leading-none mb-1">
+                                    PIANTA
+                                    </h3>
+
+                                    <p class="text-[11px] italic text-on-surface-variant/40 tracking-wide mb-4">
+                                    Descrizione
+                                    </p>
+
+                                    <div class="flex flex-col divide-y divide-white/[0.06]">
+
+                                    <div class="flex items-baseline justify-between py-[5px]">
+                                        <span class="text-[10px] uppercase tracking-[0.12em] text-on-surface-variant/40">
+                                        Temperatura
+                                        </span>
+                                        <span id="temp-range" class="text-[13px] font-semibold text-primary tabular-nums">
+                                        ?? – ?? °C
+                                        </span>
+                                    </div>
+
+                                    <div class="flex items-baseline justify-between py-[5px]">
+                                        <span class="text-[10px] uppercase tracking-[0.12em] text-on-surface-variant/40">
+                                        Umidità
+                                        </span>
+                                        <span id="hum-range" class="text-[13px] font-semibold text-primary tabular-nums">
+                                        ?? – ?? %
+                                        </span>
+                                    </div>
+
+                                    <div  class="flex items-baseline justify-between py-[5px]">
+                                        <span class="text-[10px] uppercase tracking-[0.12em] text-on-surface-variant/40">
+                                        Luce
+                                        </span>
+                                        <span id="light-range" class="text-[13px] font-semibold text-primary tabular-nums">
+                                        ???? – ???? lx
+                                        </span>
+                                    </div>
+                                </div>
                             </div>
                             <div class="mt-8 space-y-2">
                                 <div class="flex justify-between text-xs">

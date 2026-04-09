@@ -1,7 +1,7 @@
 /* =============================================================
    main.js – Chlorophyll Logic Dashboard
    ============================================================= */
-
+console.log("DEBUG: File main.js caricato!");
 /* ── Chart data ──────────────────────────────────────────────
    Each value represents a bar height as a percentage (0–100).
    Replace with real telemetry data when available.
@@ -82,8 +82,41 @@ function initChartTabs() {
     });
 }
 
+async function caricaDatiPianta(nomeId) {
+    try {
+        console.log("Chiamo API per:", nomeId);
+        // Effettua la chiamata alla tua REST API
+        let response = await fetch(`/api/piante/${nomeId}`);
+        
+        if (!response.ok) throw new Error("Pianta non trovata");
+
+        let data = await response.json();
+        console.log(data)
+        let soglie = data.thresholds;
+
+        // Aggiorna l'HTML con i dati ricevuti
+        document.getElementById('plant-name').innerText = `${data.name}`;
+        document.getElementById('plant-img').src = `${data.img}`;
+        
+        document.getElementById('temp-range').innerText = 
+            `${soglie.temp.min}° - ${soglie.temp.max}°`;
+            
+        document.getElementById('hum-range').innerText = 
+            `${soglie.hum.min}% - ${soglie.hum.max}%`;
+            
+        document.getElementById('light-range').innerText = 
+            `${soglie.light.min} - ${soglie.light.max} (LDR)`;
+
+    } catch (error) {
+        console.error("Errore nel caricamento:", error);
+        document.getElementById('plant-name').innerText = "Errore Caricamento";
+    }
+}
+
 /* ── Boot ────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
+    console.log("Boot avviato...");
+    caricaDatiPianta('ghost_orchid');
     renderChart(activeDataset);
     initChartTabs();
 });
