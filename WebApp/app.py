@@ -3,8 +3,7 @@ from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import os
-import paho.mqtt.client as mqtt
-from paho.mqtt import client as mqtt_client
+from mqtt import mqtt_hub
 import json
 
 #COMANDO PER AVVIARE IL SERVER: uvicorn app:app --reload --host 127.0.0.1 --port 8000
@@ -17,22 +16,12 @@ import json
 # nella web app voglio selezionare la pianta e vedere le soglie 
 # i valori pullati dall'influx db sono temperatura umidita quanta luce c'è i miei grafiici e le treshhold sono su questi valori
 
-
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-# 2. Configuriamo il client
-client = mqtt.Client(mqtt_client.CallbackAPIVersion.VERSION2)
-
-# 3. Ci connettiamo al broker PUBBLICO
-client.connect("broker.emqx.io", 1883, 60)
-
-# 4. Mandiamo un messaggio di prova
-client.publish("lab_iot/tuo_nome/test", "Ciao dal mio PC!")
-
-client.loop_start()
 
 @app.get("/")
 async def home():
     # 2. Invia il file index.html come risposta alla richiesta base
     return FileResponse('index.html')
+

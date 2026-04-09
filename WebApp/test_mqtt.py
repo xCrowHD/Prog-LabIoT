@@ -1,6 +1,6 @@
 import paho.mqtt.client as mqtt
 from paho.mqtt import client as mqtt_client
-TOPIC = "lab_iot/tuo_nome/test" # Sostituisci tuo_nome con qualcosa di unico
+TOPIC = "lab_iot/mafogani/#"
 
 def on_message(client, userdata, msg):
     print(f"MESSAGGIO RICEVUTO! Topic: {msg.topic} - Contenuto: {msg.payload.decode()}")
