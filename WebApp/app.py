@@ -1,7 +1,12 @@
+#pip install fastapi uvicorn influxdb-client paho-mqtt
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import os
+import paho.mqtt.client as mqtt
+from paho.mqtt import client as mqtt_client
+import json
+
 #COMANDO PER AVVIARE IL SERVER: uvicorn app:app --reload --host 127.0.0.1 --port 8000
 
 #Req web app
@@ -14,6 +19,18 @@ import os
 
 
 app = FastAPI()
+app.mount("/static", StaticFiles(directory="static"), name="static")
+
+# 2. Configuriamo il client
+client = mqtt.Client(mqtt_client.CallbackAPIVersion.VERSION2)
+
+# 3. Ci connettiamo al broker PUBBLICO
+client.connect("broker.emqx.io", 1883, 60)
+
+# 4. Mandiamo un messaggio di prova
+client.publish("lab_iot/tuo_nome/test", "Ciao dal mio PC!")
+
+client.loop_start()
 
 @app.get("/")
 async def home():
