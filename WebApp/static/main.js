@@ -13,7 +13,15 @@ const CHART_DATA = {
 };
 
 /* Active dataset key */
-let activeDataset = 'temp';
+let activeDataset = 'lux';
+
+/* Active Plant */
+let activePlantIndex = 0
+let plantArray = [
+    "monstera_albo",
+    "nepenthes_rajah",
+    "ghost_orchid"
+]
 
 /* Color map per dataset */
 const COLOR_MAP = {
@@ -53,40 +61,10 @@ function renderChart(dataset) {
     });
 }
 
-/* ── Tab switching ───────────────────────────────────────────
-   Highlights the active filter pill and re-renders the chart.
-   ─────────────────────────────────────────────────────────── */
-function initChartTabs() {
-    const tabs = document.querySelectorAll('[data-chart-tab]');
-
-    tabs.forEach((tab) => {
-        tab.addEventListener('click', () => {
-            const dataset = tab.dataset.chartTab;
-            if (dataset === activeDataset) return;
-
-            activeDataset = dataset;
-
-            /* Update pill styles */
-            tabs.forEach((t) => {
-                const isActive = t.dataset.chartTab === dataset;
-                t.classList.toggle('bg-surface-container-highest', isActive);
-                t.classList.toggle('text-primary',                  isActive);
-                t.classList.toggle('border',                        isActive);
-                t.classList.toggle('border-primary/20',             isActive);
-                t.classList.toggle('bg-surface-container-lowest',  !isActive);
-                t.classList.toggle('text-on-surface-variant',      !isActive);
-            });
-
-            renderChart(dataset);
-        });
-    });
-}
-
-async function caricaDatiPianta(nomeId) {
+async function caricaSogliePianta(nomeId) {
     try {
-        console.log("Chiamo API per:", nomeId);
         // Effettua la chiamata alla tua REST API
-        let response = await fetch(`/api/piante/${nomeId}`);
+        let response = await fetch(`/api/piante/soglie/${nomeId}`);
         
         if (!response.ok) throw new Error("Pianta non trovata");
 
@@ -113,10 +91,59 @@ async function caricaDatiPianta(nomeId) {
     }
 }
 
+async function loopPlants() {
+    if (activePlantIndex >= plantArray.length - 1){
+        activePlantIndex = 0;
+    }
+    else{
+        activePlantIndex++;
+    }
+    caricaLatestDatoPianta(plantArray[activePlantIndex]);
+    caricaSogliePianta(plantArray[activePlantIndex]);
+
+}
+
+
+async function caricaDatiPianta(nomeId) {
+    try {
+        // Effettua la chiamata alla tua REST API
+        let response = await fetch(`/api/piante/data/${nomeId}`);
+        
+        if (!response.ok) throw new Error("Pianta non trovata");
+
+        let data = await response.json();
+        console.log(data);
+    }
+    catch (error) {
+        console.error("Errore nel caricamento:", error);
+        document.getElementById('plant-name').innerText = "Errore Caricamento";
+    }
+}
+
+async function caricaLatestDatoPianta(nomeId) {
+    try {
+        // Effettua la chiamata alla tua REST API
+        let response = await fetch(`/api/piante/latestdata/${nomeId}`);
+        
+        if (!response.ok) throw new Error("Pianta non trovata");
+
+        let data = await response.json();
+        console.log(data);
+        document.getElementById('plant-temp').innerText = data.temp;
+        document.getElementById('plant-hum').innerText = data.hum;
+        document.getElementById('plant-lux').innerText = data.klux;
+    }
+    catch (error) {
+        console.error("Errore nel caricamento:", error);
+    }
+}
+
 /* ── Boot ────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Boot avviato...");
-    caricaDatiPianta('ghost_orchid');
+    caricaDatiPianta(plantArray[0]);
+    caricaSogliePianta(plantArray[0]);
+    caricaLatestDatoPianta(plantArray[0])
     renderChart(activeDataset);
-    initChartTabs();
+    document.getElementById("plant-loop").addEventListener("click", loopPlants)
 });

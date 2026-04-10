@@ -127,7 +127,7 @@
                             <span class="material-symbols-outlined text-primary">thermostat</span>
                         </div>
                         <div class="flex items-baseline gap-2">
-                            <span class="font-headline text-5xl font-light text-on-surface">24.8</span>
+                            <span id="plant-temp" class="font-headline text-5xl font-light text-on-surface">24.8</span>
                             <span class="text-on-surface-variant text-xl">°C</span>
                         </div>
                         <div class="mt-4 h-1 bg-surface-container-lowest rounded-full overflow-hidden">
@@ -142,7 +142,7 @@
                             <span class="material-symbols-outlined text-secondary">humidity_percentage</span>
                         </div>
                         <div class="flex items-baseline gap-2">
-                            <span class="font-headline text-5xl font-light text-on-surface">62</span>
+                            <span id="plant-hum" class="font-headline text-5xl font-light text-on-surface">62</span>
                             <span class="text-on-surface-variant text-xl">%</span>
                         </div>
                         <div class="mt-4 h-1 bg-surface-container-lowest rounded-full overflow-hidden">
@@ -157,7 +157,7 @@
                             <span class="material-symbols-outlined text-tertiary">light_mode</span>
                         </div>
                         <div class="flex items-baseline gap-2">
-                            <span class="font-headline text-5xl font-light text-on-surface">12.4</span>
+                            <span id="plant-lux" class="font-headline text-5xl font-light text-on-surface">12.4</span>
                             <span class="text-on-surface-variant text-xl">kLux</span>
                         </div>
                         <div class="mt-4 h-1 bg-surface-container-lowest rounded-full overflow-hidden">
@@ -242,7 +242,7 @@
                                     <span class="px-2 py-1 bg-primary/20 text-primary text-[10px] font-bold rounded">
                                         OPTIMAL
                                     </span>
-                                    <button class="text-on-surface-variant hover:text-primary transition-colors">
+                                    <button id="plant-loop" class="text-on-surface-variant hover:text-primary transition-colors">
                                         <span class="material-symbols-outlined text-[18px]">sync</span>
                                     </button>
                                 </div>
