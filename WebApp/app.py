@@ -71,13 +71,13 @@ async def get_soglie_pianta(nome_pianta: str):
     raise HTTPException(status_code=404, detail="Pianta non trovata nel database")
 
 
-@app.get("/api/piante/data/{nome_pianta}")
-async def get_data_pianta(nome_pianta: str):
+@app.get("/api/piante/data/{nome_pianta}/{last_time}")
+async def get_data_pianta(nome_pianta: str, last_time:str):
     client = InfluxDBClient(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG)
     query_api = client.query_api()
     query = f'''
     from(bucket: "{INFLUXDB_BUCKET}")
-    |> range(start: -24h)
+    |> range(start: -{last_time})
     |> filter(fn: (r) => r["_measurement"] == "Serra")
     |> filter(fn: (r) => r["pianta"] == "{nome_pianta}")
     |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
@@ -95,6 +95,7 @@ async def get_data_pianta(nome_pianta: str):
                     "timestamp": record.get_time().strftime('%H:%M:%S'),
                     "pianta": record["pianta"],
                     "temp": record.values.get("temp"),
+                    "hum": record.values.get("hum"),
                     "lux": record.values.get("lux"),
                     # Se vuoi già i kLux convertiti, usa la tua funzione qui:
                     "klux": _adc_to_klux(float(record.values.get("lux"))) if record.values.get("lux") is not None else 0
