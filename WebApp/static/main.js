@@ -6,14 +6,6 @@ console.log("DEBUG: File main.js caricato!");
    Each value represents a bar height as a percentage (0–100).
    Replace with real telemetry data when available.
    ─────────────────────────────────────────────────────────── */
-const CHART_DATA = {
-    temp: [40, 45, 55, 65, 60, 75, 85, 80, 70, 60, 50, 55, 65, 45, 40, 35, 30, 45, 55, 65],
-    hum:  [60, 62, 58, 55, 57, 63, 70, 72, 68, 65, 60, 58, 55, 60, 62, 65, 66, 64, 60, 58],
-    lux:  [ 0,  0,  0,  5, 20, 55, 80, 90, 88, 75, 60, 65, 70, 50, 30, 10,  2,  0,  0,  0],
-};
-
-/* Active dataset key */
-let activeDataset = 'lux';
 
 /* Active Plant */
 let activePlantIndex = 0
@@ -25,40 +17,53 @@ let plantArray = [
 
 /* Color map per dataset */
 const COLOR_MAP = {
-    temp: 'bg-primary',
-    hum:  'bg-secondary',
-    lux:  'bg-tertiary',
+    "temp": 'bg-primary',
+    "hum":  'bg-secondary',
+    "lux":  'bg-tertiary',
 };
 
 /* ── renderChart ─────────────────────────────────────────────
    Clears and re-renders the bar chart for the given dataset.
    ─────────────────────────────────────────────────────────── */
-function renderChart(dataset) {
+async function renderPlantChart(plantid, field, lastTime) {
     const container = document.getElementById('chart-bars');
     if (!container) return;
+    
+    try{
+        let response = await fetch(`/api/piante/data/${plantid}/${lastTime}`);
+        
+        if (!response.ok) throw new Error("Pianta non trovata");
+        let data = await response.json();
+        const colorClass = COLOR_MAP[field];
 
-    const data      = CHART_DATA[dataset];
-    const colorClass = COLOR_MAP[dataset];
+        let field_data = data.map(record => record[field]);
+        updateYAxis(field_data);
+        const max = Math.max(...field_data);
+        container.innerHTML = '';
 
-    container.innerHTML = '';
+        field_data.forEach((value) => {
+            const bar = document.createElement('div');
+            bar.className = [
+                'flex-1',
+                `${colorClass}/20`,
+                'rounded-t-sm',
+                `h-[${value}%]`,
+                `hover:${colorClass}`,
+                'transition-all',
+                'duration-300',
+            ].join(' ');
 
-    data.forEach((value) => {
-        const bar = document.createElement('div');
-        bar.className = [
-            'flex-1',
-            `${colorClass}/20`,
-            'rounded-t-sm',
-            `h-[${value}%]`,
-            `hover:${colorClass}`,
-            'transition-all',
-            'duration-300',
-        ].join(' ');
+            // Inline style fallback (Tailwind JIT won't see dynamic h-[] at runtime)
+            bar.style.height = `${value/max*100}%`;
 
-        // Inline style fallback (Tailwind JIT won't see dynamic h-[] at runtime)
-        bar.style.height = `${value}%`;
+            container.appendChild(bar);
+        });
 
-        container.appendChild(bar);
-    });
+    }catch(error){
+        console.error("Errore nel caricamento:", error);
+        container.innerHTML = '';
+    }
+
 }
 
 async function caricaSogliePianta(nomeId) {
@@ -100,25 +105,10 @@ async function loopPlants() {
     }
     caricaLatestDatoPianta(plantArray[activePlantIndex]);
     caricaSogliePianta(plantArray[activePlantIndex]);
+    renderPlantChart(plantArray[activePlantIndex], "temp", "24d")
 
 }
 
-
-async function caricaDatiPianta(nomeId) {
-    try {
-        // Effettua la chiamata alla tua REST API
-        let response = await fetch(`/api/piante/data/${nomeId}`);
-        
-        if (!response.ok) throw new Error("Pianta non trovata");
-
-        let data = await response.json();
-        console.log(data);
-    }
-    catch (error) {
-        console.error("Errore nel caricamento:", error);
-        document.getElementById('plant-name').innerText = "Errore Caricamento";
-    }
-}
 
 async function caricaLatestDatoPianta(nomeId) {
     try {
@@ -128,7 +118,7 @@ async function caricaLatestDatoPianta(nomeId) {
         if (!response.ok) throw new Error("Pianta non trovata");
 
         let data = await response.json();
-        console.log(data);
+        // console.log(data);
         document.getElementById('plant-temp').innerText = data.temp;
         document.getElementById('plant-hum').innerText = data.hum;
         document.getElementById('plant-lux').innerText = data.klux;
@@ -138,12 +128,17 @@ async function caricaLatestDatoPianta(nomeId) {
     }
 }
 
+function updateYAxis(data) {
+  const max = Math.max(...data);
+  document.getElementById('y-max').textContent = max;
+  document.getElementById('y-mid').textContent = Math.round(max / 2);
+}
+
 /* ── Boot ────────────────────────────────────────────────── */
 document.addEventListener('DOMContentLoaded', () => {
     console.log("Boot avviato...");
-    caricaDatiPianta(plantArray[0]);
     caricaSogliePianta(plantArray[0]);
     caricaLatestDatoPianta(plantArray[0])
-    renderChart(activeDataset);
+    renderPlantChart(plantArray[0], "temp", "24h");
     document.getElementById("plant-loop").addEventListener("click", loopPlants)
 });
