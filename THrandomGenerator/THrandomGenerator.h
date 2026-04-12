@@ -7,6 +7,7 @@ struct WeatherData
 {
   float temperature;
   float humidity;
+  float time;
 };
 
 class THrandomGenerator{

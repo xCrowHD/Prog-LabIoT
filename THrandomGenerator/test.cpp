@@ -8,43 +8,52 @@ int main()
     float tDew = 2.0f;
     float hNoise = 0.2f;
     float tNoise = 0.2f;
-    float theta = 0.5f;
+    float theta = 0.5f; 
 
-    THrandomGenerator generator(tDew, hNoise, tNoise, theta);
+    THrandomGenerator oncePerHour(tDew, hNoise, tNoise, theta);
+    THrandomGenerator twicePerHour(tDew, hNoise, tNoise, theta);
+    THrandomGenerator onceEveryTwoHours(tDew, hNoise, tNoise, theta);
 
     // Parametri ambientali
-    float avgTemp = 19.0f;
-    float excursion = 14.0f;
+    float avgTemp = 7.0f;
+    float excursion = 6.0f;
 
     std::cout << std::fixed << std::setprecision(2);
     std::cout << "--- INIZIO TEST SIMULAZIONE 24 ORE ---" << std::endl;
     std::cout << "Ora\tTemp (C)\tUmidita' (%)\tNota" << std::endl;
     std::cout << "----------------------------------------------------" << std::endl;
 
-    // Simuliamo un campionamento ogni ora per un giorno intero
-    for (int hour = 0; hour <= 24; ++hour)
+    for (int step = 0; step <= 48; ++step)
     {
-        float currentTime = static_cast<float>(hour);
+        // Il tempo deve avanzare di 0.5 ore a ogni step
+        float currentTime = step * 0.5f;
 
-        // Estraiamo il campione
-        WeatherData data = generator.getSample(currentTime, avgTemp, excursion);
+        // Calcolo per la stampa (es. 1.5 ore -> 01:30)
+        int h = static_cast<int>(currentTime);
+        int m = (step % 2 == 0) ? 0 : 30;
 
-        // Aggiungiamo una nota per i punti salienti
-        std::string note = "";
-        if (hour == 2)
-            note = "<-- Minimo Termico Atteso";
-        if (hour == 14)
-            note = "<-- Massimo Termico Atteso";
-        if (hour == 20)
-            note = "<-- Raffreddamento Serale";
+        // 1. Mezz'ora (Sempre)
+        WeatherData d2 = twicePerHour.getSample(currentTime, avgTemp, excursion);
+        std::cout << std::setfill('0') << std::setw(2) << h << ":" << std::setw(2) << m
+                  << "\t" << d2.temperature << "\t" << d2.humidity << "\t[Ogni 30 min]" << std::endl;
 
-        std::cout << hour << ":00\t"
-                  << data.temperature << "\t\t"
-                  << data.humidity << "\t\t"
-                  << note << std::endl;
+        // 2. Ogni Ora (Solo quando step è pari)
+        if (step % 2 == 0)
+        {
+            WeatherData d1 = oncePerHour.getSample(currentTime, avgTemp, excursion);
+            std::cout << std::setw(2) << h << ":00\t" << d1.temperature
+                      << "\t" << d1.humidity << "\t[Ogni Ora]" << std::endl;
+        }
+
+        // 3. Ogni Due Ore (Solo quando step è multiplo di 4)
+        if (step % 4 == 0)
+        {
+            WeatherData d05 = onceEveryTwoHours.getSample(currentTime, avgTemp, excursion);
+            std::cout << std::setw(2) << h << ":00\t" << d05.temperature
+                      << "\t" << d05.humidity << "\t[Ogni 2 Ore]" << std::endl;
+        }
+        std::cout << "----------------------------------------------------" << std::endl;
     }
-
-    std::cout << "----------------------------------------------------" << std::endl;
 
     // --- TEST DI REATTIVITÀ ---
     std::cout << "\n--- TEST REATTIVITA' (Inerzia con theta) ---" << std::endl;
@@ -54,7 +63,7 @@ int main()
     for (int i = 0; i < 10; ++i)
     {
         // Il tempo non avanza, ma il rumore e il drift agiscono
-        WeatherData rapidData = generator.getSample(14.0f, avgTemp, excursion);
+        WeatherData rapidData = oncePerHour.getSample(14.0f, avgTemp, excursion);
         std::cout << "Lettura " << i + 1 << ": T = " << rapidData.temperature << " C" << std::endl;
     }
 

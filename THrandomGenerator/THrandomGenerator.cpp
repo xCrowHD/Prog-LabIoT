@@ -8,40 +8,54 @@ THrandomGenerator::THrandomGenerator(float Tdew, float hNoisyness, float tNoisyn
 {
     unsigned int seed = static_cast<unsigned int>(std::time(nullptr));
     generator.seed(seed);
-    lastWeatherData = {0.0f, 0.0f};
+    lastWeatherData = {0.0f, 0.0f, 0.0f};
 }
 
 WeatherData THrandomGenerator::getSample(float timeOftheDay, float avgTemperature, float dailyExcursion)
 {
     float tClean = this->temperatureCurve(timeOftheDay, avgTemperature, dailyExcursion);
-    
-    float drift = 0.0f;
+    float tMeasured;
+
     if (firstSample)
     {
         firstSample = false;
-        lastWeatherData.temperature = tClean; 
+        tMeasured = this->applicateNoise(tClean, this->tNoisyness);
     }
     else
     {
-        drift = this->theta * (tClean - lastWeatherData.temperature);
-    }
+        float timeDiff = timeOftheDay - lastWeatherData.time;
+        if (timeDiff < 0)
+            timeDiff += 24.0f;
 
-    float tMeasured = this->applicateNoise(tClean + drift, this->tNoisyness);
+        if (timeDiff <= 0.0f) //letture simultanee, nessuna evoluzione, solo rumore
+        {
+            // introduco meno rumore per simulare lettura simultanea, 
+            //altrimenti sarebbe troppo influenzata dal rumore
+            tMeasured = this->applicateNoise(lastWeatherData.temperature, this->tNoisyness/5.0f); 
+        }
+        else
+        {
+            float alpha = std::exp(-this->theta * timeDiff);
+            float tTarget = (lastWeatherData.temperature * alpha) + (tClean * (1.0f - alpha));
+            float theoryNoise = this->tNoisyness * std::sqrt((1.0f - 
+                std::exp(-2.0f * this->theta * timeDiff)) / (2.0f * this->theta));
+
+            tMeasured = this->applicateNoise(tTarget, theoryNoise);
+        }
+    }
     float hClean = this->MagnusTetens(tMeasured);
     float hMeasured = this->applicateNoise(hClean, this->hNoisyness);
 
     if (hMeasured > 100.0f)
         hMeasured = 100.0f;
-    if (hMeasured < 0.0f)
+    else if (hMeasured < 0.0f)
         hMeasured = 0.0f;
 
-    this->lastWeatherData.temperature = tClean;
-    this->lastWeatherData.humidity = hClean;
-    WeatherData data;
-    data.temperature = tMeasured;
-    data.humidity = hMeasured;
+    this->lastWeatherData.temperature = tMeasured;
+    this->lastWeatherData.humidity = hMeasured;
+    this->lastWeatherData.time = timeOftheDay;
     
-    return data;
+    return this->lastWeatherData;
 }
 
 float THrandomGenerator::temperatureCurve(float timeOftheDay, float avgTemperature, float dailyExcursion)
