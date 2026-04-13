@@ -80,12 +80,6 @@ void loop() {
     sendDataToInflux();
   }
   
-  
-  if (flagReadDHT)
-  {
-    flagReadDHT = false;
-    readDHT();
-  }
 }
 
 // DHT functions
