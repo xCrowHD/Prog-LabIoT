@@ -2,7 +2,8 @@
 #include <Ticker.h>
 #include <ESP8266WiFi.h>
 #include <InfluxDbClient.h>
-
+#include <PubSubClient.h>
+#include <ArduinoJson.h>
 #include "secrets.h"
 
 struct TempHum {
@@ -42,6 +43,12 @@ WiFiClient client;
 // InfluxDB cfg
 InfluxDBClient client_idb(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
 
+// MQTT Broker settings
+const char *mqtt_broker = "broker.emqx.io";  // EMQX broker endpoint
+const char *mqtt_topic_threshold = "lab_iot/mafogani/threshold";  // MQTT topic
+const int mqtt_port = 1883;  // MQTT port (TCP)
+PubSubClient mqtt_client(client);
+
 char plantName[30] = "";
 
 void toggleLedRed(int times);
@@ -58,7 +65,8 @@ DHT dht = DHT(DHTPIN, DHTTYPE);
 void setup() {
 
   Serial.begin(115200);
-
+  mqtt_client.setServer(mqtt_broker, mqtt_port);
+  mqtt_client.setCallback(mqttCallback);
   pinMode(LED_RED, OUTPUT);
   pinMode(LED_GREEN, OUTPUT);
   pinMode(LED_BLUE, OUTPUT);
@@ -74,12 +82,17 @@ void setup() {
 void loop() {
 
   long rssi_strength = connectToWiFi();
+  if (!mqtt_client.connected()) {
+    reconnectMQTT();
+  }
+  mqtt_client.loop();
+
   if (flagWriteInflux)
   {
     flagWriteInflux = false;
     sendDataToInflux();
   }
-  
+
 }
 
 // DHT functions
@@ -228,4 +241,53 @@ int readPR(){
     return -1;
   }
   return lightSensorValue;
+}
+
+// MQTT
+void reconnectMQTT() {
+  while (!mqtt_client.connected()) {
+    Serial.print("Tentativo connessione MQTT...");
+    // Tenta di connettersi con un ID univoco
+    if (mqtt_client.connect("ESP8266_Serra_Client")) {
+      Serial.println("Connesso!");
+      mqtt_client.subscribe(mqtt_topic_threshold);
+    } else {
+      delay(250);
+    }
+  }
+}
+
+void mqttCallback(char *topic, byte *payload, unsigned int length) {
+    Serial.print("Message received on topic: ");
+    Serial.println(topic);
+
+  if (strcmp(topic, mqtt_topic_threshold) == 0){
+    setThresholds(payload, length);
+  }
+  else{
+    Serial.print("Message:");
+
+    for (unsigned int i = 0; i < length; i++) {
+      Serial.print((char) payload[i]);
+    }
+
+    Serial.println();
+    Serial.println("-----------------------");
+  }
+}
+
+void setThresholds(byte *payload, unsigned int length){
+  StaticJsonDocument<256> doc;
+
+  DeserializationError error = deserializeJson(doc, payload, length);
+
+  if (error) {
+    Serial.print(F("Errore parsing JSON: "));
+    Serial.println(error.f_str());
+    return;
+  }
+
+  float t_max = doc["temp_max"];
+  int h_min   = doc["hum_min"];
+  const char* nome = doc["pianta"];
 }

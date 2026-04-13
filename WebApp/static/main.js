@@ -74,7 +74,7 @@ async function caricaSogliePianta(nomeId) {
         if (!response.ok) throw new Error("Pianta non trovata");
 
         let data = await response.json();
-        console.log(data)
+        console.log(data);
         let soglie = data.thresholds;
 
         // Aggiorna l'HTML con i dati ricevuti
@@ -105,7 +105,7 @@ async function loopPlants() {
     }
     caricaLatestDatoPianta(plantArray[activePlantIndex]);
     caricaSogliePianta(plantArray[activePlantIndex]);
-    renderPlantChart(plantArray[activePlantIndex], "temp", "24d")
+    renderPlantChart(plantArray[activePlantIndex], "temp", "30d")
 
 }
 
@@ -128,6 +128,18 @@ async function caricaLatestDatoPianta(nomeId) {
     }
 }
 
+async function syncMQTTSoglie() {
+    try {
+        // Effettua la chiamata alla tua REST API
+        let response = await fetch(`/api/piante/syncmqtt/${plantArray[activePlantIndex]}`);
+        
+        if (!response.ok) throw new Error("Pianta non trovata");
+    }
+    catch (error) {
+        console.error("Errore:", error);
+    }
+}
+
 function updateYAxis(data) {
   const max = Math.max(...data);
   document.getElementById('y-max').textContent = max;
@@ -139,6 +151,7 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log("Boot avviato...");
     caricaSogliePianta(plantArray[0]);
     caricaLatestDatoPianta(plantArray[0])
-    renderPlantChart(plantArray[0], "temp", "24h");
-    document.getElementById("plant-loop").addEventListener("click", loopPlants)
+    renderPlantChart(plantArray[0], "temp", "30d");
+    document.getElementById("plant-loop").addEventListener("click", loopPlants);
+    document.getElementById("sync-mqtt").addEventListener("click", syncMQTTSoglie);
 });
