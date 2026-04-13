@@ -42,15 +42,13 @@ WiFiClient client;
 // InfluxDB cfg
 InfluxDBClient client_idb(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
 
-char plantName[30] = ""
+char plantName[30] = "";
 
 void toggleLedRed(int times);
 
-Ticker tickerDHT;
 Ticker tickerBlink;   
 Ticker writeToInflux;
 
-volatile bool flagReadDHT = false;
 volatile bool flagWriteInflux = false;
 int blinkRemaining = 0;
 int currentBlinkPin = -1;
@@ -69,8 +67,7 @@ void setup() {
 
   dht.begin();
 
-  tickerDHT.attach(2.5, []() { flagReadDHT = true; });
-  //writeToInflux.attach(2.5, []() { flagWriteInflux = true; });
+  writeToInflux.attach(5.0, []() { flagWriteInflux = true; });
 
 }
 
@@ -102,7 +99,7 @@ TempHum readDHT()
     Serial.println(F("Failed to read from DHT sensor!"));
     startBlink(LED_RED, 2);
     data.valid = false;
-    return ;
+    return data;
   }
   
   Serial.print(F("\nHumidity: "));
@@ -165,14 +162,9 @@ void sendDataToInflux() {
     return;
   }
 
-  if (!dataReadings.hasFields()) {
-    Serial.println(F("No data to send"));
-    return;
-  }
-
   Serial.print(F("Sending to InfluxDB... "));
 
-  Point dataReadings("Serra");
+  Point sensorData("Serra");
   sensorData.addTag("device", "NodeMCU");
   sensorData.addTag("pianta", plantName);
 
@@ -196,7 +188,7 @@ void sendDataToInflux() {
   sensorData.addField("lux", pr);
   sensorData.addField("rssi", rssi);
 
-  if (client_idb.writePoint(dataReadings)) {
+  if (client_idb.writePoint(sensorData)) {
     startBlink(LED_BLUE, 1);
   } else {
     Serial.println(client_idb.getLastErrorMessage());
