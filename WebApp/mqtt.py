@@ -26,6 +26,9 @@ class MQTTManager:
         # Supponiamo che l'ESP mandi "online" o "offline"
         self.is_esp_online = (payload.lower() == "online")
         print(f"[MQTT] Stato ESP aggiornato: {self.is_esp_online}")
+    
+    def send_thresholds(self, str_payload):
+        self.client.publish(TOPIC_SET_ESP_THRESHOLD, str_payload)
 
 
     

@@ -68,7 +68,18 @@ async def get_soglie_pianta(nome_pianta: str):
     if pianta:
         return pianta
     
-    raise HTTPException(status_code=404, detail="Pianta non trovata nel database")
+
+@app.get("/api/piante/syncmqtt/{nome_pianta}")
+async def sync_mqtt(nome_pianta: str):
+    pianta = PLANT_DATABASE.get(nome_pianta)
+    
+    if pianta:
+        payload = {
+            "name": nome_pianta,
+            "thresholds": pianta.get("thresholds")
+        }
+        json_string = json.dumps(payload)
+        mqtt_hub.send_thresholds(json_string)
 
 
 @app.get("/api/piante/data/{nome_pianta}/{last_time}")
