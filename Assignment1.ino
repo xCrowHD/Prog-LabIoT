@@ -5,13 +5,22 @@
 
 #include "secrets.h"
 
+struct TempHum {
+  float temperatura;
+  float umidita;
+  bool valid;
+};
+
 // DHT sensor
 #define DHTPIN D7     // sensor I/O pin, eg. D1 (DO NOT USE D0 or D4! see above notes)
 #define DHTTYPE DHT11  // sensor type DHT 11
 
+// Photoresistor
+#define PHOTORESISTOR A0 
+
 // LED RGB
-#define LED_RED D5   // In conflitto con DHT, usare switch o cambiare pin
-#define LED_GREEN D2
+#define LED_RED D8   // In conflitto con DHT, usare switch o cambiare pin
+#define LED_GREEN D6
 #define LED_BLUE D3
 
 // Influx settings
@@ -32,9 +41,8 @@ WiFiClient client;
 
 // InfluxDB cfg
 InfluxDBClient client_idb(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
-Point pointDevice("device_status");// Per ora non ci interessa, faremo poi
-Point DHTreadings("sensor_data");
 
+char plantName[30] = ""
 
 void toggleLedRed(int times);
 
@@ -61,25 +69,20 @@ void setup() {
 
   dht.begin();
 
-  DHTreadings.addTag("device", "ESP8266_NodeMCU");
-  DHTreadings.addTag("sensor_type", "DHT11");
-
   tickerDHT.attach(2.5, []() { flagReadDHT = true; });
-  writeToInflux.attach(2.5, []() { flagWriteInflux = true; });
+  //writeToInflux.attach(2.5, []() { flagWriteInflux = true; });
 
 }
 
 void loop() {
 
   long rssi_strength = connectToWiFi();
-  if (rssi_strength > RSSI_THRESHOLD) {
-    check_influxdb();
-    if (flagWriteInflux)
-    {
+  if (flagWriteInflux)
+  {
     flagWriteInflux = false;
     sendDataToInflux();
-    }
   }
+  
   
   if (flagReadDHT)
   {
@@ -89,24 +92,28 @@ void loop() {
 }
 
 // DHT functions
-void readDHT()
+TempHum readDHT()
 {
   float h = dht.readHumidity();      // humidity percentage, range 20-80% (±5% accuracy)
   float t = dht.readTemperature();   // temperature Celsius, range 0-50°C (±2°C accuracy)
+  TempHum data;
   if (isnan(h) || isnan(t)) 
   {   // readings failed, skip
     Serial.println(F("Failed to read from DHT sensor!"));
     startBlink(LED_RED, 2);
+    data.valid = false;
     return ;
   }
-  /*
-  Serial.print(F("Humidity: "));
+  
+  Serial.print(F("\nHumidity: "));
   Serial.print(h);
   Serial.print(F("%  Temperature: "));
-  Serial.print(t);*/
+  Serial.print(t);
 
-  DHTreadings.addField("Temperature", t);
-  DHTreadings.addField("Humidity", h);
+  data.temperatura = t;
+  data.umidita = h;
+  data.valid = true;
+  return data;
 }
 
 //LED functions
@@ -138,26 +145,58 @@ void toggleLedBlue() {
 
 // Influx DB operations
 
-void check_influxdb() {
+bool check_influxdb() {
   // check InfluxDB server connection
   if (client_idb.validateConnection()) {
     Serial.print(F("Connected to InfluxDB: "));
     Serial.println(client_idb.getServerUrl());
+    return true;
   } else {
     Serial.print(F("InfluxDB connection failed: "));
     Serial.println(client_idb.getLastErrorMessage());
+    return false;
   }
 }
 
 void sendDataToInflux() {
 
-  if (!DHTreadings.hasFields()) {
+  if (!check_influxdb()){
+    Serial.println(F("Not Connected To InfluxDB"));
+    return;
+  }
+
+  if (!dataReadings.hasFields()) {
     Serial.println(F("No data to send"));
     return;
   }
 
   Serial.print(F("Sending to InfluxDB... "));
-  if (client_idb.writePoint(DHTreadings)) {
+
+  Point dataReadings("Serra");
+  sensorData.addTag("device", "NodeMCU");
+  sensorData.addTag("pianta", plantName);
+
+  TempHum dht = readDHT();
+  if(!dht.valid){
+    return;
+  }
+
+  int pr = readPR();
+  if ( pr == -1){
+    return;
+  }
+
+  long rssi = connectToWiFi();
+  if(rssi < RSSI_THRESHOLD){
+    return;
+  }
+
+  sensorData.addField("temp", dht.temperatura);
+  sensorData.addField("hum", dht.umidita);
+  sensorData.addField("lux", pr);
+  sensorData.addField("rssi", rssi);
+
+  if (client_idb.writePoint(dataReadings)) {
     startBlink(LED_BLUE, 1);
   } else {
     Serial.println(client_idb.getLastErrorMessage());
@@ -190,4 +229,17 @@ long connectToWiFi() {
   }
 
   return rssi_strength;
+}
+
+int readPR(){
+  
+  static unsigned int lightSensorValue;
+
+  lightSensorValue = analogRead(PHOTORESISTOR);   // read analog value (range 0-1023)
+  Serial.print(F("Light sensor value: "));
+  Serial.println(lightSensorValue);
+  if ( lightSensorValue == 0){
+    return -1;
+  }
+  return lightSensorValue;
 }
