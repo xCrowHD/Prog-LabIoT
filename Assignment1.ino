@@ -6,7 +6,7 @@
 #include "secrets.h"
 
 // DHT sensor
-#define DHTPIN D1     // sensor I/O pin, eg. D1 (DO NOT USE D0 or D4! see above notes)
+#define DHTPIN D7     // sensor I/O pin, eg. D1 (DO NOT USE D0 or D4! see above notes)
 #define DHTTYPE DHT11  // sensor type DHT 11
 
 // LED RGB
