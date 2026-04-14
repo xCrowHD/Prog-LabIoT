@@ -1,16 +1,24 @@
 #include <DHT.h>
+#include <LiquidCrystal_I2C.h>   // display library
+#include <Wire.h>                // I2C library
+
 #include <Ticker.h>
 #include <ESP8266WiFi.h>
+
 #include <InfluxDbClient.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
-#include "secrets.h"
 
-struct TempHum {
-  float temperatura;
-  float umidita;
-  bool valid;
-};
+#include "secrets.h"
+#include "THrandomGenerator/THrandomGenerator.h" //Vediamo se tenere o no. Contiene WeatherData e serve per test sui sensori
+
+// Button
+#define BUTTON D4 //Messo un numero a caso per farlo compilare
+
+// Display 
+#define DISPLAY_CHARS 16    // number of characters on a line
+#define DISPLAY_LINES 2     // number of display lines
+#define DISPLAY_ADDR 0x27   // display address on I2C bus
 
 // DHT sensor
 #define DHTPIN D7     // sensor I/O pin, eg. D1 (DO NOT USE D0 or D4! see above notes)
@@ -24,12 +32,11 @@ struct TempHum {
 #define LED_GREEN D6
 #define LED_BLUE D3
 
-// Influx settings
+// Influx 
 #define LED_ONBOARD LED_BUILTIN_AUX   // D0, LED on the development board (between the ESP module and the USB port)  https://github.com/nodemcu/nodemcu-devkit-v1.0/blob/master/NODEMCU_DEVKIT_V1.0.PDF
 #define RSSI_THRESHOLD -60 
 
 // WiFi config
-
 char ssid[] = SECRET_SSID;   // your network SSID (name)
 char pass[] = SECRET_PASS;   // your network password
 #ifdef IP
@@ -43,15 +50,19 @@ WiFiClient client;
 // InfluxDB cfg
 InfluxDBClient client_idb(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
 
-// MQTT Broker settings
+// Display cfg
+LiquidCrystal_I2C lcd(DISPLAY_ADDR, DISPLAY_CHARS, DISPLAY_LINES); 
+
+// DHT config
+DHT dht = DHT(DHTPIN, DHTTYPE);
+
+// MQTT Broker config
 const char *mqtt_broker = "broker.emqx.io";  // EMQX broker endpoint
 const char *mqtt_topic_threshold = "lab_iot/mafogani/threshold";  // MQTT topic
 const int mqtt_port = 1883;  // MQTT port (TCP)
 PubSubClient mqtt_client(client);
 
 char plantName[30] = "";
-
-void toggleLedRed(int times);
 
 Ticker tickerBlink;   
 Ticker writeToInflux;
@@ -60,7 +71,7 @@ volatile bool flagWriteInflux = false;
 int blinkRemaining = 0;
 int currentBlinkPin = -1;
 
-DHT dht = DHT(DHTPIN, DHTTYPE);
+void displayLCDconfig();
 
 void setup() {
 
@@ -73,14 +84,32 @@ void setup() {
 
   ledOff();
 
+  Wire.begin();
+  Wire.beginTransmission(DISPLAY_ADDR);
+  byte error = Wire.endTransmission();
+
+  if (error == 0) {
+    Serial.println(F("LCD found."));
+    lcd.begin(DISPLAY_CHARS, 2);   
+    displayLCDconfig();
+
+  } else {
+    Serial.print(F("LCD not found. Error "));
+    Serial.println(error);
+    Serial.println(F("Check connections and configuration. Reset to try again!"));
+    while (true)
+      delay(1);
+  }
+
   dht.begin();
 
   writeToInflux.attach(5.0, []() { flagWriteInflux = true; });
 
+  Serial.println("\nSetup completed!\n");
 }
 
 void loop() {
-
+  static WeatherData dataToSend;
   long rssi_strength = connectToWiFi();
   if (!mqtt_client.connected()) {
     reconnectMQTT();
@@ -90,21 +119,56 @@ void loop() {
   if (flagWriteInflux)
   {
     flagWriteInflux = false;
-    sendDataToInflux();
+    dataToSend = readDHT();
+    sendDataToInflux(dataToSend);
+    showDataOnDisplay(dataToSend);
   }
+}
 
+// Display
+void displayLCDconfig(){
+  static float time = millis();
+  lcd.setBacklight(255);    // set backlight to maximum
+    lcd.home();               // move cursor to 0,0
+    lcd.clear();              // clear text
+    lcd.print("Hello LCD");   // show text
+    while(time - millis()<1000);
+    lcd.clear();
+    lcd.setCursor(0,0);
+}
+
+void showDataOnDisplay(WeatherData data)
+{
+  float t = data.temperature;
+  float h = data.humidity;
+  float hic = dht.computeHeatIndex(t, h, false);
+  //float l = valore fotoresistore
+
+  lcd.setCursor(0, 0);
+  lcd.print("H: ");
+  lcd.print(int(h));
+  lcd.print("% T:");
+  lcd.print(int(t));
+  lcd.print(" C");
+  lcd.setCursor(0, 1);
+  lcd.print("A.temp: ");   // the temperature perceived by humans (takes into account humidity)
+  lcd.print(hic);
+  lcd.print(" C");
+  /*lcd.print("L:");
+  lcd.print(int(l));
+  lcd.print("/1023"); */
 }
 
 // DHT functions
-TempHum readDHT()
+WeatherData readDHT()
 {
   float h = dht.readHumidity();      // humidity percentage, range 20-80% (±5% accuracy)
   float t = dht.readTemperature();   // temperature Celsius, range 0-50°C (±2°C accuracy)
-  TempHum data;
+  WeatherData data;
   if (isnan(h) || isnan(t)) 
   {   // readings failed, skip
     Serial.println(F("Failed to read from DHT sensor!"));
-    startBlink(LED_RED, 2);
+    startBlink(LED_RED, 3);
     data.valid = false;
     return data;
   }
@@ -114,8 +178,9 @@ TempHum readDHT()
   Serial.print(F("%  Temperature: "));
   Serial.print(t);
 
-  data.temperatura = t;
-  data.umidita = h;
+  data.temperature = t;
+  data.humidity= h;
+  //data.time = ?
   data.valid = true;
   return data;
 }
@@ -143,10 +208,6 @@ void handleBlink() {
   }
 }
 
-void toggleLedBlue() {
-  digitalWrite(LED_BLUE, !digitalRead(LED_BLUE));
-}
-
 // Influx DB operations
 
 bool check_influxdb() {
@@ -162,7 +223,7 @@ bool check_influxdb() {
   }
 }
 
-void sendDataToInflux() {
+void sendDataToInflux(WeatherData dht) {
 
   if (!check_influxdb()){
     Serial.println(F("Not Connected To InfluxDB"));
@@ -171,11 +232,6 @@ void sendDataToInflux() {
 
   Serial.print(F("Sending to InfluxDB... "));
 
-  Point sensorData("Serra");
-  sensorData.addTag("device", "NodeMCU");
-  sensorData.addTag("pianta", plantName);
-
-  TempHum dht = readDHT();
   if(!dht.valid){
     return;
   }
@@ -190,8 +246,11 @@ void sendDataToInflux() {
     return;
   }
 
-  sensorData.addField("temp", dht.temperatura);
-  sensorData.addField("hum", dht.umidita);
+  Point sensorData("Serra");
+  sensorData.addTag("device", "NodeMCU");
+  sensorData.addTag("pianta", plantName); // crerei l'intero record dopo i controlli per evitare di salvare da qualche parte record incompleti
+  sensorData.addField("temp", dht.temperature);
+  sensorData.addField("hum", dht.humidity);
   sensorData.addField("lux", pr);
   sensorData.addField("rssi", rssi);
 
@@ -230,6 +289,7 @@ long connectToWiFi() {
   return rssi_strength;
 }
 
+// Phororesistor
 int readPR(){
   
   static unsigned int lightSensorValue;
