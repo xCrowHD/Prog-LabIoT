@@ -128,6 +128,20 @@ async function caricaLatestDatoPianta(nomeId) {
     }
 }
 
+async function selectTabPlantField() {
+    const tabs = document.querySelectorAll('#chart-field-tabs span');
+    tabs.forEach( t => {
+        t.classList.remove("border", "border-primary/20");
+        t.classList.replace("bg-surface-container-highest", "bg-surface-container-lowest");
+        t.classList.replace("text-primary", "text-on-surface-variant");
+    });
+
+    this.classList.add("border", "border-primary/20");
+    this.classList.replace("bg-surface-container-lowest", "bg-surface-container-highest");
+    this.classList.replace("text-on-surface-variant", "text-primary");
+
+}
+
 async function syncMQTTSoglie() {
     try {
         // Effettua la chiamata alla tua REST API
@@ -154,4 +168,8 @@ document.addEventListener('DOMContentLoaded', () => {
     renderPlantChart(plantArray[0], "temp", "30d");
     document.getElementById("plant-loop").addEventListener("click", loopPlants);
     document.getElementById("sync-mqtt").addEventListener("click", syncMQTTSoglie);
+    const tabs = document.querySelectorAll('#chart-field-tabs span');
+    tabs.forEach(tab => {
+        tab.addEventListener("click", selectTabPlantField);
+    });
 });

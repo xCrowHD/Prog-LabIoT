@@ -200,10 +200,10 @@
                 <div class="md:col-span-8 bg-surface-container-high rounded-xl p-8 overflow-hidden">
                 <div class="flex justify-between items-center mb-8">
                     <h3 class="font-headline text-xl font-bold text-on-surface">Telemetry 24h Cycles</h3>
-                    <div class="flex gap-2">
-                    <span class="px-3 py-1 bg-surface-container-highest rounded text-[10px] font-bold text-primary border border-primary/20 cursor-pointer">TEMP</span>
-                    <span class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer">HUM</span>
-                    <span class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer">LUX</span>
+                    <div id="chart-field-tabs" class="flex gap-2">
+                        <span data-field="temp" class="px-3 py-1 bg-surface-container-highest rounded text-[10px] font-bold text-primary border border-primary/20 cursor-pointer">TEMP</span>
+                        <span data-field="hum" class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer">HUM</span>
+                        <span data-field="lux" class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer">LUX</span>
                     </div>
                 </div>
 
