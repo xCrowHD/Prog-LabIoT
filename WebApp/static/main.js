@@ -8,12 +8,15 @@ console.log("DEBUG: File main.js caricato!");
    ─────────────────────────────────────────────────────────── */
 
 /* Active Plant */
-let activePlantIndex = 0
+let activePlantIndex = 0;
 let plantArray = [
     "monstera_albo",
     "nepenthes_rajah",
     "ghost_orchid"
 ]
+
+let activeField = "temp";
+let activeTime = "24h";
 
 /* Color map per dataset */
 const COLOR_MAP = {
@@ -37,6 +40,11 @@ async function renderPlantChart(plantid, field, lastTime) {
         const colorClass = COLOR_MAP[field];
 
         let field_data = data.map(record => record[field]);
+
+        if (field_data.length == 0){
+            return;
+        }
+
         updateYAxis(field_data);
         const max = Math.max(...field_data);
         container.innerHTML = '';
@@ -105,7 +113,7 @@ async function loopPlants() {
     }
     caricaLatestDatoPianta(plantArray[activePlantIndex]);
     caricaSogliePianta(plantArray[activePlantIndex]);
-    renderPlantChart(plantArray[activePlantIndex], "temp", "30d")
+    renderPlantChart(plantArray[activePlantIndex], activeField, activeTime);
 
 }
 
@@ -139,6 +147,24 @@ async function selectTabPlantField() {
     this.classList.add("border", "border-primary/20");
     this.classList.replace("bg-surface-container-lowest", "bg-surface-container-highest");
     this.classList.replace("text-on-surface-variant", "text-primary");
+    activeField = this.getAttribute("data-field");
+    renderPlantChart(plantArray[activePlantIndex], activeField, activeTime);
+
+}
+
+async function selectTabPlantTime() {
+    const tabs = document.querySelectorAll('#chart-time-tabs span');
+    tabs.forEach( t => {
+        t.classList.remove("border", "border-primary/20");
+        t.classList.replace("bg-surface-container-highest", "bg-surface-container-lowest");
+        t.classList.replace("text-primary", "text-on-surface-variant");
+    });
+
+    this.classList.add("border", "border-primary/20");
+    this.classList.replace("bg-surface-container-lowest", "bg-surface-container-highest");
+    this.classList.replace("text-on-surface-variant", "text-primary");
+    activeTime = this.getAttribute("data-field");
+    renderPlantChart(plantArray[activePlantIndex], activeField, activeTime);
 
 }
 
@@ -165,11 +191,15 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log("Boot avviato...");
     caricaSogliePianta(plantArray[0]);
     caricaLatestDatoPianta(plantArray[0])
-    renderPlantChart(plantArray[0], "temp", "30d");
+    renderPlantChart(plantArray[0], activeField, activeTime);
     document.getElementById("plant-loop").addEventListener("click", loopPlants);
     document.getElementById("sync-mqtt").addEventListener("click", syncMQTTSoglie);
-    const tabs = document.querySelectorAll('#chart-field-tabs span');
-    tabs.forEach(tab => {
+    const ftabs = document.querySelectorAll('#chart-field-tabs span');
+    ftabs.forEach(tab => {
         tab.addEventListener("click", selectTabPlantField);
+    });
+    const ttabs = document.querySelectorAll('#chart-time-tabs span');
+    ttabs.forEach(tab => {
+        tab.addEventListener("click", selectTabPlantTime);
     });
 });
