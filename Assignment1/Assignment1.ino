@@ -10,9 +10,37 @@
 #include <ArduinoJson.h>
 
 #include "secrets.h"
-#include "THrandomGenerator/THrandomGenerator.h" //Vediamo se tenere o no. Contiene WeatherData e serve per test sui sensori
+
+// Struct 
+struct WeatherData{
+  float temperature;
+  float humidity;
+  float hic;
+  float light;
+  bool valid;
+};
+
+struct Thresholds{
+  float tMin;
+  float tMax;
+  float hMin;
+  float hMax;
+  float lMin;
+  float lMax;
+};
+
+
+struct AlarmStatus{
+  bool dhtError = false;
+  bool lightError = false;
+  bool silenced = false;
+};
+
+enum AlarmType {NONE, ALL_OK, THRESHOLDS_OUT, SENSOR_ERROR};
+
 
 // Button
+AlarmStatus currentAlarm;
 #define BUTTON D4 //Messo un numero a caso per farlo compilare
 
 // Display 
@@ -28,7 +56,7 @@
 #define PHOTORESISTOR A0 
 
 // LED RGB
-#define LED_RED D8   // In conflitto con DHT, usare switch o cambiare pin
+#define LED_RED D8   // D8 attaccato a ground! potrebbe causare errori
 #define LED_GREEN D6
 #define LED_BLUE D3
 
@@ -51,7 +79,7 @@ WiFiClient client;
 InfluxDBClient client_idb(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
 
 // Display cfg
-LiquidCrystal_I2C lcd(DISPLAY_ADDR, DISPLAY_CHARS, DISPLAY_LINES); 
+LiquidCrystal_I2C lcd(DISPLAY_ADDR, DISPLAY_CHARS, DISPLAY_LINES);
 
 // DHT config
 DHT dht = DHT(DHTPIN, DHTTYPE);
@@ -71,6 +99,10 @@ volatile bool flagWriteInflux = false;
 int blinkRemaining = 0;
 int currentBlinkPin = -1;
 
+AlarmType lastAlarmType = NONE;
+bool alarmSilenced = false;
+Thresholds ts; //Non mi piace threshold globale, ma per ora teniamo così e vediamo se funziona
+
 void displayLCDconfig();
 
 void setup() {
@@ -85,64 +117,82 @@ void setup() {
   ledOff();
 
   Wire.begin();
-  Wire.beginTransmission(DISPLAY_ADDR);
-  byte error = Wire.endTransmission();
+  bool lcdFound = false;
+  int trials = 0;
+  
+  while (!lcdFound) {
+    Wire.beginTransmission(DISPLAY_ADDR);
+    byte error = Wire.endTransmission();
 
-  if (error == 0) {
-    Serial.println(F("LCD found."));
-    lcd.begin(DISPLAY_CHARS, 2);   
-    displayLCDconfig();
+    if (error == 0) {
+      Serial.println(F("LCD found!"));
+      lcd.begin(DISPLAY_CHARS, 2);
+      displayLCDconfig();
+      lcdFound = true;
+    } else {
+      trials++;
+      Serial.print(F("LCD not found (error "));
+      Serial.print(error);
+      Serial.print(F("). Trial n. "));
+      Serial.println(trials);
+      
+      for(int i = 0; i < 10; i++) {
+        delay(100); 
+        yield(); 
+      }
+    }
 
-  } else {
-    Serial.print(F("LCD not found. Error "));
-    Serial.println(error);
-    Serial.println(F("Check connections and configuration. Reset to try again!"));
-    while (true)
-      delay(1);
+    if (trials % 10 == 0 && !lcdFound) {
+       startBlink(LED_RED, 5);
+       lcdFound = true; 
+       Serial.println(F("LCD not found. Continuing without it!")); 
+    }
   }
 
   dht.begin();
 
   writeToInflux.attach(5.0, []() { flagWriteInflux = true; });
-
   Serial.println("\nSetup completed!\n");
 }
 
 void loop() {
   static WeatherData dataToSend;
-  long rssi_strength = connectToWiFi();
+  connectToWiFi();
+  
   if (!mqtt_client.connected()) {
     reconnectMQTT();
   }
+
   mqtt_client.loop();
 
   if (flagWriteInflux)
   {
     flagWriteInflux = false;
-    dataToSend = readDHT();
+    dataToSend.valid = true;
+    readDHT(dataToSend);
+    readPR(dataToSend);
     sendDataToInflux(dataToSend);
     showDataOnDisplay(dataToSend);
+    updateLEDStatus(dataToSend, ts); 
   }
 }
 
 // Display
-void displayLCDconfig(){
-  static float time = millis();
-  lcd.setBacklight(255);    // set backlight to maximum
-    lcd.home();               // move cursor to 0,0
-    lcd.clear();              // clear text
-    lcd.print("Hello LCD");   // show text
-    while(time - millis()<1000);
-    lcd.clear();
-    lcd.setCursor(0,0);
+void displayLCDconfig() {
+  lcd.setBacklight(255);
+  lcd.home();
+  lcd.clear();
+  lcd.print("Hello LCD!");
+  delay(1000); // Nel setup il delay è accettabile e più sicuro
+  lcd.clear();
 }
 
-void showDataOnDisplay(WeatherData data)
+void showDataOnDisplay(WeatherData &data)
 {
   float t = data.temperature;
   float h = data.humidity;
-  float hic = dht.computeHeatIndex(t, h, false);
-  //float l = valore fotoresistore
+  float hic = data.hic;
+  float l = data.light;
 
   lcd.setCursor(0, 0);
   lcd.print("H: ");
@@ -154,58 +204,29 @@ void showDataOnDisplay(WeatherData data)
   lcd.print("A.temp: ");   // the temperature perceived by humans (takes into account humidity)
   lcd.print(hic);
   lcd.print(" C");
-  /*lcd.print("L:");
+  lcd.print("L:");
   lcd.print(int(l));
-  lcd.print("/1023"); */
+  lcd.print("/1023"); 
 }
 
 // DHT functions
-WeatherData readDHT()
+void readDHT(WeatherData &data)
 {
   float h = dht.readHumidity();      // humidity percentage, range 20-80% (±5% accuracy)
   float t = dht.readTemperature();   // temperature Celsius, range 0-50°C (±2°C accuracy)
-  WeatherData data;
   if (isnan(h) || isnan(t)) 
-  {   // readings failed, skip
+  {   
     Serial.println(F("Failed to read from DHT sensor!"));
-    startBlink(LED_RED, 3);
+    startBlink(LED_RED  , 3);
     data.valid = false;
-    return data;
+    return;
   }
-  
-  Serial.print(F("\nHumidity: "));
-  Serial.print(h);
-  Serial.print(F("%  Temperature: "));
-  Serial.print(t);
 
   data.temperature = t;
   data.humidity= h;
-  //data.time = ?
-  data.valid = true;
-  return data;
-}
+  data.hic = dht.computeHeatIndex(t, h, false);
 
-//LED functions
-void ledOff() {
-  digitalWrite(LED_RED, LOW);
-  digitalWrite(LED_GREEN, LOW);
-  digitalWrite(LED_BLUE, LOW);
-}
-
-void startBlink(int pin, int count) {
-  currentBlinkPin = pin;
-  blinkRemaining = count * 2; 
-  tickerBlink.attach(0.2, handleBlink);
-}
-
-void handleBlink() {
-  if (blinkRemaining > 0) {
-    digitalWrite(currentBlinkPin, !digitalRead(currentBlinkPin));
-    blinkRemaining--;
-  } else {
-    tickerBlink.detach();
-    digitalWrite(currentBlinkPin, LOW);
-  }
+  return;
 }
 
 // Influx DB operations
@@ -223,45 +244,28 @@ bool check_influxdb() {
   }
 }
 
-void sendDataToInflux(WeatherData dht) {
+void sendDataToInflux(WeatherData &data) {
+  // Invece di validare la connessione ogni volta, 
+  // controlliamo solo se il Wi-Fi è attivo
+  if (WiFi.status() != WL_CONNECTED || !data.valid) return;
 
-  if (!check_influxdb()){
-    Serial.println(F("Not Connected To InfluxDB"));
-    return;
-  }
-
-  Serial.print(F("Sending to InfluxDB... "));
-
-  if(!dht.valid){
-    return;
-  }
-
-  int pr = readPR();
-  if ( pr == -1){
-    return;
-  }
-
-  long rssi = connectToWiFi();
-  if(rssi < RSSI_THRESHOLD){
-    return;
-  }
-
-  Point sensorData("Serra");
+  Point sensorData("Greenhouse");
   sensorData.addTag("device", "NodeMCU");
-  sensorData.addTag("pianta", plantName); // crerei l'intero record dopo i controlli per evitare di salvare da qualche parte record incompleti
-  sensorData.addField("temp", dht.temperature);
-  sensorData.addField("hum", dht.humidity);
-  sensorData.addField("lux", pr);
-  sensorData.addField("rssi", rssi);
+  sensorData.addTag("plant", (plantName[0] == '\0') ? "Unknown" : plantName);
+  
+  sensorData.addField("temp", data.temperature);
+  sensorData.addField("hum", data.humidity);
+  sensorData.addField("lux", data.light);
+  sensorData.addField("rssi", WiFi.RSSI());
 
   if (client_idb.writePoint(sensorData)) {
     startBlink(LED_BLUE, 1);
   } else {
+    Serial.print(F("InfluxDB Error: "));
     Serial.println(client_idb.getLastErrorMessage());
     startBlink(LED_RED, 1);
   }
 }
-
 // WiFi connection
 
 long connectToWiFi() {
@@ -290,29 +294,27 @@ long connectToWiFi() {
 }
 
 // Phororesistor
-int readPR(){
-  
-  static unsigned int lightSensorValue;
-
-  lightSensorValue = analogRead(PHOTORESISTOR);   // read analog value (range 0-1023)
+void readPR(WeatherData &data)
+{
+  data.light = analogRead(PHOTORESISTOR);   // read analog value (range 0-1023)
   Serial.print(F("Light sensor value: "));
-  Serial.println(lightSensorValue);
-  if ( lightSensorValue == 0){
-    return -1;
-  }
-  return lightSensorValue;
+  Serial.println(data.light);
 }
+
 
 // MQTT
 void reconnectMQTT() {
-  while (!mqtt_client.connected()) {
-    Serial.print("Tentativo connessione MQTT...");
-    // Tenta di connettersi con un ID univoco
+  static unsigned long lastRetry = 0;
+  if (!mqtt_client.connected() && (millis() - lastRetry > 5000)) {
+    lastRetry = millis();
+    Serial.print("Attempting MQTT connection...");
     if (mqtt_client.connect("ESP8266_Serra_Client")) {
-      Serial.println("Connesso!");
+      Serial.println("Connected!");
       mqtt_client.subscribe(mqtt_topic_threshold);
     } else {
-      delay(250);
+      Serial.print("failed, rc=");
+      Serial.print(mqtt_client.state());
+      Serial.println(" try again in 5 seconds");
     }
   }
 }
@@ -336,18 +338,118 @@ void mqttCallback(char *topic, byte *payload, unsigned int length) {
   }
 }
 
-void setThresholds(byte *payload, unsigned int length){
+void setThresholds(byte *payload, unsigned int length) {
   StaticJsonDocument<256> doc;
-
   DeserializationError error = deserializeJson(doc, payload, length);
 
   if (error) {
-    Serial.print(F("Errore parsing JSON: "));
+    Serial.print(F("JSON errore parsing "));
     Serial.println(error.f_str());
     return;
   }
 
-  float t_max = doc["temp_max"];
-  int h_min   = doc["hum_min"];
-  const char* nome = doc["pianta"];
+  ts.tMin = doc["temp_min"] | ts.tMin;
+  ts.tMax = doc["temp_max"] | ts.tMax;
+  ts.hMin = doc["hum_min"] | ts.hMin;
+  ts.hMax = doc["hum_max"] | ts.hMax;
+  ts.lMin = doc["lux_min"] | ts.lMin;
+  ts.lMax = doc["lux_max"] | ts.lMax;
+
+  
+  if (doc.containsKey("plant")) {
+    strlcpy(plantName, doc["plant"], sizeof(plantName));
+    Serial.print(F("Set new plant: "));
+    Serial.println(plantName);
+  }
+
+  // IMPORTANTE: Reset dello stato allarme
+  // Ricevere nuove soglie equivale a un "cambio di scenario", 
+  // quindi forziamo il sistema a ricalcolare i LED al prossimo loop.
+  lastAlarmType = NONE; 
+  alarmSilenced = false;
+  
+  Serial.println(F("Thresholds updated via MQTT."));
+}
+
+
+//LED functions
+
+void ledOff() {
+  digitalWrite(LED_RED, LOW);
+  digitalWrite(LED_GREEN, LOW);
+  digitalWrite(LED_BLUE, LOW);
+}
+
+void startBlink(int pin, int count) {
+  currentBlinkPin = pin;
+  blinkRemaining = count * 2; 
+  tickerBlink.attach(0.2, handleBlink);
+}
+
+void handleBlink() {
+  if (blinkRemaining > 0) {
+    digitalWrite(currentBlinkPin, !digitalRead(currentBlinkPin));
+    blinkRemaining--;
+  } else {
+    tickerBlink.detach();
+    digitalWrite(currentBlinkPin, LOW);
+  }
+}
+
+void updateLEDStatus(WeatherData &data, Thresholds &ts) {
+  AlarmType currentType;
+
+  // 1. Determina il tipo di allarme attuale
+  if (!data.valid) {
+    currentType = SENSOR_ERROR;
+  } else {
+    bool tIn = (data.temperature >= ts.tMin && data.temperature <= ts.tMax);
+    bool hIn = (data.humidity >= ts.hMin && data.humidity <= ts.hMax);
+    bool lIn = (data.light >= ts.lMin && data.light <= ts.lMax);
+
+    if (tIn && hIn && lIn) {
+      currentType = ALL_OK;
+    } else {
+      currentType = THRESHOLDS_OUT;
+    }
+  }
+
+  // 2. Se il tipo di allarme è cambiato rispetto all'ultima volta, riattiva i LED
+  if (currentType != lastAlarmType) {
+    alarmSilenced = false;
+    lastAlarmType = currentType;
+    tickerBlink.detach(); // Ferma eventuali lampeggi precedenti
+  }
+
+  // 3. Esecuzione visiva (solo se non silenziato)
+  if (alarmSilenced) {
+    ledOff();
+    return;
+  }
+
+  switch (currentType) {
+    case SENSOR_ERROR:
+      startBlink(LED_RED, 999); // Lampeggio continuo (count alto)
+      digitalWrite(LED_GREEN, LOW);
+      digitalWrite(LED_BLUE, LOW);
+      break;
+
+    case THRESHOLDS_OUT:
+      tickerBlink.detach();
+      digitalWrite(LED_RED, HIGH);
+      digitalWrite(LED_GREEN, LOW);
+      digitalWrite(LED_BLUE, LOW);
+      break;
+
+    case ALL_OK:
+      tickerBlink.detach();
+      digitalWrite(LED_RED, LOW);
+      digitalWrite(LED_GREEN, HIGH);
+      digitalWrite(LED_BLUE, LOW);
+      break;
+      
+    case NONE:
+      ledOff();
+      break;
+  }
 }
