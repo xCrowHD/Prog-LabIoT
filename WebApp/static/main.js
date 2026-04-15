@@ -42,9 +42,12 @@ async function renderPlantChart(plantid, field, lastTime) {
         let field_data = data.map(record => record[field]);
 
         if (field_data.length == 0){
+            container.innerHTML = '';
+            document.getElementById('y-max').textContent = "No Data";
+            document.getElementById('y-mid').textContent = "No Data";
             return;
         }
-
+        
         updateYAxis(field_data);
         const max = Math.max(...field_data);
         container.innerHTML = '';
