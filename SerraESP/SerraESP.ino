@@ -1,7 +1,6 @@
 #include <Ticker.h>
 #include <ESP8266WiFi.h>
 #include <InfluxDbClient.h>
-#include <ArduinoJson.h>
 #include "secrets.h"
 #include "MqttHandler.h"
 #include "SensorManager.h"
@@ -35,7 +34,6 @@ MqttHandler mqtt(client, "broker.emqx.io", 1883);
 //Sensori
 SensorManager sensor;
 
-char plantName[30] = "";
 
 void toggleLedRed(int times);
 
@@ -47,14 +45,7 @@ int blinkRemaining = 0;
 int currentBlinkPin = -1;
 
 void callback(char* topic, byte* payload, unsigned int length) {
-  Serial.printf("Messaggio ricevuto su [%s]\n", topic);
-
-  StaticJsonDocument<512> doc;
-  DeserializationError error = deserializeJson(doc, payload, length);
-
-  if (!error) {
-    Serial.print("\nAbbiamo un Messaggio");
-  }
+  mqtt.processMessage(topic, payload, length);
 }
 
 void setup() {
@@ -136,7 +127,7 @@ void sendDataToInflux() {
 
   Point sensorData("Serra");
   sensorData.addTag("device", "NodeMCU");
-  sensorData.addTag("pianta", plantName);
+  sensorData.addTag("pianta", mqtt.getThresholds().platName);
 
   PlantData data = sensor.getAllData();
   if (!data.valid) {
@@ -162,7 +153,6 @@ void sendDataToInflux() {
 }
 
 // WiFi connection
-
 long connectToWiFi() {
   long rssi_strength;
   // connect to WiFi (if not already connected)
