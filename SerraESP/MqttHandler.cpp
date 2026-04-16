@@ -1,7 +1,7 @@
 #include "MqttHandler.h"
 
 MqttHandler::MqttHandler(WiFiClient& wifiClient, const char* broker, int port)
-  : _client(wifiClient), _broker(broker), _port(port) {}
+  : _client(wifiClient), _broker(broker), _port(port), _plantThresholds{} {}
 
 void MqttHandler::begin(MQTT_CALLBACK_SIGNATURE) {
   _client.setServer(_broker, _port);
