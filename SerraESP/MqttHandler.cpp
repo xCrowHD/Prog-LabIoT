@@ -17,15 +17,15 @@ void MqttHandler::handle() {
 
 void MqttHandler::reconnect() {
   while (!_client.connected()) {
-    Serial.print("Tentativo connessione MQTT...");
+    Serial.print(F("Tentativo connessione MQTT..."));
     if (_client.connect("ESP8266_Serra_Client")) {
-      Serial.println("Connesso!");
+      Serial.println(F("Connesso!"));
       _client.subscribe(TOPIC_THRESHOLD);
       _client.subscribe(TOPIC_START_STOP);
     } else {
-      Serial.print("fallito, rc=");
+      Serial.print(F("fallito, rc="));
       Serial.print(_client.state());
-      Serial.println(" riprovo tra 2 secondi");
+      Serial.println(F(" riprovo tra 2 secondi"));
       delay(2000);  // Un po' di respiro
     }
   }
@@ -44,7 +44,7 @@ void MqttHandler::processMessage(char* topic, byte* payload, unsigned int length
 }
 
 void MqttHandler::handleThresholds(byte* payload, unsigned int length) {
-  Serial.print("Payload ricevuto: ");
+  Serial.print(F("Payload ricevuto: "));
   for (int i = 0; i < length; i++) {
     Serial.print((char)payload[i]);
   }
@@ -52,12 +52,38 @@ void MqttHandler::handleThresholds(byte* payload, unsigned int length) {
 
   StaticJsonDocument<512> doc;
   DeserializationError error = deserializeJson(doc, payload, length);
-  Serial.println("Aggiornamento soglie ricevuto!");
-  // Logica di parsing...
+  if (!error) {
+
+    if (doc.containsKey("name")) {
+      const char* nameFromData = doc["name"];
+
+      // Copiamo il nome nel nostro array fisso (max 31 char + \0)
+      strncpy(_plantThresholds.platName, nameFromData, sizeof(_plantThresholds.platName) - 1);
+
+      // Assicuriamoci che la stringa sia chiusa correttamente
+      _plantThresholds.platName[sizeof(_plantThresholds.platName) - 1] = '\0';
+    }
+    JsonObject thresholds = doc["thresholds"];
+    Serial.println(F("Aggiornamento soglie!"));
+
+    _plantThresholds.tempMin = thresholds["temp"]["min"];
+    _plantThresholds.tempMax = thresholds["temp"]["max"];
+
+    _plantThresholds.humMin = thresholds["hum"]["min"];
+    _plantThresholds.humMax = thresholds["hum"]["max"];
+
+    _plantThresholds.luxMin = thresholds["light"]["min"];
+    _plantThresholds.luxMax = thresholds["light"]["max"];
+    Serial.println(F("--- Dati Aggiornati ---"));
+    Serial.print(F("Nuova Pianta: "));
+    Serial.println(_plantThresholds.platName);
+  }else{
+    Serial.println(F("Could no set thresholds"));
+  }
 }
 
 void MqttHandler::handleStartStop(byte* payload, unsigned int length) {
-  Serial.print("Payload ricevuto: ");
+  Serial.print(F("Payload ricevuto: "));
   for (int i = 0; i < length; i++) {
     Serial.print((char)payload[i]);
   }

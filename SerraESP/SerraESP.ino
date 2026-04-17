@@ -11,7 +11,7 @@
 #define LED_BLUE D3
 #define LED_ONBOARD LED_BUILTIN_AUX  // D0, LED on the development board (between the ESP module and the USB port)  https://github.com/nodemcu/nodemcu-devkit-v1.0/blob/master/NODEMCU_DEVKIT_V1.0.PDF
 
-#define RSSI_THRESHOLD -60
+#define RSSI_THRESHOLD -80
 
 // WiFi config
 
@@ -49,7 +49,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 }
 
 void setup() {
-
+  long _dc = connectToWiFi();
   Serial.begin(115200);
   mqtt.begin(callback);
   pinMode(LED_RED, OUTPUT);
@@ -58,7 +58,7 @@ void setup() {
   sensor.begin();
   ledOff();
 
-  writeToInflux.attach(5.0, []() {
+  writeToInflux.attach(10.0, []() {
     flagWriteInflux = true;
   });
 }
@@ -127,15 +127,27 @@ void sendDataToInflux() {
 
   Point sensorData("Serra");
   sensorData.addTag("device", "NodeMCU");
-  sensorData.addTag("pianta", mqtt.getThresholds().platName);
+
+  Thresholds currentThr = mqtt.getThresholds();
+
+  // Controlla se il primo carattere NON è lo zero (stringa non vuota)
+  if (currentThr.platName[0] != '\0') {
+    sensorData.addTag("pianta", currentThr.platName);
+  } else {
+    Serial.println(F("Plant Name not Found"));
+    return;
+  }
 
   PlantData data = sensor.getAllData();
   if (!data.valid) {
+    Serial.println(F("Datas are not valid"));
     return;
   }
 
   long rssi = connectToWiFi();
   if (rssi < RSSI_THRESHOLD) {
+    Serial.println(F("RSSI too low"));
+    Serial.println(rssi);
     return;
   }
 
@@ -145,6 +157,7 @@ void sendDataToInflux() {
   sensorData.addField("rssi", rssi);
 
   if (client_idb.writePoint(sensorData)) {
+    Serial.print(F("Sent to data to influxDB"));
     startBlink(LED_BLUE, 1);
   } else {
     Serial.println(client_idb.getLastErrorMessage());

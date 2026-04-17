@@ -11,24 +11,32 @@ INFLUXDB_URL = "http://iot.islab.disco.unimib.it:8086"
 client = InfluxDBClient(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG)
 write_api = client.write_api(write_options=SYNCHRONOUS)
 
+tempStart = 10.0
+humStart = 10.0
+luxStart = 10
+
 try:
     while True:
         # Generiamo dati casuali realistici per il test
-        t = round(random.uniform(22.0, 26.0), 1)
-        h = round(random.uniform(55.0, 65.0), 1)
-        l = random.randint(300, 800)
+        # t = round(random.uniform(22.0, 26.0), 1)
+        # h = round(random.uniform(55.0, 65.0), 1)
+        # l = random.randint(300, 800)
 
         # Creazione del punto
         point = Point("Serra") \
             .tag("pianta", "ghost_orchid") \
-            .field("temp", t) \
-            .field("hum", h) \
-            .field("lux", l)
+            .field("temp", tempStart) \
+            .field("hum", humStart) \
+            .field("lux", luxStart)
+
+        tempStart += 10
+        humStart += 10
+        luxStart += 10
 
         # Scrittura
         write_api.write(bucket=INFLUXDB_BUCKET, org=INFLUXDB_ORG, record=point)
         
-        print(f"[{time.strftime('%H:%M:%S')}] Inviato: Temp={t}°, Hum={h}%, Lux={l}")
+        print(f"[{time.strftime('%H:%M:%S')}] Inviato: Temp={tempStart}°, Hum={humStart}%, Lux={luxStart}")
 
         # Aspetta 5 minuti (300 secondi)
         # Per testare subito, puoi mettere 5 o 10 secondi!
