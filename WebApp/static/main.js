@@ -38,8 +38,9 @@ async function renderPlantChart(plantid, field, lastTime) {
         if (!response.ok) throw new Error("Pianta non trovata");
         let data = await response.json();
         const colorClass = COLOR_MAP[field];
-
+        //console.log(data);
         let field_data = data.map(record => record[field]);
+        //console.log(field_data);
 
         if (field_data.length == 0){
             container.innerHTML = '';

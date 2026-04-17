@@ -92,6 +92,8 @@ async def get_data_pianta(nome_pianta: str, last_time:str):
     |> filter(fn: (r) => r["_measurement"] == "Serra")
     |> filter(fn: (r) => r["pianta"] == "{nome_pianta}")
     |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+    |> group()
+    |> sort(columns: ["_time"], desc: false)
     '''
 
     try:
@@ -130,8 +132,10 @@ async def get_latest_data_pianta(nome_pianta: str):
     |> range(start: 0)
     |> filter(fn: (r) => r["_measurement"] == "Serra")
     |> filter(fn: (r) => r["pianta"] == "{nome_pianta}")
-    |> last()
     |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+    |> group() 
+    |> sort(columns: ["_time"], desc: true)
+    |> limit(n: 1)
     '''
 
     try:
