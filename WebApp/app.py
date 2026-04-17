@@ -81,6 +81,11 @@ async def sync_mqtt(nome_pianta: str):
         json_string = json.dumps(payload)
         mqtt_hub.send_thresholds(json_string)
 
+@app.get("/api/piante/startstop/{esp_status}")
+async def sync_mqtt(esp_status: str):
+    payload = str(esp_status)
+    mqtt_hub.send_start_stop(payload)
+
 
 @app.get("/api/piante/data/{nome_pianta}/{last_time}")
 async def get_data_pianta(nome_pianta: str, last_time:str):

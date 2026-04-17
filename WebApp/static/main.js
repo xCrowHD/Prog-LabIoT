@@ -184,6 +184,29 @@ async function syncMQTTSoglie() {
     }
 }
 
+async function startStopEsp8266() {
+    try {
+        let status = this.getAttribute("data-field");
+        // Effettua la chiamata alla tua REST API
+        let response = await fetch(`/api/piante/startstop/${status}`);
+        if (status == "START") {
+            this.setAttribute("data-field", "STOP");
+            document.getElementById("start-stop-text").innerHTML = "STOP ESP8266";
+        }
+        else if (status == "STOP"){
+            this.setAttribute("data-field", "START");
+            document.getElementById("start-stop-text").innerHTML = "START ESP8266";
+        }
+        else{
+            document.getElementById("start-stop-text").innerHTML = "ERRORE";
+        }
+        console.log("Called It");
+    }
+    catch (error) {
+        console.error("Errore:", error);
+    }
+}
+
 function updateYAxis(data) {
   const max = Math.max(...data);
   document.getElementById('y-max').textContent = max;
@@ -206,4 +229,6 @@ document.addEventListener('DOMContentLoaded', () => {
     ttabs.forEach(tab => {
         tab.addEventListener("click", selectTabPlantTime);
     });
+
+    document.getElementById("start-esp").addEventListener("click", startStopEsp8266);
 });

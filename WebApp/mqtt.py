@@ -8,6 +8,7 @@ import json
 TOPIC_TEST = "lab_iot/mafogani/test"
 TOPIC_IS_ESP_ONLINE = "lab_iot/mafogani/esp_online"
 TOPIC_SET_ESP_THRESHOLD = "lab_iot/mafogani/threshold"
+TOPIC_SET_ESP_START_STOP = "lab_iot/mafogani/start-stop"
 MQTT_IP = "broker.emqx.io"
 MQTT_PORT = 1883
 
@@ -29,6 +30,8 @@ class MQTTManager:
     
     def send_thresholds(self, str_payload):
         self.client.publish(TOPIC_SET_ESP_THRESHOLD, str_payload)
+    def send_start_stop(self, str_payload):
+        self.client.publish(TOPIC_SET_ESP_START_STOP, str_payload)
 
 
     

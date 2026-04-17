@@ -34,6 +34,7 @@
                         "on-secondary-container":       "#00344e",
                         "surface-container":            "#171f33",
                         "primary":                      "#4de082",
+                        "red":                          "#e04d4d",
                         "tertiary-fixed":               "#acf847",
                         "tertiary":                     "#91db2a",
                         "error":                        "#ffb4ab",
@@ -351,9 +352,11 @@
                         </div>
 
                         <!-- Start Node Button -->
-                        <button class="bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-md font-bold text-sm tracking-widest uppercase h-[52px] mt-auto flex items-center justify-center gap-2 active:scale-95 transition-all">
+                        <button id="start-esp" data-field="START" class="bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-md font-bold text-sm tracking-widest uppercase h-[52px] mt-auto flex items-center justify-center gap-2 active:scale-95 transition-all">
                             <span class="material-symbols-outlined">power_settings_new</span>
-                            Start Node
+                                <div id="start-stop-text">
+                                    Start ESP8266
+                                </div>
                         </button>
 
                         <!-- Initiate Sleep Button -->
