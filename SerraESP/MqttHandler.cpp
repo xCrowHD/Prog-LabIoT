@@ -77,7 +77,7 @@ void MqttHandler::handleThresholds(byte* payload, unsigned int length) {
     Serial.println(F("--- Dati Aggiornati ---"));
     Serial.print(F("Nuova Pianta: "));
     Serial.println(_plantThresholds.platName);
-  }else{
+  } else {
     Serial.println(F("Could no set thresholds"));
   }
 }
@@ -88,8 +88,16 @@ void MqttHandler::handleStartStop(byte* payload, unsigned int length) {
     Serial.print((char)payload[i]);
   }
   Serial.println();
-  StaticJsonDocument<512> doc;
-  DeserializationError error = deserializeJson(doc, payload, length);
+  if (length == 5 && memcmp(payload, "START", 5) == 0) {
+    _isStartMode = true;
+    Serial.println(F("Stato: ATTIVO"));
+  } else if (length == 4 && memcmp(payload, "STOP", 4) == 0) {
+    _isStartMode = false;
+    Serial.println(F("Stato: DISATTIVATO"));
+  } else {
+    Serial.print(F("Comando sconosciuto di lunghezza: "));
+    Serial.println(length);
+  }
 }
 
 Thresholds MqttHandler::getThresholds() {

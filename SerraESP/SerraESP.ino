@@ -58,14 +58,18 @@ void setup() {
   sensor.begin();
   ledOff();
 
-  writeToInflux.attach(10.0, []() {
+  writeToInflux.attach(20.0, []() {
     flagWriteInflux = true;
   });
 }
 
 void loop() {
-
   mqtt.handle();
+  if (!mqtt.isRunning()) {
+    Serial.println(F("ESP8266 OFFMODE"));
+    delay(1000);
+    return;
+  }
 
   if (flagWriteInflux) {
     flagWriteInflux = false;

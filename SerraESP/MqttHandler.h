@@ -26,7 +26,7 @@ private:
   const char* _broker;
   int _port;
   Thresholds _plantThresholds;
-  bool _isStartMode;
+  bool _isStartMode = false;
 
 public:
   // Costruttore
