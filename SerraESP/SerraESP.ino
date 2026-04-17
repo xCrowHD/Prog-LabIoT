@@ -4,6 +4,7 @@
 #include "secrets.h"
 #include "MqttHandler.h"
 #include "SensorManager.h"
+#include "LCDHandler.h"
 
 // LED RGB
 #define LED_RED D8  // In conflitto con DHT, usare switch o cambiare pin
@@ -34,6 +35,9 @@ MqttHandler mqtt(client, "broker.emqx.io", 1883);
 //Sensori
 SensorManager sensor;
 
+//LCD 
+LCDHandler lcd;
+
 
 void toggleLedRed(int times);
 
@@ -52,6 +56,7 @@ void setup() {
   long _dc = connectToWiFi();
   Serial.begin(115200);
   mqtt.begin(callback);
+  lcd.begin();
   pinMode(LED_RED, OUTPUT);
   pinMode(LED_GREEN, OUTPUT);
   pinMode(LED_BLUE, OUTPUT);
@@ -67,6 +72,7 @@ void loop() {
   mqtt.handle();
   if (!mqtt.isRunning()) {
     Serial.println(F("ESP8266 OFFMODE"));
+    lcd.displayMessage("OFFMODE");
     delay(1000);
     return;
   }
@@ -162,6 +168,7 @@ void sendDataToInflux() {
 
   if (client_idb.writePoint(sensorData)) {
     Serial.print(F("Sent to data to influxDB"));
+    lcd.displayData(data.temperatura, data.umidita, data.luce);
     startBlink(LED_BLUE, 1);
   } else {
     Serial.println(client_idb.getLastErrorMessage());

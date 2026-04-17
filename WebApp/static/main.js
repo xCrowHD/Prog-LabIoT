@@ -200,7 +200,7 @@ async function startStopEsp8266() {
         else{
             document.getElementById("start-stop-text").innerHTML = "ERRORE";
         }
-        console.log("Called It");
+        //console.log("Called It");
     }
     catch (error) {
         console.error("Errore:", error);
