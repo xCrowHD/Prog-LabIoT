@@ -35,7 +35,7 @@ MqttHandler mqtt(client, "broker.emqx.io", 1883);
 //Sensori
 SensorManager sensor;
 
-//LCD 
+//LCD
 LCDHandler lcd;
 
 
@@ -43,6 +43,7 @@ void toggleLedRed(int times);
 
 Ticker tickerBlink;
 Ticker writeToInflux;
+Ticker writeLCD;
 
 volatile bool flagWriteInflux = false;
 int blinkRemaining = 0;
@@ -66,15 +67,19 @@ void setup() {
   writeToInflux.attach(20.0, []() {
     flagWriteInflux = true;
   });
+  
+  writeLCD.attach(2.0, []() {
+    lcd.popAndDisplay();
+  });
 }
 
 void loop() {
   mqtt.handle();
   if (!mqtt.isRunning()) {
-    Serial.println(F("ESP8266 OFFMODE"));
-    lcd.displayMessage("OFFMODE");
-    delay(1000);
+    lcd.addMessage("Status", "OFFLINE");
     return;
+  } else {
+    lcd.addMessage("Status", "ONLINE");
   }
 
   if (flagWriteInflux) {
@@ -168,7 +173,7 @@ void sendDataToInflux() {
 
   if (client_idb.writePoint(sensorData)) {
     Serial.print(F("Sent to data to influxDB"));
-    lcd.displayData(data.temperatura, data.umidita, data.luce);
+    lcd.addMessagePlantData(data.temperatura, data.umidita, data.luce);
     startBlink(LED_BLUE, 1);
   } else {
     Serial.println(client_idb.getLastErrorMessage());

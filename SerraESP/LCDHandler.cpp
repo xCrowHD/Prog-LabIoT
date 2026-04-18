@@ -25,24 +25,6 @@ void LCDHandler::begin() {
   }
 }
 
-void LCDHandler::displayData(float temp, float hum, float lux) {
-
-  _lcd.clear();
-  _lcd.home();
-  _lcd.print("T:");
-  _lcd.print((int)temp);
-  _lcd.print("C ");
-  _lcd.print("H:");
-  _lcd.print((int)hum);
-  _lcd.print("%");  // Spazi extra per pulire residui
-
-  // Riga 1: Lux
-  _lcd.setCursor(0, 1);
-  _lcd.print("Luce: ");
-  _lcd.print((int)lux);
-  _lcd.print(" lx");
-}
-
 void LCDHandler::displayMessage(const char* line1, const char* line2) {
   _lcd.clear();
   _lcd.home();
@@ -51,4 +33,44 @@ void LCDHandler::displayMessage(const char* line1, const char* line2) {
     _lcd.setCursor(0, 1);
     _lcd.print(line2);
   }
+}
+
+void LCDHandler::addMessage(const char* msgOne, const char* msgSec) {
+  for (const auto& item : _queue) {
+    if (strcmp(item.firstLine, msgOne) == 0 && strcmp(item.secondLine, msgSec) == 0) {
+      return;  // Già in coda, esco
+    }
+  }
+
+  LCDMsg newMsg;
+  strncpy(newMsg.firstLine, msgOne, DISPLAY_CHARS);
+  strncpy(newMsg.secondLine, msgSec, DISPLAY_CHARS);
+  newMsg.firstLine[DISPLAY_CHARS] = '\0';
+  newMsg.secondLine[DISPLAY_CHARS] = '\0';
+
+  _queue.push_back(newMsg);
+}
+
+void LCDHandler::popAndDisplay() {
+  if (_queue.empty()) return;
+
+  // Prendo il primo elemento
+  LCDMsg msgToShow = _queue.front();
+  _queue.pop_front();
+
+  _lcd.clear();
+  _lcd.setCursor(0, 0);
+  displayMessage(msgToShow.firstLine, msgToShow.secondLine);
+}
+
+void LCDHandler::addMessagePlantData(float temp, float hum, float lux) {
+  char row1[17];  // Buffer per riga 1
+  char row2[17];  // Buffer per riga 2
+
+  // Formattiamo i dati come char*
+  snprintf(row1, sizeof(row1), "T:%dC H:%d%%", (int)temp, (int)hum);
+  snprintf(row2, sizeof(row2), "Luce: %d lx", (int)lux);
+
+  // Aggiungiamo i char* alla coda del display
+  addMessage(row1, row2);
 }
