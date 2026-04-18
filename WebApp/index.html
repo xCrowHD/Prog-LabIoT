@@ -34,6 +34,7 @@
                         "on-secondary-container":       "#00344e",
                         "surface-container":            "#171f33",
                         "primary":                      "#4de082",
+                        "red":                          "#e04d4d",
                         "tertiary-fixed":               "#acf847",
                         "tertiary":                     "#91db2a",
                         "error":                        "#ffb4ab",
@@ -199,14 +200,20 @@
                 <!-- ── Row 2: 24h Telemetry Chart (8 cols) ── -->
                 <div class="md:col-span-8 bg-surface-container-high rounded-xl p-8 overflow-hidden">
                 <div class="flex justify-between items-center mb-8">
-                    <h3 class="font-headline text-xl font-bold text-on-surface">Telemetry 24h Cycles</h3>
-                    <div class="flex gap-2">
-                    <span class="px-3 py-1 bg-surface-container-highest rounded text-[10px] font-bold text-primary border border-primary/20 cursor-pointer">TEMP</span>
-                    <span class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer">HUM</span>
-                    <span class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer">LUX</span>
+                    <h3 class="font-headline text-xl font-bold text-on-surface">Telemetry Cycles</h3>
+                    <div id="chart-time-tabs" class="flex gap-2">
+                        <span data-field="24h" class="px-3 py-1 bg-surface-container-highest rounded text-[10px] font-bold text-primary border border-primary/20 cursor-pointer">24h</span>
+                        <span data-field="7d" class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer">7d</span>
+                        <span data-field="30d" class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer">30d</span>
+                    </div>
+
+                    <div id="chart-field-tabs" class="flex gap-2">
+                        <span data-field="temp" class="px-3 py-1 bg-surface-container-highest rounded text-[10px] font-bold text-primary border border-primary/20 cursor-pointer">TEMP</span>
+                        <span data-field="hum" class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer">HUM</span>
+                        <span data-field="lux" class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer">LUX</span>
                     </div>
                 </div>
-
+                
                 <!-- Chart area con Y-axis -->
                 <div class="flex gap-2 items-stretch">
 
@@ -345,9 +352,11 @@
                         </div>
 
                         <!-- Start Node Button -->
-                        <button class="bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-md font-bold text-sm tracking-widest uppercase h-[52px] mt-auto flex items-center justify-center gap-2 active:scale-95 transition-all">
+                        <button id="start-esp" data-field="START" class="bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-md font-bold text-sm tracking-widest uppercase h-[52px] mt-auto flex items-center justify-center gap-2 active:scale-95 transition-all">
                             <span class="material-symbols-outlined">power_settings_new</span>
-                            Start Node
+                                <div id="start-stop-text">
+                                    Start ESP8266
+                                </div>
                         </button>
 
                         <!-- Initiate Sleep Button -->

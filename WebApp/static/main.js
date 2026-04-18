@@ -8,12 +8,15 @@ console.log("DEBUG: File main.js caricato!");
    ─────────────────────────────────────────────────────────── */
 
 /* Active Plant */
-let activePlantIndex = 0
+let activePlantIndex = 0;
 let plantArray = [
     "monstera_albo",
     "nepenthes_rajah",
     "ghost_orchid"
 ]
+
+let activeField = "temp";
+let activeTime = "24h";
 
 /* Color map per dataset */
 const COLOR_MAP = {
@@ -35,8 +38,17 @@ async function renderPlantChart(plantid, field, lastTime) {
         if (!response.ok) throw new Error("Pianta non trovata");
         let data = await response.json();
         const colorClass = COLOR_MAP[field];
-
+        //console.log(data);
         let field_data = data.map(record => record[field]);
+        //console.log(field_data);
+
+        if (field_data.length == 0){
+            container.innerHTML = '';
+            document.getElementById('y-max').textContent = "No Data";
+            document.getElementById('y-mid').textContent = "No Data";
+            return;
+        }
+        
         updateYAxis(field_data);
         const max = Math.max(...field_data);
         container.innerHTML = '';
@@ -105,7 +117,7 @@ async function loopPlants() {
     }
     caricaLatestDatoPianta(plantArray[activePlantIndex]);
     caricaSogliePianta(plantArray[activePlantIndex]);
-    renderPlantChart(plantArray[activePlantIndex], "temp", "30d")
+    renderPlantChart(plantArray[activePlantIndex], activeField, activeTime);
 
 }
 
@@ -128,12 +140,67 @@ async function caricaLatestDatoPianta(nomeId) {
     }
 }
 
+async function selectTabPlantField() {
+    const tabs = document.querySelectorAll('#chart-field-tabs span');
+    tabs.forEach( t => {
+        t.classList.remove("border", "border-primary/20");
+        t.classList.replace("bg-surface-container-highest", "bg-surface-container-lowest");
+        t.classList.replace("text-primary", "text-on-surface-variant");
+    });
+
+    this.classList.add("border", "border-primary/20");
+    this.classList.replace("bg-surface-container-lowest", "bg-surface-container-highest");
+    this.classList.replace("text-on-surface-variant", "text-primary");
+    activeField = this.getAttribute("data-field");
+    renderPlantChart(plantArray[activePlantIndex], activeField, activeTime);
+
+}
+
+async function selectTabPlantTime() {
+    const tabs = document.querySelectorAll('#chart-time-tabs span');
+    tabs.forEach( t => {
+        t.classList.remove("border", "border-primary/20");
+        t.classList.replace("bg-surface-container-highest", "bg-surface-container-lowest");
+        t.classList.replace("text-primary", "text-on-surface-variant");
+    });
+
+    this.classList.add("border", "border-primary/20");
+    this.classList.replace("bg-surface-container-lowest", "bg-surface-container-highest");
+    this.classList.replace("text-on-surface-variant", "text-primary");
+    activeTime = this.getAttribute("data-field");
+    renderPlantChart(plantArray[activePlantIndex], activeField, activeTime);
+
+}
+
 async function syncMQTTSoglie() {
     try {
         // Effettua la chiamata alla tua REST API
         let response = await fetch(`/api/piante/syncmqtt/${plantArray[activePlantIndex]}`);
         
         if (!response.ok) throw new Error("Pianta non trovata");
+    }
+    catch (error) {
+        console.error("Errore:", error);
+    }
+}
+
+async function startStopEsp8266() {
+    try {
+        let status = this.getAttribute("data-field");
+        // Effettua la chiamata alla tua REST API
+        let response = await fetch(`/api/piante/startstop/${status}`);
+        if (status == "START") {
+            this.setAttribute("data-field", "STOP");
+            document.getElementById("start-stop-text").innerHTML = "STOP ESP8266";
+        }
+        else if (status == "STOP"){
+            this.setAttribute("data-field", "START");
+            document.getElementById("start-stop-text").innerHTML = "START ESP8266";
+        }
+        else{
+            document.getElementById("start-stop-text").innerHTML = "ERRORE";
+        }
+        //console.log("Called It");
     }
     catch (error) {
         console.error("Errore:", error);
@@ -151,7 +218,17 @@ document.addEventListener('DOMContentLoaded', () => {
     console.log("Boot avviato...");
     caricaSogliePianta(plantArray[0]);
     caricaLatestDatoPianta(plantArray[0])
-    renderPlantChart(plantArray[0], "temp", "30d");
+    renderPlantChart(plantArray[0], activeField, activeTime);
     document.getElementById("plant-loop").addEventListener("click", loopPlants);
     document.getElementById("sync-mqtt").addEventListener("click", syncMQTTSoglie);
+    const ftabs = document.querySelectorAll('#chart-field-tabs span');
+    ftabs.forEach(tab => {
+        tab.addEventListener("click", selectTabPlantField);
+    });
+    const ttabs = document.querySelectorAll('#chart-time-tabs span');
+    ttabs.forEach(tab => {
+        tab.addEventListener("click", selectTabPlantTime);
+    });
+
+    document.getElementById("start-esp").addEventListener("click", startStopEsp8266);
 });
