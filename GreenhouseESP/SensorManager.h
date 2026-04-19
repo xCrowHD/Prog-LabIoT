@@ -4,16 +4,15 @@
 #include <Arduino.h>
 #include <DHT.h>
 
-// Definizione dei Pin (Puoi cambiarli qui e cambieranno ovunque)
 #define DHTPIN D7
 #define DHTTYPE DHT11
 #define PHOTORESISTOR A0
 
 // Struct per contenere tutti i dati della serra
 struct PlantData {
-  float temperatura;
-  float umidita;
-  int luce;
+  float temperature;
+  float humidity;
+  int light;
   bool valid;
 };
 

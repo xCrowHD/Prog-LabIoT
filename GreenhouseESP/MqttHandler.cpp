@@ -17,15 +17,15 @@ void MqttHandler::handle() {
 
 void MqttHandler::reconnect() {
   while (!_client.connected()) {
-    Serial.print(F("Tentativo connessione MQTT..."));
+    Serial.print(F("Trying to connect MQTT..."));
     if (_client.connect("ESP8266_Serra_Client")) {
-      Serial.println(F("Connesso!"));
+      Serial.println(F("Connected!"));
       _client.subscribe(TOPIC_THRESHOLD);
       _client.subscribe(TOPIC_START_STOP);
     } else {
-      Serial.print(F("fallito, rc="));
+      Serial.print(F("Failed, rc="));
       Serial.print(_client.state());
-      Serial.println(F(" riprovo tra 2 secondi"));
+      Serial.println(F(" I'll try in 2 seconds"));
       delay(2000);  // Un po' di respiro
     }
   }
@@ -44,7 +44,7 @@ void MqttHandler::processMessage(char* topic, byte* payload, unsigned int length
 }
 
 void MqttHandler::handleThresholds(byte* payload, unsigned int length) {
-  Serial.print(F("Payload ricevuto: "));
+  Serial.print(F("Got playload: "));
   for (int i = 0; i < length; i++) {
     Serial.print((char)payload[i]);
   }
@@ -74,28 +74,28 @@ void MqttHandler::handleThresholds(byte* payload, unsigned int length) {
 
     _plantThresholds.luxMin = thresholds["light"]["min"];
     _plantThresholds.luxMax = thresholds["light"]["max"];
-    Serial.println(F("--- Dati Aggiornati ---"));
-    Serial.print(F("Nuova Pianta: "));
+    Serial.println(F("--- Data upload ---"));
+    Serial.print(F("New Plant: "));
     Serial.println(_plantThresholds.platName);
   } else {
-    Serial.println(F("Could no set thresholds"));
+    Serial.println(F("Could not set thresholds"));
   }
 }
 
 void MqttHandler::handleStartStop(byte* payload, unsigned int length) {
-  Serial.print(F("Payload ricevuto: "));
+  Serial.print(F("Got playload: "));
   for (int i = 0; i < length; i++) {
     Serial.print((char)payload[i]);
   }
   Serial.println();
   if (length == 5 && memcmp(payload, "START", 5) == 0) {
     _isStartMode = true;
-    Serial.println(F("Stato: ATTIVO"));
+    Serial.println(F("State: ACTIVE"));
   } else if (length == 4 && memcmp(payload, "STOP", 4) == 0) {
     _isStartMode = false;
-    Serial.println(F("Stato: DISATTIVATO"));
+    Serial.println(F("State: DISABLED"));
   } else {
-    Serial.print(F("Comando sconosciuto di lunghezza: "));
+    Serial.print(F("Unknown command of lenght: "));
     Serial.println(length);
   }
 }

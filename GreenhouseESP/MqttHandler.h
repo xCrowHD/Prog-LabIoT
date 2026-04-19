@@ -28,8 +28,10 @@ private:
   Thresholds _plantThresholds;
   bool _isStartMode = false;
 
+  void handleThresholds(byte* payload, unsigned int length);
+  void handleStartStop(byte* payload, unsigned int length);
+
 public:
-  // Costruttore
   MqttHandler(WiFiClient& wifiClient, const char* broker, int port);
 
   // Funzioni principali
@@ -40,10 +42,7 @@ public:
   void processMessage(char* topic, byte* payload, unsigned int length);
   Thresholds getThresholds();
   bool isRunning();
-
-private:
-  void handleThresholds(byte* payload, unsigned int length);
-  void handleStartStop(byte* payload, unsigned int length);
+  
 };
 
 #endif
