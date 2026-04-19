@@ -1,6 +1,5 @@
 #include "SensorManager.h"
 
-// Inizializzazione del sensore DHT nel costruttore
 SensorManager::SensorManager()
   : _dht(DHTPIN, DHTTYPE) {}
 
@@ -19,26 +18,20 @@ PlantData SensorManager::getAllData() {
   // 2. Lettura Fotoresistenza
   int lightValue = analogRead(PHOTORESISTOR);
 
-  // Controllo validità (isnan per DHT e controllo base per fotoresistenza)
   if (isnan(h) || isnan(t)) {
-    Serial.println(F("ERRORE: Lettura DHT fallita!"));
+    Serial.println(F("ERROR in DHT reading"));
     data.valid = false;
     return data;
   }
 
-  data.temperatura = t;
-  data.umidita = h;
-  data.luce = (lightValue == 0) ? -1 : lightValue;
-
-  if (data.luce == -1) {
-    data.valid = false;
-    return data;
-  }
+  data.temperature = t;
+  data.humidity = h;
+  data.light = lightValue;
 
   data.valid = true;
 
   // Log di debug
-  Serial.printf("\n--- Nuova Lettura ---\nTemp: %.2f C | Umid: %.2f %% | Luce: %d\n", t, h, data.luce);
+  Serial.printf("\n--- New Reaiding---\nTemp: %.2f C | Hum: %.2f %% | Light: %d\n", t, h, lightValue);
 
   return data;
 }

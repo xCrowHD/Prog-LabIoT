@@ -5,12 +5,14 @@
 #include "MqttHandler.h"
 #include "SensorManager.h"
 #include "LCDHandler.h"
+#include "AlarmHandler.h"
 
 // LED RGB
 #define LED_RED D8  // In conflitto con DHT, usare switch o cambiare pin
 #define LED_GREEN D6
 #define LED_BLUE D3
 #define LED_ONBOARD LED_BUILTIN_AUX  // D0, LED on the development board (between the ESP module and the USB port)  https://github.com/nodemcu/nodemcu-devkit-v1.0/blob/master/NODEMCU_DEVKIT_V1.0.PDF
+#define BUTTON D4 // numero a caso per farlo girare
 
 #define RSSI_THRESHOLD -80
 
@@ -38,15 +40,12 @@ SensorManager sensor;
 //LCD 
 LCDHandler lcd;
 
-
-void toggleLedRed(int times);
-
-Ticker tickerBlink;
+//Ticker dell'allarme gestito internamente in Alarmhandler.cpp
 Ticker writeToInflux;
 
+AlarmHandler alarm(LED_RED, LED_GREEN, LED_BLUE);
+
 volatile bool flagWriteInflux = false;
-int blinkRemaining = 0;
-int currentBlinkPin = -1;
 
 void callback(char* topic, byte* payload, unsigned int length) {
   mqtt.processMessage(topic, payload, length);
@@ -60,8 +59,11 @@ void setup() {
   pinMode(LED_RED, OUTPUT);
   pinMode(LED_GREEN, OUTPUT);
   pinMode(LED_BLUE, OUTPUT);
+  
   sensor.begin();
-  ledOff();
+
+  alarm.setAlarmType(NONE);
+  alarm.manageLEDerrors(); //questa configurazione spegne tutti i led
 
   writeToInflux.attach(20.0, []() {
     flagWriteInflux = true;
@@ -83,34 +85,6 @@ void loop() {
   }
 }
 
-
-//LED functions
-void ledOff() {
-  digitalWrite(LED_RED, LOW);
-  digitalWrite(LED_GREEN, LOW);
-  digitalWrite(LED_BLUE, LOW);
-}
-
-void startBlink(int pin, int count) {
-  currentBlinkPin = pin;
-  blinkRemaining = count * 2;
-  tickerBlink.attach(0.2, handleBlink);
-}
-
-void handleBlink() {
-  if (blinkRemaining > 0) {
-    digitalWrite(currentBlinkPin, !digitalRead(currentBlinkPin));
-    blinkRemaining--;
-  } else {
-    tickerBlink.detach();
-    digitalWrite(currentBlinkPin, LOW);
-  }
-}
-
-void toggleLedBlue() {
-  digitalWrite(LED_BLUE, !digitalRead(LED_BLUE));
-}
-
 // Influx DB operations
 
 bool check_influxdb() {
@@ -129,31 +103,53 @@ bool check_influxdb() {
 void sendDataToInflux() {
 
   if (!check_influxdb()) {
-    Serial.println(F("Not Connected To InfluxDB"));
+    Serial.println(F("Not connected To InfluxDB"));
     return;
   }
 
   Serial.print(F("Sending to InfluxDB... "));
 
-  Point sensorData("Serra");
+  Point sensorData("Greenhouse");
   sensorData.addTag("device", "NodeMCU");
 
   Thresholds currentThr = mqtt.getThresholds();
 
-  // Controlla se il primo carattere NON è lo zero (stringa non vuota)
-  if (currentThr.platName[0] != '\0') {
-    sensorData.addTag("pianta", currentThr.platName);
+
+  if (currentThr.platName[0] != '\0') { //da spostare lato MQTT
+    sensorData.addTag("Plant", currentThr.platName);
   } else {
     Serial.println(F("Plant Name not Found"));
     return;
   }
 
   PlantData data = sensor.getAllData();
+
+
   if (!data.valid) {
+    alarm.setAlarmType(SENSOR_ERROR);
+    alarm.manageLEDerrors();
     Serial.println(F("Datas are not valid"));
     return;
   }
 
+  bool tempInRange = data.temperature >= currentThr.tempMin && data.temperature <= currentThr.tempMax;
+  bool humInRange = data.temperature >= currentThr.humMin && data.temperature <= currentThr.humMax;
+  bool luxInrange = data.light >= currentThr.luxMin && data.light <= currentThr.luxMax; 
+
+  if (tempInRange && humInRange && luxInrange)
+  {
+    alarm.setAlarmType(ALL_OK);
+  }
+  else if (!tempInRange && !humInRange && !luxInrange)
+  {
+    alarm.setAlarmType(ALL_THRESHOLDS_OUT);
+  }
+  else 
+  {
+    alarm.setAlarmType(SOME_THRESHOLDS_OUT);
+  }
+  
+  alarm.manageLEDerrors();
   long rssi = connectToWiFi();
   if (rssi < RSSI_THRESHOLD) {
     Serial.println(F("RSSI too low"));
@@ -161,18 +157,16 @@ void sendDataToInflux() {
     return;
   }
 
-  sensorData.addField("temp", data.temperatura);
-  sensorData.addField("hum", data.umidita);
-  sensorData.addField("lux", data.luce);
+  sensorData.addField("temp", data.temperature);
+  sensorData.addField("hum", data.humidity);
+  sensorData.addField("lux", data.light);
   sensorData.addField("rssi", rssi);
 
   if (client_idb.writePoint(sensorData)) {
     Serial.print(F("Sent to data to influxDB"));
-    lcd.displayData(data.temperatura, data.umidita, data.luce);
-    startBlink(LED_BLUE, 1);
+    lcd.displayData(data.temperature, data.humidity, data.light);
   } else {
     Serial.println(client_idb.getLastErrorMessage());
-    startBlink(LED_RED, 1);
   }
 }
 
