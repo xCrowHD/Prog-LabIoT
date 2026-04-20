@@ -39,16 +39,13 @@ LCDHandler lcd;
 // Alarm LEDRGB
 AlarmHandler alarm;
 
-
-void toggleLedRed(int times);
-
 Ticker tickerBlink;
 Ticker writeToInflux;
 Ticker writeLCD;
+Tikcer tickerAlarm;
+
 
 volatile bool flagWriteInflux = false;
-int blinkRemaining = 0;
-int currentBlinkPin = -1;
 
 void callback(char* topic, byte* payload, unsigned int length) {
   mqtt.processMessage(topic, payload, length);
@@ -66,9 +63,13 @@ void setup() {
   writeToInflux.attach(20.0, []() {
     flagWriteInflux = true;
   });
-  
+
   writeLCD.attach(2.0, []() {
     lcd.popAndDisplay();
+  });
+
+  tickerAlarm.attach(1.5, []() {
+    alarm.nextAlarmColor();
   });
 }
 
@@ -135,21 +136,23 @@ void sendDataToInflux() {
 
   bool tempInRange = data.temperature >= currentThr.tempMin && data.temperature <= currentThr.tempMax;
   bool humInRange = data.temperature >= currentThr.humMin && data.temperature <= currentThr.humMax;
-  bool luxInrange = data.light >= currentThr.luxMin && data.light <= currentThr.luxMax; 
+  bool luxInrange = data.light >= currentThr.luxMin && data.light <= currentThr.luxMax;
 
-  if (tempInRange && humInRange && luxInrange)
-  {
-    alarm.manageLEDerrors(AlarmType::ALL_OK);
+  if (tempInRange && humInRange && luxInrange) {
+    alarm.addAlarm(AlarmType::ALL_OK);
+    // Se tutto è OK, potresti voler rimuovere gli altri errori
+    alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
+    alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
     lcd.addMessage("Thresholds", "ALL OK");
-  }
-  else if (!tempInRange && !humInRange && !luxInrange)
-  {
-    alarm.manageLEDerrors(AlarmType::ALL_THRESHOLDS_OUT);
+  } else if (!tempInRange && !humInRange && !luxInrange) {
+    alarm.addAlarm(AlarmType::ALL_THRESHOLDS_OUT);
+    alarm.removeAlarm(AlarmType::ALL_OK);
+    alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
     lcd.addMessage("Thresholds", "ALL O.O.R");
-  }
-  else 
-  {
-    alarm.manageLEDerrors(AlarmType::SOME_THRESHOLDS_OUT);
+  } else {
+    alarm.addAlarm(AlarmType::SOME_THRESHOLDS_OUT);
+    alarm.removeAlarm(AlarmType::ALL_OK);
+    alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
     lcd.addMessage("Thresholds", "SOME O.O.R");
   }
 

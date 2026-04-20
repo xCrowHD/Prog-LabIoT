@@ -22,7 +22,6 @@ private:
 public:
   LCDHandler();
   void begin();
-  void displayData(float temp, float hum, float lux);
   void popAndDisplay();
   void addMessage(const char* msgOne, const char* msgSec = "");
   void addMessagePlantData(float temp, float hum, float lux);

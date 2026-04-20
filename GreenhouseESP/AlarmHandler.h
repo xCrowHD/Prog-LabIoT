@@ -2,7 +2,7 @@
 #define ALARMHANDLER_H
 
 #include <Arduino.h>
-#include <Ticker.h>
+#include <set>
 
 #define LED_RED D0
 #define LED_GREEN D4
@@ -19,11 +19,18 @@ enum class AlarmType { NONE,
 class AlarmHandler {
 private:
   AlarmType _alarmType;
-  void ledOff();
+  std::set<AlarmType> _activeAlarms; // Il set gestisce i duplicati da solo
+  std::set<AlarmType>::iterator _currentIt; // Iteratore per scorrere
 
 public:
   AlarmHandler();
   void begin();
+  void addAlarm(AlarmType type);
+  void removeAlarm(AlarmType type);
+  void nextAlarmColor();
+
+private:
+  void ledOff();
   void setLedRGB(uint8_t r, uint8_t g, uint8_t b);
   void manageLEDerrors(AlarmType alarmType);
 };

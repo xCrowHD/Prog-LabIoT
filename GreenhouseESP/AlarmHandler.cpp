@@ -1,6 +1,8 @@
 #include "AlarmHandler.h"
 
-AlarmHandler::AlarmHandler() {}
+AlarmHandler::AlarmHandler() {
+  _currentIt = _activeAlarms.begin();
+}
 
 void AlarmHandler::begin() {
   pinMode(LED_RED, OUTPUT);
@@ -9,15 +11,11 @@ void AlarmHandler::begin() {
 }
 
 void AlarmHandler::ledOff() {
-  digitalWrite(LED_RED, LOW);
-  digitalWrite(LED_GREEN, LOW);
-  digitalWrite(LED_BLUE, LOW);
+  setLedRGB(LOW, LOW, LOW);
 }
 
 void AlarmHandler::manageLEDerrors(AlarmType alarm) {
 
-  ledOff();
-  // Se arriviamo qui, l'allarme è nuovo
   switch (alarm) {
     case AlarmType::ALL_OK:
       setLedRGB(LOW, HIGH, LOW);  // Verde
@@ -41,4 +39,31 @@ void AlarmHandler::setLedRGB(uint8_t r, uint8_t g, uint8_t b) {
   digitalWrite(LED_RED, r);
   digitalWrite(LED_GREEN, g);
   digitalWrite(LED_BLUE, b);
+}
+
+void AlarmHandler::addAlarm(AlarmType type) {
+  if (type == AlarmType::NONE) return;
+  _activeAlarms.insert(type);          // Se esiste già, non fa nulla. Comodo, no?
+  _currentIt = _activeAlarms.begin();  // Reset iteratore per sicurezza
+}
+
+void AlarmHandler::removeAlarm(AlarmType type) {
+  _activeAlarms.erase(type);           // Rimuove l'errore se presente
+  _currentIt = _activeAlarms.begin();  // Reset iteratore
+}
+
+void AlarmHandler::nextAlarmColor() {
+  if (_activeAlarms.empty()) {
+    ledOff();
+    return;
+  }
+
+  // Se l'iteratore è alla fine o non valido, ricomincia da capo
+  if (_currentIt == _activeAlarms.end()) {
+    _currentIt = _activeAlarms.begin();
+  }
+
+  AlarmType current = *_currentIt;
+  manageLEDerrors(current);
+  _currentIt++;
 }
