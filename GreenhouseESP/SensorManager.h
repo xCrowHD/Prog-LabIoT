@@ -11,9 +11,9 @@
 
 // Struct per contenere tutti i dati della serra
 struct PlantData {
-  float temperatura;
-  float umidita;
-  int luce;
+  float temperature;
+  float humidity;
+  int light;
   bool valid;
 };
 

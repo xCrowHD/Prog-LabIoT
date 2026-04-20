@@ -26,19 +26,14 @@ PlantData SensorManager::getAllData() {
     return data;
   }
 
-  data.temperatura = t;
-  data.umidita = h;
-  data.luce = (lightValue == 0) ? -1 : lightValue;
-
-  if (data.luce == -1) {
-    data.valid = false;
-    return data;
-  }
+  data.temperature = t;
+  data.humidity = h;
+  data.light = lightValue;
 
   data.valid = true;
 
   // Log di debug
-  Serial.printf("\n--- Nuova Lettura ---\nTemp: %.2f C | Umid: %.2f %% | Luce: %d\n", t, h, data.luce);
+  Serial.printf("\n--- Nuova Lettura ---\nTemp: %.2f C | Umid: %.2f %% | Luce: %d\n", t, h, lightValue);
 
   return data;
 }
