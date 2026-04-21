@@ -114,7 +114,7 @@ async def get_data_pianta(nome_pianta: str, last_time:str):
         for table in results:
             for record in table.records:
                 punto = {
-                    "timestamp": record.get_time().strftime('%H:%M:%S'),
+                    "timestamp": record.get_time().strftime('%d/%m/%Y %H:%M'),
                     "pianta": record["pianta"],
                     "temp": record.values.get("temp"),
                     "hum": record.values.get("hum"),
@@ -155,7 +155,7 @@ async def get_latest_data_pianta(nome_pianta: str):
         
         # Costruiamo il dizionario da restituire come JSON
         data = {
-            "timestamp": record.get_time(),
+            "timestamp": record.get_time().strftime('%d/%m/%Y %H:%M'),
             "pianta": record.values.get("pianta"),
             "temp": record.values.get("temp"),
             "hum": record.values.get("hum"),
