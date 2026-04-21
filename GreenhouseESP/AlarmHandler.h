@@ -28,6 +28,7 @@ public:
   void addAlarm(AlarmType type);
   void removeAlarm(AlarmType type);
   void nextAlarmColor();
+  void clearAlarms();
 
 private:
   void ledOff();

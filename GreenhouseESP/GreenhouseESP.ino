@@ -8,7 +8,15 @@
 #include "AlarmHandler.h"
 
 // LED RGB
-#define LED_ONBOARD LED_BUILTIN_AUX  // D0, LED on the development board (between the ESP module and the USB port)  https://github.com/nodemcu/nodemcu-devkit-v1.0/blob/master/NODEMCU_DEVKIT_V1.0.PDF
+#define LED_ONBOARD LED_BUILTIN_AUX
+// D0, LED on the development board (between the ESP module and the USB port)
+//https://github.com/nodemcu/nodemcu-devkit-v1.0/blob/master/NODEMCU_DEVKIT_V1.0.PDF
+
+//BUTTON
+#define RESET_ALARMS D5
+#define BUTTON_DEBOUNCE_DELAY 200
+unsigned long lastDebounceTime = 0;  // L'ultima volta che il pin è stato campionato
+bool lastButtonState = LOW;
 
 #define RSSI_THRESHOLD -80
 
@@ -42,7 +50,7 @@ AlarmHandler alarm;
 Ticker tickerBlink;
 Ticker writeToInflux;
 Ticker writeLCD;
-Tikcer tickerAlarm;
+Ticker tickerAlarm;
 
 
 volatile bool flagWriteInflux = false;
@@ -54,6 +62,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 void setup() {
   Serial.begin(115200);
   long _dc = connectToWiFi();
+  pinMode(RESET_ALARMS, INPUT_PULLUP);
 
   mqtt.begin(callback);
   lcd.begin();
@@ -86,6 +95,22 @@ void loop() {
     flagWriteInflux = false;
     sendDataToInflux();
   }
+
+  int reading = digitalRead(RESET_ALARMS);
+  if (reading != lastButtonState) {
+    // Reset del timer
+    lastDebounceTime = millis();
+  }
+
+  if ((millis() - lastDebounceTime) > BUTTON_DEBOUNCE_DELAY) {
+    // Se è passato abbastanza tempo, la lettura è stabile
+    if (reading == LOW) {
+      Serial.println(F("Pressione stabile rilevata!"));
+      alarm.clearAlarms();
+    }
+  }
+
+  lastButtonState = reading;
 }
 
 // Influx DB operations
@@ -122,13 +147,15 @@ void sendDataToInflux() {
     sensorData.addTag("pianta", currentThr.platName);
   } else {
     Serial.println(F("Plant Name not Found"));
+    alarm.addAlarm(AlarmType::SENSOR_ERROR);
+    lcd.addMessage("ERROR", "Plant null");
     return;
   }
 
   PlantData data = sensor.getAllData();
   if (!data.valid) {
     Serial.println(F("Datas are not valid"));
-    alarm.manageLEDerrors(AlarmType::SENSOR_ERROR);
+    alarm.addAlarm(AlarmType::SENSOR_ERROR);
     lcd.addMessage("ERROR", "Sensors Error");
     return;
   }

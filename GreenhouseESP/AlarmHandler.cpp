@@ -67,3 +67,9 @@ void AlarmHandler::nextAlarmColor() {
   manageLEDerrors(current);
   _currentIt++;
 }
+
+void AlarmHandler::clearAlarms() {
+  _activeAlarms.clear();
+  _currentIt = _activeAlarms.begin();
+  ledOff();
+}
