@@ -1,4 +1,4 @@
-#pip install fastapi uvicorn influxdb-client paho-mqtt urllib3
+#pip install fastapi uvicorn influxdb-client paho-mqtt urllib3 python-dotenv
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
@@ -7,8 +7,12 @@ from mqtt import mqtt_hub
 import json
 from influxdb_client import InfluxDBClient
 from fastapi import FastAPI, HTTPException
+from dotenv import load_dotenv
 
-#COMANDO PER AVVIARE IL SERVER: uvicorn app:app --reload --host 127.0.0.1 --port 8000
+# 1. Carica il file .env
+load_dotenv()
+
+#COMANDO PER AVVIARE IL SERVER: python -m uvicorn app:app --reload --host 127.0.0.1 --port 8000
 
 #Req web app
 # App per lab Iot per microcontrollore esp2286
@@ -18,10 +22,10 @@ from fastapi import FastAPI, HTTPException
 # nella web app voglio selezionare la pianta e vedere le soglie 
 # i valori pullati dall'influx db sono temperatura umidita quanta luce c'è i miei grafiici e le treshhold sono su questi valori
 
-INFLUXDB_TOKEN = "***REMOVED***"
-INFLUXDB_ORG = "***REMOVED***"
-INFLUXDB_BUCKET = "***REMOVED***"
-INFLUXDB_URL = "***REMOVED***"
+INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN")
+INFLUXDB_ORG = os.getenv("INFLUXDB_ORG")
+INFLUXDB_BUCKET = os.getenv("INFLUXDB_BUCKET")
+INFLUXDB_URL = os.getenv("INFLUXDB_URL")
 
 PLANT_DATABASE = {
     "monstera_albo": {

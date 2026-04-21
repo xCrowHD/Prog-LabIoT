@@ -1,0 +1,6 @@
+OUTPUT (Uscita): È il microcontrollore a "comandare". 
+Invia energia dal pin verso l'esterno per far accadere qualcosa (accendere un LED, far girare un motore).
+
+INPUT (Ingresso): È il microcontrollore a "ascoltare". 
+Il pin rimane in attesa di ricevere una tensione dall'esterno per capire cosa succede fuori 
+(se un bottone è premuto, se un sensore ha rilevato qualcosa).
