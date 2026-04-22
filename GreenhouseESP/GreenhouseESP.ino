@@ -14,9 +14,9 @@
 
 //BUTTON
 #define RESET_ALARMS D5
-#define BUTTON_DEBOUNCE_DELAY 200
+#define BUTTON_DEBOUNCE_DELAY 20
 unsigned long lastDebounceTime = 0;  // L'ultima volta che il pin è stato campionato
-bool lastButtonState = LOW;
+bool lastButtonState = HIGH;
 
 #define RSSI_THRESHOLD -80
 
@@ -103,11 +103,17 @@ void loop() {
   }
 
   if ((millis() - lastDebounceTime) > BUTTON_DEBOUNCE_DELAY) {
+    static bool wasAlreadyPressed = false;
     // Se è passato abbastanza tempo, la lettura è stabile
-    if (reading == LOW) {
+    if (reading == LOW && !wasAlreadyPressed) {
       alarm.flipEnabled();
       const char* aStatus = alarm.getAlarmStatus() ? "ON" : "OFF";
       lcd.addMessage("Alarm Status:", aStatus);
+      wasAlreadyPressed = true;
+    }
+    if (reading == HIGH) {
+      // Quando rilasci il bottone, resettiamo la guardia per la prossima volta
+      wasAlreadyPressed = false;
     }
   }
 
