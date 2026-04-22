@@ -159,6 +159,8 @@ void sendDataToInflux() {
     return;
   }
 
+  alarm.removeAlarm(AlarmType::SENSOR_ERROR);
+
   PlantData data = sensor.getAllData();
   if (!data.valid) {
     Serial.println(F("Datas are not valid"));
@@ -167,6 +169,7 @@ void sendDataToInflux() {
     return;
   }
 
+  alarm.removeAlarm(AlarmType::SENSOR_ERROR);
 
   bool tempInRange = data.temperature >= currentThr.tempMin && data.temperature <= currentThr.tempMax;
   bool humInRange = data.temperature >= currentThr.humMin && data.temperature <= currentThr.humMax;
