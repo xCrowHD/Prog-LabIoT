@@ -220,7 +220,7 @@ async function updateXAxis(data) {
     const container = document.getElementById("x-axe");
     container.innerHTML = '';
     if (!data || data.length === 0) return;
-
+    const lastIdx = data.length - 1;
     if (data.length <= 5) {
         xPoints = data.map(d => d.timestamp);
     } else {
