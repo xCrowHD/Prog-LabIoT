@@ -155,6 +155,7 @@ void sendDataToInflux() {
   } else {
     Serial.println(F("Plant Name not Found"));
     alarm.addAlarm(AlarmType::SENSOR_ERROR);
+    alarm.removeAlarm(AlarmType::ALL_OK);
     lcd.addMessage("ERROR", "Plant null");
     return;
   }
@@ -165,6 +166,7 @@ void sendDataToInflux() {
   if (!data.valid) {
     Serial.println(F("Datas are not valid"));
     alarm.addAlarm(AlarmType::SENSOR_ERROR);
+    alarm.removeAlarm(AlarmType::ALL_OK);
     lcd.addMessage("ERROR", "Sensors Error");
     return;
   }
