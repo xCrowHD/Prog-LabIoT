@@ -18,7 +18,7 @@ enum class AlarmType { NONE,
 
 class AlarmHandler {
 private:
-  AlarmType _alarmType;
+  bool _enabled;
   std::set<AlarmType> _activeAlarms; // Il set gestisce i duplicati da solo
   std::set<AlarmType>::iterator _currentIt; // Iteratore per scorrere
 
@@ -28,12 +28,14 @@ public:
   void addAlarm(AlarmType type);
   void removeAlarm(AlarmType type);
   void nextAlarmColor();
-  void clearAlarms();
+  void flipEnabled();
+  bool getAlarmStatus();
 
 private:
   void ledOff();
   void setLedRGB(uint8_t r, uint8_t g, uint8_t b);
   void manageLEDerrors(AlarmType alarmType);
+  void clearAlarms();
 };
 
 #endif

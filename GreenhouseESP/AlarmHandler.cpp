@@ -2,6 +2,7 @@
 
 AlarmHandler::AlarmHandler() {
   _currentIt = _activeAlarms.begin();
+  _enabled = true;
 }
 
 void AlarmHandler::begin() {
@@ -53,7 +54,8 @@ void AlarmHandler::removeAlarm(AlarmType type) {
 }
 
 void AlarmHandler::nextAlarmColor() {
-  if (_activeAlarms.empty()) {
+
+  if (_activeAlarms.empty() || !_enabled) {
     ledOff();
     return;
   }
@@ -72,4 +74,13 @@ void AlarmHandler::clearAlarms() {
   _activeAlarms.clear();
   _currentIt = _activeAlarms.begin();
   ledOff();
+}
+
+void AlarmHandler::flipEnabled(){
+  clearAlarms();
+  _enabled = !_enabled;
+}
+
+bool AlarmHandler::getAlarmStatus(){
+  return _enabled;
 }

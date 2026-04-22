@@ -105,8 +105,9 @@ void loop() {
   if ((millis() - lastDebounceTime) > BUTTON_DEBOUNCE_DELAY) {
     // Se è passato abbastanza tempo, la lettura è stabile
     if (reading == LOW) {
-      Serial.println(F("Pressione stabile rilevata!"));
-      alarm.clearAlarms();
+      alarm.flipEnabled();
+      const char* aStatus = alarm.getAlarmStatus() ? "ON" : "OFF";
+      lcd.addMessage("Alarm Status:", aStatus);
     }
   }
 
