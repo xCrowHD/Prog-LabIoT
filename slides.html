@@ -271,16 +271,15 @@ pre .dim { color: var(--muted); }
         <div class="card">
           <div class="ctitle">🔌 Edge Layer</div>
           <ul>
-            <li>ESP8266 (NodeMCU) con Wi-Fi integrato</li>
+            <li>ESP8266 (NodeMCU)</li>
             <li>Sensori: DHT11 &amp; fotoresistenza KY-018</li>
             <li>Attuatori: LED RGB + LCD 16×2 I²C</li>
-            <li>Logica di allarme locale in C++</li>
           </ul>
         </div>
         <div class="card">
           <div class="ctitle">☁️ Backend &amp; Storage</div>
           <ul>
-            <li>FastAPI per REST API e web app</li>
+            <li>FastAPI per REST API</li>
             <li>InfluxDB per storage time-series</li>
             <li>Broker MQTT pubblico (EMQX)</li>
             <li>Dashboard HTML + Tailwind CSS</li>
@@ -294,7 +293,7 @@ pre .dim { color: var(--muted); }
         <span class="dim"> ◀──publish── </span>
         <span class="hi">FastAPI</span>
         <br>
-        <span class="dim">│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; │</span>
+        <span class="dim">│ &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; │</span>
         <br>
         <span class="dim">Sensori · LED · LCD &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; InfluxDB · Dashboard</span>
       </div>
@@ -311,7 +310,7 @@ pre .dim { color: var(--muted); }
           <tr><td><strong>DHT11</strong></td><td><code>D7</code></td><td>Temperatura &amp; Umidità digitale</td></tr>
           <tr><td><strong>KY-018</strong> (fotoresistenza)</td><td><code>A0</code></td><td>Livello luminosità (ADC 0–1023)</td></tr>
           <tr><td><strong>LED RGB</strong></td><td><code>D0 · D3 · D4</code></td><td>Allarme visivo multicolore</td></tr>
-          <tr><td><strong>LCD 16×2 I²C</strong></td><td><code>0x27</code></td><td>Stato sistema in tempo reale</td></tr>
+          <tr><td><strong>LCD 16×2 I²C</strong></td><td><code>D1 · D2</code></td><td>Stato sistema in tempo reale</td></tr>
         </tbody>
       </table>
       <div style="margin-top:16px">
@@ -334,26 +333,30 @@ pre .dim { color: var(--muted); }
         <div>
 <pre>GreenhouseESP.ino
 <span class="hi">├─</span> SensorManager
-<span class="dim">│    → DHT11 + A0 → struct PlantData</span>
+<span class="dim">│    → DHT11 + Photoresistor → struct PlantData</span>
 <span class="hi">├─</span> MqttHandler
-<span class="dim">│    → broker, subscribe, JSON parse</span>
+<span class="dim">│    → broker, subscribe, JSON parse → struct Thresholds</span>
 <span class="hi">├─</span> AlarmHandler
-<span class="dim">│    → std::set allarmi + LED RGB</span>
+<span class="dim">│    → std::set AlarmType + LED RGB</span>
 <span class="hi">└─</span> LCDHandler
-<span class="dim">     → std::deque messaggi I²C</span></pre>
+<span class="dim">     → std::deque LCDMsg + LiquidCrystal_I2C</span></pre>
           <div class="box" style="margin-top:12px;font-size:0.78em">
             <code>std::set</code> gestisce allarmi multipli senza duplicati.
             <code>nextAlarmColor()</code> cicla tra i colori attivi.
           </div>
+          <div class="box" style="margin-top:12px;font-size:0.78em">
+            <code>std::deque</code> gestisce i messaggi da mostrare sul display.
+            <code>popAndDisplay()</code> mostra il messaggio più recente togliendolo dalla coda.
+          </div>
         </div>
         <div>
           <table>
-            <thead><tr><th>LED</th><th>Stato</th></tr></thead>
+            <thead><tr><th>Colore LED</th><th>Stato Sistema</th></tr></thead>
             <tbody>
               <tr><td><span class="led lg"></span>Verde</td><td>All OK</td></tr>
-              <tr><td><span class="led lp"></span>Viola</td><td>Alcune soglie superate</td></tr>
+              <tr><td><span class="led lp"></span>Viola</td><td>Alcune soglie sono fuori range</td></tr>
               <tr><td><span class="led ly"></span>Giallo</td><td>Tutte le soglie fuori range</td></tr>
-              <tr><td><span class="led lr"></span>Rosso</td><td>Errore lettura sensore</td></tr>
+              <tr><td><span class="led lr"></span>Rosso</td><td>Errore lettura sensore e nome pianta nullo</td></tr>
             </tbody>
           </table>
         </div>
@@ -443,15 +446,15 @@ pre .dim { color: var(--muted); }
         <div class="card">
           <div class="ctitle">📊 Monitoraggio</div>
           <ul>
+            <li>Navigazione tra le 3 piante configurate</li>
             <li>Ultimo valore di temperatura, umidità, kLux</li>
-            <li>Grafico a barre con dati storici InfluxDB</li>
-            <li>Range temporale: 1h &nbsp;·&nbsp; 6h &nbsp;·&nbsp; 24h</li>
+            <li>Grafico a barre con dati storici InfluxDB: Temperatura &nbsp;·&nbsp; Umidità &nbsp;·&nbsp; Intensità Luce</li>
+            <li>Range temporale: 24h &nbsp;·&nbsp; 7d &nbsp;·&nbsp; 30d</li>
           </ul>
         </div>
         <div class="card">
           <div class="ctitle">🎛️ Controllo Remoto</div>
           <ul>
-            <li>Navigazione tra le 3 piante configurate</li>
             <li><strong>Sync MQTT</strong> – invia soglie all'ESP</li>
             <li><strong>START / STOP</strong> – attiva o sospende il microcontrollore</li>
           </ul>
@@ -480,8 +483,7 @@ pre .dim { color: var(--muted); }
           <ul>
             <li>Deep sleep ESP8266 per risparmio energetico</li>
             <li>Notifiche push / e-mail sugli alert</li>
-            <li>Aggiunta sensore CO₂ o soil moisture</li>
-            <li>Predizione AI sulle condizioni della pianta</li>
+            <li>Aggiunta sensore infrared</li>
           </ul>
         </div>
       </div>
