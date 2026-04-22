@@ -10,6 +10,7 @@ console.log("DEBUG: File main.js caricato!");
 /* Active Plant */
 let activePlantIndex = 0;
 let plantArray = [
+    "test-lab",
     "monstera_albo",
     "nepenthes_rajah",
     "ghost_orchid"

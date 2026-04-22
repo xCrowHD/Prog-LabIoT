@@ -27,6 +27,15 @@ INFLUXDB_BUCKET = os.getenv("INFLUXDB_BUCKET")
 INFLUXDB_URL = os.getenv("INFLUXDB_URL")
 
 PLANT_DATABASE = {
+    "test-lab" : {
+        "name": "Test Lab Plant",
+        "img": "./static/test_plant.jpeg",
+        "thresholds": {
+            "temp": {"min": 15.0, "max": 35.0},
+            "hum": {"min": 20.0, "max": 90.0},
+            "light": {"min": 100, "max": 1000}
+        }
+    },
     "monstera_albo": {
         "name": "Monstera Deliciosa",
         "img": "./static/P1.jpeg",
