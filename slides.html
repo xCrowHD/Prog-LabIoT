@@ -272,6 +272,7 @@ pre .dim { color: var(--muted); }
           <div class="ctitle">🔌 Edge Layer</div>
           <ul>
             <li>ESP8266 (NodeMCU)</li>
+            <li>Bottone/Switch</li>
             <li>Sensori: DHT11 &amp; fotoresistenza KY-018</li>
             <li>Attuatori: LED RGB + LCD 16×2 I²C</li>
           </ul>
@@ -311,6 +312,8 @@ pre .dim { color: var(--muted); }
           <tr><td><strong>KY-018</strong> (fotoresistenza)</td><td><code>A0</code></td><td>Livello luminosità (ADC 0–1023)</td></tr>
           <tr><td><strong>LED RGB</strong></td><td><code>D0 · D3 · D4</code></td><td>Allarme visivo multicolore</td></tr>
           <tr><td><strong>LCD 16×2 I²C</strong></td><td><code>D1 · D2</code></td><td>Stato sistema in tempo reale</td></tr>
+          <tr><td><strong>Bottone/Switch</strong></td><td><code>D5</code></td><td>On/Off notifica di allarme</td></tr>
+          <tr><td><strong>Batteria Esterna</strong></td><td><code>USB</code></td><td>Alimentazione</td></tr>
         </tbody>
       </table>
       <div style="margin-top:16px">
@@ -321,6 +324,8 @@ pre .dim { color: var(--muted); }
         <span class="tag">DHT</span>
         <span class="tag">LiquidCrystal_I2C</span>
         <span class="tag">Wire</span>
+        <span class="tag">Ticker</span>
+        <span class="tag">InfluxDbClient</span>
       </div>
     </div>
   </section>
@@ -356,7 +361,7 @@ pre .dim { color: var(--muted); }
               <tr><td><span class="led lg"></span>Verde</td><td>All OK</td></tr>
               <tr><td><span class="led lp"></span>Viola</td><td>Alcune soglie sono fuori range</td></tr>
               <tr><td><span class="led ly"></span>Giallo</td><td>Tutte le soglie fuori range</td></tr>
-              <tr><td><span class="led lr"></span>Rosso</td><td>Errore lettura sensore e nome pianta nullo</td></tr>
+              <tr><td><span class="led lr"></span>Rosso</td><td>Errore lettura sensore o nome pianta nullo</td></tr>
             </tbody>
           </table>
         </div>
@@ -437,7 +442,7 @@ pre .dim { color: var(--muted); }
 
   <!-- ══ 8 · DASHBOARD ══ -->
   <section class="slide">
-    <div class="sh"><span class="snum">07</span><h1 class="stitle">Dashboard – Chlorophyll Logic</h1></div>
+    <div class="sh"><span class="snum">07</span><h1 class="stitle">Dashboard</h1></div>
     <div class="sb">
       <div class="box" style="margin-bottom:14px">
         Interfaccia HTML + Tailwind CSS + JS vanilla &nbsp;·&nbsp; servita direttamente da FastAPI
@@ -474,8 +479,7 @@ pre .dim { color: var(--muted); }
             <li>Alerting visivo con LED RGB e allarmi ciclici</li>
             <li>Storage time-series su InfluxDB (query Flux)</li>
             <li>Controllo remoto START/STOP via MQTT</li>
-            <li>Soglie configurabili per pianta dalla dashboard</li>
-            <li>Conversione ADC → kLux server-side</li>
+            <li>Soglie configurabili per pianta dalla dashboard via MQTT</li>
           </ul>
         </div>
         <div class="card">
