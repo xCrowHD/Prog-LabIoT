@@ -1,4 +1,3 @@
-#pip install fastapi uvicorn influxdb-client paho-mqtt urllib3 python-dotenv
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
