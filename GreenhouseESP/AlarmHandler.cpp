@@ -44,7 +44,7 @@ void AlarmHandler::setLedRGB(uint8_t r, uint8_t g, uint8_t b) {
 
 void AlarmHandler::addAlarm(AlarmType type) {
   if (type == AlarmType::NONE) return;
-  _activeAlarms.insert(type);          // Se esiste già, non fa nulla. Comodo, no?
+  _activeAlarms.insert(type);          // Se esiste già, non fa nulla. 
   _currentIt = _activeAlarms.begin();  // Reset iteratore per sicurezza
 }
 
