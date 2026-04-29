@@ -1,7 +1,6 @@
-<!DOCTYPE html>
+<!doctype html>
 <html class="dark" lang="en">
-
-<head>
+  <head>
     <meta charset="utf-8" />
     <meta content="width=device-width, initial-scale=1.0" name="viewport" />
 
@@ -10,365 +9,631 @@
 
     <!-- Google Fonts -->
     <link
-        href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap"
-        rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600&display=swap"
+      rel="stylesheet"
     />
     <link
-        href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
-        rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+      rel="stylesheet"
     />
 
     <!-- Tailwind Config -->
     <script id="tailwind-config">
-        tailwind.config = {
-            darkMode: "class",
-            theme: {
-                extend: {
-                    colors: {
-                        "background":                   "#0b1326",
-                        "secondary-fixed":              "#c9e6ff",
-                        "inverse-on-surface":           "#283044",
-                        "on-error":                     "#690005",
-                        "surface-container-lowest":     "#060e20",
-                        "on-primary-container":         "#c7ffcf",
-                        "on-secondary-container":       "#00344e",
-                        "surface-container":            "#171f33",
-                        "primary":                      "#4de082",
-                        "red":                          "#e04d4d",
-                        "tertiary-fixed":               "#acf847",
-                        "tertiary":                     "#91db2a",
-                        "error":                        "#ffb4ab",
-                        "surface-dim":                  "#0b1326",
-                        "primary-container":            "#007f3f",
-                        "outline":                      "#8a9485",
-                        "surface-container-low":        "#131b2e",
-                        "on-tertiary-fixed-variant":    "#304f00",
-                        "secondary-container":          "#00a2e6",
-                        "surface-container-highest":    "#2d3449",
-                        "surface-bright":               "#31394d",
-                        "primary-fixed-dim":            "#4de082",
-                        "surface":                      "#0b1326",
-                        "secondary-fixed-dim":          "#89ceff",
-                        "on-secondary-fixed":           "#001e2f",
-                        "inverse-primary":              "#006d36",
-                        "surface-tint":                 "#4de082",
-                        "on-primary-fixed":             "#00210c",
-                        "outline-variant":              "#40493d",
-                        "on-error-container":           "#ffdad6",
-                        "surface-variant":              "#2d3449",
-                        "inverse-surface":              "#dae2fd",
-                        "tertiary-fixed-dim":           "#91db2a",
-                        "tertiary-container":           "#4c7a00",
-                        "on-background":                "#dae2fd",
-                        "surface-container-high":       "#222a3d",
-                        "on-tertiary":                  "#1f3700",
-                        "on-primary":                   "#003919",
-                        "on-surface-variant":           "#bfcaba",
-                        "on-tertiary-container":        "#d4ff9d",
-                        "on-tertiary-fixed":            "#102000",
-                        "on-surface":                   "#dae2fd",
-                        "on-secondary":                 "#00344d",
-                        "on-primary-fixed-variant":     "#005227",
-                        "secondary":                    "#89ceff",
-                        "primary-fixed":                "#6dfe9c",
-                        "on-secondary-fixed-variant":   "#004c6e",
-                        "error-container":              "#93000a"
-                    },
-                    borderRadius: {
-                        "DEFAULT": "0.125rem",
-                        "lg":      "0.25rem",
-                        "xl":      "0.5rem",
-                        "full":    "0.75rem"
-                    },
-                    fontFamily: {
-                        "headline": ["Space Grotesk"],
-                        "body":     ["Inter"],
-                        "label":    ["Inter"]
-                    }
-                }
-            }
-        };
+      tailwind.config = {
+        darkMode: "class",
+        theme: {
+          extend: {
+            colors: {
+              background: "#0b1326",
+              "secondary-fixed": "#c9e6ff",
+              "inverse-on-surface": "#283044",
+              "on-error": "#690005",
+              "surface-container-lowest": "#060e20",
+              "on-primary-container": "#c7ffcf",
+              "on-secondary-container": "#00344e",
+              "surface-container": "#171f33",
+              primary: "#4de082",
+              red: "#e04d4d",
+              "tertiary-fixed": "#acf847",
+              tertiary: "#91db2a",
+              error: "#ffb4ab",
+              "surface-dim": "#0b1326",
+              "primary-container": "#007f3f",
+              outline: "#8a9485",
+              "surface-container-low": "#131b2e",
+              "on-tertiary-fixed-variant": "#304f00",
+              "secondary-container": "#00a2e6",
+              "surface-container-highest": "#2d3449",
+              "surface-bright": "#31394d",
+              "primary-fixed-dim": "#4de082",
+              surface: "#0b1326",
+              "secondary-fixed-dim": "#89ceff",
+              "on-secondary-fixed": "#001e2f",
+              "inverse-primary": "#006d36",
+              "surface-tint": "#4de082",
+              "on-primary-fixed": "#00210c",
+              "outline-variant": "#40493d",
+              "on-error-container": "#ffdad6",
+              "surface-variant": "#2d3449",
+              "inverse-surface": "#dae2fd",
+              "tertiary-fixed-dim": "#91db2a",
+              "tertiary-container": "#4c7a00",
+              "on-background": "#dae2fd",
+              "surface-container-high": "#222a3d",
+              "on-tertiary": "#1f3700",
+              "on-primary": "#003919",
+              "on-surface-variant": "#bfcaba",
+              "on-tertiary-container": "#d4ff9d",
+              "on-tertiary-fixed": "#102000",
+              "on-surface": "#dae2fd",
+              "on-secondary": "#00344d",
+              "on-primary-fixed-variant": "#005227",
+              secondary: "#89ceff",
+              "primary-fixed": "#6dfe9c",
+              "on-secondary-fixed-variant": "#004c6e",
+              "error-container": "#93000a",
+            },
+            borderRadius: {
+              DEFAULT: "0.125rem",
+              lg: "0.25rem",
+              xl: "0.5rem",
+              full: "0.75rem",
+            },
+            fontFamily: {
+              headline: ["Space Grotesk"],
+              body: ["Inter"],
+              label: ["Inter"],
+            },
+          },
+        },
+      };
     </script>
 
     <!-- Custom Styles -->
     <link rel="stylesheet" href="static/styles.css" />
 
     <title>Lab IoT</title>
-</head>
+  </head>
 
-<body class="selection:bg-primary/30">
-
+  <body class="selection:bg-primary/30">
     <!-- ===== MAIN CONTENT ===== -->
     <main>
-        <div class="max-w-7xl mx-auto space-y-8">
+      <div class="max-w-7xl mx-auto space-y-8">
+        <!-- Page Header -->
+        <header
+          class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4"
+        >
+          <div>
+            <h1
+              class="font-headline text-4xl font-bold tracking-tight text-on-surface"
+            >
+              Dashboard Overview
+            </h1>
+            <p class="text-on-surface-variant font-medium">
+              Monitoring Node: ESP-NODE-MCU1.0
+            </p>
+          </div>
+          <div
+            class="flex items-center gap-3 bg-surface-container-high px-4 py-2 rounded-lg"
+          >
+            <div class="w-3 h-3 rounded-full bg-primary pulse-indicator"></div>
+            <span
+              class="text-xs font-bold tracking-widest text-primary uppercase"
+              >System Online</span
+            >
+            <span
+              class="text-xs text-on-surface-variant border-l border-outline-variant/30 pl-3"
+              >22ms Latency</span
+            >
+          </div>
+        </header>
 
-            <!-- Page Header -->
-            <header class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
-                <div>
-                    <h1 class="font-headline text-4xl font-bold tracking-tight text-on-surface">Dashboard Overview</h1>
-                    <p class="text-on-surface-variant font-medium">Monitoring Node: ESP-NODE-MCU1.0 </p>
+        <!-- Dashboard Grid -->
+        <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+          <!-- ── Row 1: Live Telemetry Cards (8 cols) ── -->
+          <div class="md:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <!-- Temperature -->
+            <div
+              class="bg-surface-container-high p-6 rounded-xl hover:bg-surface-container-highest transition-colors duration-200"
+            >
+              <div class="flex justify-between items-start mb-4">
+                <span
+                  class="text-xs font-bold tracking-widest text-on-surface-variant uppercase"
+                  >Temperature</span
+                >
+                <span class="material-symbols-outlined text-primary"
+                  >thermostat</span
+                >
+              </div>
+              <div class="flex items-baseline gap-2">
+                <span
+                  id="plant-temp"
+                  class="font-headline text-5xl font-light text-on-surface"
+                  >24.8</span
+                >
+                <span class="text-on-surface-variant text-xl">°C</span>
+              </div>
+              <div
+                class="mt-4 h-1 bg-surface-container-lowest rounded-full overflow-hidden"
+              >
+                <div class="h-full bg-primary w-[10%]"></div>
+              </div>
+            </div>
+
+            <!-- Humidity -->
+            <div
+              class="bg-surface-container-high p-6 rounded-xl hover:bg-surface-container-highest transition-colors duration-200"
+            >
+              <div class="flex justify-between items-start mb-4">
+                <span
+                  class="text-xs font-bold tracking-widest text-on-surface-variant uppercase"
+                  >Humidity</span
+                >
+                <span class="material-symbols-outlined text-secondary"
+                  >humidity_percentage</span
+                >
+              </div>
+              <div class="flex items-baseline gap-2">
+                <span
+                  id="plant-hum"
+                  class="font-headline text-5xl font-light text-on-surface"
+                  >62</span
+                >
+                <span class="text-on-surface-variant text-xl">%</span>
+              </div>
+              <div
+                class="mt-4 h-1 bg-surface-container-lowest rounded-full overflow-hidden"
+              >
+                <div class="h-full bg-secondary w-[80%]"></div>
+              </div>
+            </div>
+
+            <!-- Light Intensity -->
+            <div
+              class="bg-surface-container-high p-6 rounded-xl hover:bg-surface-container-highest transition-colors duration-200"
+            >
+              <div class="flex justify-between items-start mb-4">
+                <span
+                  class="text-xs font-bold tracking-widest text-on-surface-variant uppercase"
+                  >Intensity</span
+                >
+                <span class="material-symbols-outlined text-tertiary"
+                  >light_mode</span
+                >
+              </div>
+              <div class="flex items-baseline gap-2">
+                <span
+                  id="plant-lux"
+                  class="font-headline text-5xl font-light text-on-surface"
+                  >12.4</span
+                >
+                <span class="text-on-surface-variant text-xl">kLux</span>
+              </div>
+              <div
+                class="mt-4 h-1 bg-surface-container-lowest rounded-full overflow-hidden"
+              >
+                <div class="h-full bg-tertiary w-[45%]"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ── Row 1: Hardware Profile (4 cols) ── -->
+          <div
+            class="md:col-span-4 bg-surface-container-low p-6 rounded-xl space-y-4"
+          >
+            <h3
+              class="text-xs font-bold tracking-widest text-on-surface-variant uppercase mb-4"
+            >
+              Hardware Profile
+            </h3>
+            <div class="space-y-3">
+              <div
+                class="flex justify-between items-center py-2 border-b border-outline-variant/10"
+              >
+                <span class="text-sm text-on-surface-variant">SSID</span>
+                <span class="text-sm font-mono text-secondary"
+                  >CHLORO_WIFI_EXT</span
+                >
+              </div>
+
+              <div
+                class="flex justify-between items-center py-2 border-b border-outline-variant/10"
+              >
+                <span class="text-sm text-on-surface-variant">IP Address</span>
+                <span class="text-sm font-mono text-on-surface"
+                  >192.168.1.142</span
+                >
+              </div>
+
+              <div
+                class="flex justify-between items-center py-2 border-b border-outline-variant/10"
+              >
+                <span class="text-sm text-on-surface-variant">RSSI</span>
+                <div class="flex items-center gap-1">
+                  <span class="text-sm font-mono text-primary">-54 dBm</span>
+                  <span
+                    class="material-symbols-outlined text-[16px] text-primary"
+                    >signal_cellular_alt</span
+                  >
                 </div>
-                <div class="flex items-center gap-3 bg-surface-container-high px-4 py-2 rounded-lg">
-                    <div class="w-3 h-3 rounded-full bg-primary pulse-indicator"></div>
-                    <span class="text-xs font-bold tracking-widest text-primary uppercase">System Online</span>
-                    <span class="text-xs text-on-surface-variant border-l border-outline-variant/30 pl-3">22ms Latency</span>
-                </div>
-            </header>
+              </div>
 
-            <!-- Dashboard Grid -->
-            <div class="grid grid-cols-1 md:grid-cols-12 gap-6">
+              <div class="flex justify-between items-center py-2">
+                <span class="text-sm text-on-surface-variant">Uptime</span>
+                <span class="text-sm font-mono text-on-surface"
+                  >12d 04h 22m</span
+                >
+              </div>
+            </div>
+          </div>
 
-                <!-- ── Row 1: Live Telemetry Cards (8 cols) ── -->
-                <div class="md:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-6">
+          <!-- ── Row 2: 24h Telemetry Chart (8 cols) ── -->
+          <div
+            class="md:col-span-8 bg-surface-container-high rounded-xl p-8 overflow-hidden"
+          >
+            <div class="flex justify-between items-center mb-8">
+              <h3 class="font-headline text-xl font-bold text-on-surface">
+                Telemetry Cycles
+              </h3>
+              <div id="chart-time-tabs" class="flex gap-2">
+                <span
+                  data-field="24h"
+                  class="px-3 py-1 bg-surface-container-highest rounded text-[10px] font-bold text-primary border border-primary/20 cursor-pointer"
+                  >24h</span
+                >
+                <span
+                  data-field="7d"
+                  class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer"
+                  >7d</span
+                >
+                <span
+                  data-field="30d"
+                  class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer"
+                  >30d</span
+                >
+              </div>
 
-                    <!-- Temperature -->
-                    <div class="bg-surface-container-high p-6 rounded-xl hover:bg-surface-container-highest transition-colors duration-200">
-                        <div class="flex justify-between items-start mb-4">
-                            <span class="text-xs font-bold tracking-widest text-on-surface-variant uppercase">Temperature</span>
-                            <span class="material-symbols-outlined text-primary">thermostat</span>
-                        </div>
-                        <div class="flex items-baseline gap-2">
-                            <span id="plant-temp" class="font-headline text-5xl font-light text-on-surface">24.8</span>
-                            <span class="text-on-surface-variant text-xl">°C</span>
-                        </div>
-                        <div class="mt-4 h-1 bg-surface-container-lowest rounded-full overflow-hidden">
-                            <div class="h-full bg-primary w-[10%]"></div>
-                        </div>
-                    </div>
+              <div id="chart-field-tabs" class="flex gap-2">
+                <span
+                  data-field="temp"
+                  class="px-3 py-1 bg-surface-container-highest rounded text-[10px] font-bold text-primary border border-primary/20 cursor-pointer"
+                  >TEMP</span
+                >
+                <span
+                  data-field="hum"
+                  class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer"
+                  >HUM</span
+                >
+                <span
+                  data-field="lux"
+                  class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer"
+                  >LUX</span
+                >
+              </div>
+            </div>
 
-                    <!-- Humidity -->
-                    <div class="bg-surface-container-high p-6 rounded-xl hover:bg-surface-container-highest transition-colors duration-200">
-                        <div class="flex justify-between items-start mb-4">
-                            <span class="text-xs font-bold tracking-widest text-on-surface-variant uppercase">Humidity</span>
-                            <span class="material-symbols-outlined text-secondary">humidity_percentage</span>
-                        </div>
-                        <div class="flex items-baseline gap-2">
-                            <span id="plant-hum" class="font-headline text-5xl font-light text-on-surface">62</span>
-                            <span class="text-on-surface-variant text-xl">%</span>
-                        </div>
-                        <div class="mt-4 h-1 bg-surface-container-lowest rounded-full overflow-hidden">
-                            <div class="h-full bg-secondary w-[80%]"></div>
-                        </div>
-                    </div>
+            <!-- Chart area con Y-axis -->
+            <div class="flex gap-2 items-stretch">
+              <!-- Y-axis labels -->
+              <div
+                class="flex flex-col justify-between items-end pb-0 pr-2 shrink-0"
+                style="height: 256px"
+              >
+                <span
+                  id="y-max"
+                  class="text-[9px] font-mono text-on-surface-variant/50 tabular-nums"
+                  >–</span
+                >
+                <span
+                  id="y-mid"
+                  class="text-[9px] font-mono text-on-surface-variant/50 tabular-nums"
+                  >–</span
+                >
+                <span
+                  class="text-[9px] font-mono text-on-surface-variant/50 tabular-nums"
+                  >0</span
+                >
+              </div>
 
-                    <!-- Light Intensity -->
-                    <div class="bg-surface-container-high p-6 rounded-xl hover:bg-surface-container-highest transition-colors duration-200">
-                        <div class="flex justify-between items-start mb-4">
-                            <span class="text-xs font-bold tracking-widest text-on-surface-variant uppercase">Intensity</span>
-                            <span class="material-symbols-outlined text-tertiary">light_mode</span>
-                        </div>
-                        <div class="flex items-baseline gap-2">
-                            <span id="plant-lux" class="font-headline text-5xl font-light text-on-surface">12.4</span>
-                            <span class="text-on-surface-variant text-xl">kLux</span>
-                        </div>
-                        <div class="mt-4 h-1 bg-surface-container-lowest rounded-full overflow-hidden">
-                            <div class="h-full bg-tertiary w-[45%]"></div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ── Row 1: Hardware Profile (4 cols) ── -->
-                <div class="md:col-span-4 bg-surface-container-low p-6 rounded-xl space-y-4">
-                    <h3 class="text-xs font-bold tracking-widest text-on-surface-variant uppercase mb-4">Hardware Profile</h3>
-                    <div class="space-y-3">
-
-                        <div class="flex justify-between items-center py-2 border-b border-outline-variant/10">
-                            <span class="text-sm text-on-surface-variant">SSID</span>
-                            <span class="text-sm font-mono text-secondary">CHLORO_WIFI_EXT</span>
-                        </div>
-
-                        <div class="flex justify-between items-center py-2 border-b border-outline-variant/10">
-                            <span class="text-sm text-on-surface-variant">IP Address</span>
-                            <span class="text-sm font-mono text-on-surface">192.168.1.142</span>
-                        </div>
-
-                        <div class="flex justify-between items-center py-2 border-b border-outline-variant/10">
-                            <span class="text-sm text-on-surface-variant">RSSI</span>
-                            <div class="flex items-center gap-1">
-                                <span class="text-sm font-mono text-primary">-54 dBm</span>
-                                <span class="material-symbols-outlined text-[16px] text-primary">signal_cellular_alt</span>
-                            </div>
-                        </div>
-
-                        <div class="flex justify-between items-center py-2">
-                            <span class="text-sm text-on-surface-variant">Uptime</span>
-                            <span class="text-sm font-mono text-on-surface">12d 04h 22m</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ── Row 2: 24h Telemetry Chart (8 cols) ── -->
-                <div class="md:col-span-8 bg-surface-container-high rounded-xl p-8 overflow-hidden">
-                <div class="flex justify-between items-center mb-8">
-                    <h3 class="font-headline text-xl font-bold text-on-surface">Telemetry Cycles</h3>
-                    <div id="chart-time-tabs" class="flex gap-2">
-                        <span data-field="24h" class="px-3 py-1 bg-surface-container-highest rounded text-[10px] font-bold text-primary border border-primary/20 cursor-pointer">24h</span>
-                        <span data-field="7d" class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer">7d</span>
-                        <span data-field="30d" class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer">30d</span>
-                    </div>
-
-                    <div id="chart-field-tabs" class="flex gap-2">
-                        <span data-field="temp" class="px-3 py-1 bg-surface-container-highest rounded text-[10px] font-bold text-primary border border-primary/20 cursor-pointer">TEMP</span>
-                        <span data-field="hum" class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer">HUM</span>
-                        <span data-field="lux" class="px-3 py-1 bg-surface-container-lowest rounded text-[10px] font-bold text-on-surface-variant cursor-pointer">LUX</span>
-                    </div>
-                </div>
-                
-                <!-- Chart area con Y-axis -->
-                <div class="flex gap-2 items-stretch">
-
-                    <!-- Y-axis labels -->
-                    <div class="flex flex-col justify-between items-end pb-0 pr-2 shrink-0" style="height: 256px;">
-                    <span id="y-max" class="text-[9px] font-mono text-on-surface-variant/50 tabular-nums">–</span>
-                    <span id="y-mid" class="text-[9px] font-mono text-on-surface-variant/50 tabular-nums">–</span>
-                    <span class="text-[9px] font-mono text-on-surface-variant/50 tabular-nums">0</span>
-                    </div>
-
-                    <!-- Bars + gridlines -->
-                    <div class="relative flex-1">
-                    <!-- Gridlines -->
-                    <div class="absolute inset-0 flex flex-col justify-between pointer-events-none">
-                        <div class="border-t border-white/[0.06] w-full"></div>
-                        <div class="border-t border-white/[0.06] w-full"></div>
-                        <div class="border-t border-white/[0.06] w-full"></div>
-                    </div>
-
-                    <!-- Bars -->
-                    <div class="h-64 flex items-end justify-between gap-1 relative z-10" id="chart-bars">
-                        <!-- Bars injected by main.js -->
-                    </div>
-                    </div>
-
-                </div>
-
-                <!-- X-axis labels -->
-                <div id="x-axe" class="flex justify-between mt-4 pl-9 text-[10px] text-on-surface-variant font-mono uppercase tracking-widest">
-                    <!-- X-axis spans -->
-                </div>
-                </div>
-
-                <!-- ── Row 2: Plant Profile Card (4 cols) ── -->
-                <div class="md:col-span-4 flex flex-col gap-6">
-                    <div class="bg-surface-container-high rounded-xl p-6 relative overflow-hidden flex-1 group">
-                        <img id="plant-img"
-                            class="absolute inset-0 w-full h-full object-cover opacity-20 grayscale group-hover:grayscale-0 transition-all duration-700"
-                            alt="Close up of a large vibrant green Monstera Deliciosa leaf"
-                            src=""
-                        />
-                        <div class="relative z-10 flex flex-col h-full justify-between">
-                            <div>
-                                <div class="flex justify-between items-center mb-2">
-                                    <span class="px-2 py-1 bg-primary/20 text-primary text-[10px] font-bold rounded">
-                                        OPTIMAL
-                                    </span>
-                                    <button id="plant-loop" class="text-on-surface-variant hover:text-primary transition-colors">
-                                        <span class="material-symbols-outlined text-[18px]">sync</span>
-                                    </button>
-                                </div>
-                                    <h3 id="plant-name"
-                                    class="font-headline text-2xl font-bold text-on-surface tracking-tight leading-none mb-1">
-                                    PIANTA
-                                    </h3>
-
-                                    <p class="text-[11px] italic text-on-surface-variant/40 tracking-wide mb-4">
-                                    Descrizione
-                                    </p>
-
-                                    <div class="flex flex-col divide-y divide-white/[0.06]">
-
-                                    <div class="flex items-baseline justify-between py-[5px]">
-                                        <span class="text-[10px] uppercase tracking-[0.12em] text-on-surface-variant/40">
-                                        Temperatura
-                                        </span>
-                                        <span id="temp-range" class="text-[13px] font-semibold text-primary tabular-nums">
-                                        ?? – ?? °C
-                                        </span>
-                                    </div>
-
-                                    <div class="flex items-baseline justify-between py-[5px]">
-                                        <span class="text-[10px] uppercase tracking-[0.12em] text-on-surface-variant/40">
-                                        Umidità
-                                        </span>
-                                        <span id="hum-range" class="text-[13px] font-semibold text-primary tabular-nums">
-                                        ?? – ?? %
-                                        </span>
-                                    </div>
-
-                                    <div  class="flex items-baseline justify-between py-[5px]">
-                                        <span class="text-[10px] uppercase tracking-[0.12em] text-on-surface-variant/40">
-                                        Luce
-                                        </span>
-                                        <span id="light-range" class="text-[13px] font-semibold text-primary tabular-nums">
-                                        ???? – ???? lx
-                                        </span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="mt-8 space-y-2">
-                                <div class="flex justify-between text-xs">
-                                    <span class="text-on-surface-variant">Threshold Match</span>
-                                    <span class="text-primary font-bold">98%</span>
-                                </div>
-                                <div class="h-1.5 bg-surface-container-lowest rounded-full overflow-hidden">
-                                    <div class="h-full bg-primary w-[98%]"></div>
-                                </div>
-                                <button id="sync-mqtt" class="w-full mt-4 py-2 bg-primary/10 border border-primary/20 text-primary text-xs font-bold tracking-widest uppercase hover:bg-primary hover:text-on-primary transition-all rounded">
-                                    Sync to MQTT
-                                </button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- ── Row 3: Node Actuation (Full Width) ── -->
-                <div class="md:col-span-12 bg-surface-container-high p-8 rounded-xl flex flex-col lg:flex-row items-center gap-10">
-                    <div class="lg:w-1/3">
-                        <h3 class="font-headline text-xl font-bold text-on-surface mb-2">Node Actuation</h3>
-                        <p class="text-sm text-on-surface-variant">
-                            Direct hardware override for ESP8266 power cycles and deep sleep management.
-                        </p>
-                    </div>
-                    <div class="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-6 w-full">
-
-                        <!-- Sleep Duration Input -->
-                        <div class="space-y-2">
-                            <label class="text-[10px] font-bold tracking-widest text-on-surface-variant uppercase ml-1">
-                                Sleep Duration
-                            </label>
-                            <div class="relative">
-                                <input
-                                    class="w-full bg-surface-container-lowest border-0 border-b-2 border-outline-variant/20 focus:border-primary focus:ring-0 text-on-surface font-mono py-3 px-4"
-                                    type="number"
-                                    value="30"
-                                />
-                                <span class="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-on-surface-variant uppercase font-bold">
-                                    MIN
-                                </span>
-                            </div>
-                        </div>
-
-                        <!-- Start Node Button -->
-                        <button id="start-esp" data-field="START" class="bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-md font-bold text-sm tracking-widest uppercase h-[52px] mt-auto flex items-center justify-center gap-2 active:scale-95 transition-all">
-                            <span class="material-symbols-outlined">power_settings_new</span>
-                                <div id="start-stop-text">
-                                    Start ESP8266
-                                </div>
-                        </button>
-
-                        <!-- Initiate Sleep Button -->
-                        <button class="bg-surface-container-highest border border-outline-variant/30 text-on-surface rounded-md font-bold text-sm tracking-widest uppercase h-[52px] mt-auto flex items-center justify-center gap-2 hover:bg-surface-bright active:scale-95 transition-all">
-                            <span class="material-symbols-outlined">bedtime</span>
-                            Initiate Sleep
-                        </button>
-                    </div>
+              <!-- Bars + gridlines -->
+              <div class="relative flex-1">
+                <!-- Gridlines -->
+                <div
+                  class="absolute inset-0 flex flex-col justify-between pointer-events-none"
+                >
+                  <div class="border-t border-white/[0.06] w-full"></div>
+                  <div class="border-t border-white/[0.06] w-full"></div>
+                  <div class="border-t border-white/[0.06] w-full"></div>
                 </div>
 
-            </div><!-- /grid -->
-        </div><!-- /max-w -->
+                <!-- Bars -->
+                <div
+                  class="h-64 flex items-end justify-between gap-1 relative z-10"
+                  id="chart-bars"
+                >
+                  <!-- Bars injected by main.js -->
+                </div>
+              </div>
+            </div>
+
+            <!-- X-axis labels -->
+            <div
+              id="x-axe"
+              class="flex justify-between mt-4 pl-9 text-[10px] text-on-surface-variant font-mono uppercase tracking-widest"
+            >
+              <!-- X-axis spans -->
+            </div>
+          </div>
+
+          <!-- ── Row 2: Plant Profile Card (4 cols) ── -->
+          <div class="md:col-span-4 flex flex-col gap-6">
+            <div
+              class="bg-surface-container-high rounded-xl p-6 relative overflow-hidden flex-1 group"
+            >
+              <img
+                id="plant-img"
+                class="absolute inset-0 w-full h-full object-cover opacity-20 grayscale group-hover:grayscale-0 transition-all duration-700"
+                alt="Close up of a large vibrant green Monstera Deliciosa leaf"
+                src=""
+              />
+              <div class="relative z-10 flex flex-col h-full justify-between">
+                <div class="flex justify-between items-center mb-2">
+                  <span
+                    class="px-2 py-1 bg-primary/20 text-primary text-[10px] font-bold rounded"
+                  >
+                    OPTIMAL
+                  </span>
+                  <button
+                    id="plant-loop"
+                    class="text-on-surface-variant hover:text-primary transition-colors"
+                  >
+                    <span class="material-symbols-outlined text-[18px]"
+                      >sync</span
+                    >
+                  </button>
+                </div>
+
+                <!-- ── Row 2: Plant Profile Card Display(4 cols) ── -->
+                <div id="plant-display-section" class="hidden">
+                  <h3
+                    id="plant-name"
+                    class="font-headline text-2xl font-bold text-on-surface tracking-tight leading-none mb-1"
+                  >
+                    PIANTA
+                  </h3>
+
+                  <p
+                    class="text-[11px] italic text-on-surface-variant/40 tracking-wide mb-4"
+                  >
+                    Descrizione
+                  </p>
+
+                  <div class="flex flex-col divide-y divide-white/[0.06]"></div>
+
+                  <div class="flex items-baseline justify-between py-[5px]">
+                    <span
+                      class="text-[10px] uppercase tracking-[0.12em] text-on-surface-variant/40"
+                    >
+                      Temperatura
+                    </span>
+                    <span
+                      id="temp-range"
+                      class="text-[13px] font-semibold text-primary tabular-nums"
+                    >
+                      ?? – ?? °C
+                    </span>
+                  </div>
+
+                  <div class="flex items-baseline justify-between py-[5px]">
+                    <span
+                      class="text-[10px] uppercase tracking-[0.12em] text-on-surface-variant/40"
+                    >
+                      Umidità
+                    </span>
+                    <span
+                      id="hum-range"
+                      class="text-[13px] font-semibold text-primary tabular-nums"
+                    >
+                      ?? – ?? %
+                    </span>
+                  </div>
+
+                  <div class="flex items-baseline justify-between py-[5px]">
+                    <span
+                      class="text-[10px] uppercase tracking-[0.12em] text-on-surface-variant/40"
+                    >
+                      Luce
+                    </span>
+                    <span
+                      id="light-range"
+                      class="text-[13px] font-semibold text-primary tabular-nums"
+                    >
+                      ???? – ???? lx
+                    </span>
+                  </div>
+
+                  <div class="mt-8 space-y-2">
+                    <button
+                      id="sync-mqtt"
+                      class="w-full mt-4 py-2 bg-primary/10 border border-primary/20 text-primary text-xs font-bold tracking-widest uppercase hover:bg-primary hover:text-on-primary transition-all rounded"
+                    >
+                      Sync to MQTT
+                    </button>
+                  </div>
+                </div>
+
+                <!-- ── Row 2: Plant Form Card (4 cols) ── -->
+                <div id="add-plant-form" class="flex flex-col gap-1 mt-4">
+                  <h4 class="text-xs font-bold uppercase text-primary mb-2">
+                    Nuova Configurazione
+                  </h4>
+                  <input
+                    type="text"
+                    id="new-name"
+                    placeholder="Nome"
+                    class="bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-on-surface"
+                  />
+
+                  <div class="flex flex-col gap-1">
+                    <label class="text-[9px] uppercase text-white/40 ml-1"
+                      >Immagine Pianta</label
+                    >
+                    <input
+                      type="file"
+                      id="new-img"
+                      accept="image/*"
+                      class="text-[10px] text-white/60"
+                    />
+                  </div>
+
+                  <div class="flex items-baseline justify-between py-[5px]">
+                    <span
+                      class="text-[10px] uppercase tracking-[0.12em] text-on-surface-variant/40"
+                    >
+                      Temperatura
+                    </span>
+                    <div class="flex items-center gap-1 text-primary">
+                      <input
+                        type="number"
+                        id="temp-min-input"
+                        placeholder="Min"
+                        class="w-20 bg-black/40 border border-white/10 rounded p-1 text-center text-xs text-primary outline-none focus:border-primary/50"
+                      />
+                      <span class="text-[13px] font-semibold">°</span>
+                      <span class="text-[13px] font-semibold">–</span>
+                      <input
+                        type="number"
+                        id="temp-max-input"
+                        placeholder="Max"
+                        class="w-20 bg-black/40 border border-white/10 rounded p-1 text-center text-xs text-primary outline-none focus:border-primary/50"
+                      />
+                      <span class="text-[13px] font-semibold">°</span>
+                    </div>
+                  </div>
+
+                  <div class="flex items-baseline justify-between py-[5px]">
+                    <span
+                      class="text-[10px] uppercase tracking-[0.12em] text-on-surface-variant/40"
+                    >
+                      Umidità
+                    </span>
+                    <div class="flex items-center gap-1 text-primary">
+                      <input
+                        type="number"
+                        id="hum-min-input"
+                        placeholder="Min"
+                        class="w-20 bg-black/40 border border-white/10 rounded p-1 text-center text-xs text-primary outline-none focus:border-primary/50"
+                      />
+                      <span class="text-[13px] font-semibold">%</span>
+                      <span class="text-[13px] font-semibold">–</span>
+                      <input
+                        type="number"
+                        id="hum-max-input"
+                        placeholder="Max"
+                        class="w-20 bg-black/40 border border-white/10 rounded p-1 text-center text-xs text-primary outline-none focus:border-primary/50"
+                      />
+                      <span class="text-[13px] font-semibold">%</span>
+                    </div>
+                  </div>
+
+                  <div class="flex items-baseline justify-between py-[5px]">
+                    <span
+                      class="text-[10px] uppercase tracking-[0.12em] text-on-surface-variant/40"
+                    >
+                      Luce
+                    </span>
+                    <div class="flex items-center gap-1 text-primary">
+                      <input
+                        type="number"
+                        id="lux-min-input"
+                        placeholder="Min"
+                        class="w-20 bg-black/40 border border-white/10 rounded p-1 text-center text-xs text-primary outline-none focus:border-primary/50"
+                      />
+                      <span class="text-[13px] font-semibold">–</span>
+                      <input
+                        type="number"
+                        id="lux-max-input"
+                        placeholder="Max"
+                        class="w-20 bg-black/40 border border-white/10 rounded p-1 text-center text-xs text-primary outline-none focus:border-primary/50"
+                      />
+                      <span class="text-[13px] font-semibold">(LDR)</span>
+                    </div>
+                  </div>
+
+                  <div class="mt-8 space-y-2">
+                    <button
+                      id="save-new-plant"
+                      class="w-full mt-2 py-2 bg-primary/10 border border-primary/20 text-primary text-xs font-bold tracking-widest uppercase hover:bg-primary hover:text-on-primary transition-all rounded"
+                    >
+                      Salva
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ── Row 3: Node Actuation (Full Width) ── -->
+        <div
+          class="md:col-span-12 bg-surface-container-high p-8 rounded-xl flex flex-col lg:flex-row items-center gap-10"
+        >
+          <div class="lg:w-1/3">
+            <h3 class="font-headline text-xl font-bold text-on-surface mb-2">
+              Node Actuation
+            </h3>
+            <p class="text-sm text-on-surface-variant">
+              Direct hardware override for ESP8266 power cycles and deep sleep
+              management.
+            </p>
+          </div>
+          <div class="flex-1 grid grid-cols-1 sm:grid-cols-3 gap-6 w-full">
+            <!-- Sleep Duration Input -->
+            <div class="space-y-2">
+              <label
+                class="text-[10px] font-bold tracking-widest text-on-surface-variant uppercase ml-1"
+              >
+                Sleep Duration
+              </label>
+              <div class="relative">
+                <input
+                  class="w-full bg-surface-container-lowest border-0 border-b-2 border-outline-variant/20 focus:border-primary focus:ring-0 text-on-surface font-mono py-3 px-4"
+                  type="number"
+                  value="30"
+                />
+                <span
+                  class="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-on-surface-variant uppercase font-bold"
+                >
+                  MIN
+                </span>
+              </div>
+            </div>
+
+            <!-- Start Node Button -->
+            <button
+              id="start-esp"
+              data-field="START"
+              class="bg-gradient-to-br from-primary to-primary-container text-on-primary rounded-md font-bold text-sm tracking-widest uppercase h-[52px] mt-auto flex items-center justify-center gap-2 active:scale-95 transition-all"
+            >
+              <span class="material-symbols-outlined">power_settings_new</span>
+              <div id="start-stop-text">Start ESP8266</div>
+            </button>
+
+            <!-- Initiate Sleep Button -->
+            <button
+              class="bg-surface-container-highest border border-outline-variant/30 text-on-surface rounded-md font-bold text-sm tracking-widest uppercase h-[52px] mt-auto flex items-center justify-center gap-2 hover:bg-surface-bright active:scale-95 transition-all"
+            >
+              <span class="material-symbols-outlined">bedtime</span>
+              Initiate Sleep
+            </button>
+          </div>
+        </div>
+      </div>
+      <!-- /grid -->
+      <!-- /max-w -->
     </main>
 
     <!-- Main JS -->
     <script src="static/main.js"></script>
-
-</body>
+  </body>
 </html>
