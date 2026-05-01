@@ -4,3 +4,5 @@ influxdb-client
 paho-mqtt 
 urllib3 
 python-dotenv
+SQLAlchemy
+python-multipart

@@ -3,13 +3,16 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 import os
 from mqtt import mqtt_hub
+from plants_db import db_manager
 import json
 from influxdb_client import InfluxDBClient
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File, Form
+import shutil
 from dotenv import load_dotenv
 
 # 1. Carica il file .env
 load_dotenv()
+db_manager.delete_plant_by_id("test")
 
 #COMANDO PER AVVIARE IL SERVER: python -m uvicorn app:app --reload --host 127.0.0.1 --port 8000
 
@@ -26,44 +29,8 @@ INFLUXDB_ORG = os.getenv("INFLUXDB_ORG")
 INFLUXDB_BUCKET = os.getenv("INFLUXDB_BUCKET")
 INFLUXDB_URL = os.getenv("INFLUXDB_URL")
 
-PLANT_DATABASE = {
-    "test-lab" : {
-        "name": "Test Lab Plant",
-        "img": "./static/test_plant.jpeg",
-        "thresholds": {
-            "temp": {"min": 15.0, "max": 35.0},
-            "hum": {"min": 20.0, "max": 90.0},
-            "light": {"min": 100, "max": 1000}
-        }
-    },
-    "monstera_albo": {
-        "name": "Monstera Deliciosa",
-        "img": "./static/P1.jpeg",
-        "thresholds": {
-            "temp": {"min": 18.0, "max": 27.0},
-            "hum": {"min": 60.0, "max": 75.0},
-            "light": {"min": 300, "max": 500} 
-        }
-    },
-    "nepenthes_rajah": {
-        "name": "Nepenthes Rajah",
-        "img": "./static/P2.jpeg",
-        "thresholds": {
-            "temp": {"min": 13.0, "max": 25.0},
-            "hum": {"min": 80.0, "max": 95.0},
-            "light": {"min": 200, "max": 400}
-        }
-    },
-    "ghost_orchid": {
-        "name": "Dendrophylax lindenii",
-        "img": "./static/P3.jpeg",
-        "thresholds": {
-            "temp": {"min": 22.0, "max": 32.0},
-            "hum": {"min": 70.0, "max": 90.0},
-            "light": {"min": 600, "max": 850}
-        }
-    }
-}
+UPLOAD_DIR = "./static/uploads"
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 app = FastAPI()
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -75,26 +42,47 @@ async def home():
 
 @app.get("/api/piante/soglie/{nome_pianta}")
 async def get_soglie_pianta(nome_pianta: str):
-    pianta = PLANT_DATABASE.get(nome_pianta)
+    plant = db_manager.get_plant_by_id(nome_pianta)
     
-    if pianta:
-        return pianta
+    if plant is None:
+        # Ritorna un errore 404 (Not Found) invece di un semplice 'null'
+        raise HTTPException(status_code=404, detail="Pianta non trovata")
+        
+    return plant
+
+@app.get("/api/piante/count")
+async def get_numero_piante():
+    count = db_manager.get_plants_count()
+    return {"count": count}
+
+
+@app.get("/api/piante/soglie/position/{pos}")
+async def get_soglie_pianta_by_pos(pos: int):
+    plant = db_manager.get_plant_by_position(pos)
     
+    if plant is None:
+        return None
+        
+    return plant
 
 @app.get("/api/piante/syncmqtt/{nome_pianta}")
 async def sync_mqtt(nome_pianta: str):
-    pianta = PLANT_DATABASE.get(nome_pianta)
+    pianta = db_manager.get_plant_by_id(nome_pianta)
     
     if pianta:
         payload = {
             "name": nome_pianta,
-            "thresholds": pianta.get("thresholds")
+            "thresholds": {
+                "temp": {"min": pianta.temp_min, "max": pianta.temp_max},
+                "hum": {"min": pianta.hum_min, "max": pianta.hum_max},
+                "light": {"min": pianta.light_min, "max": pianta.light_max}
+            }
         }
         json_string = json.dumps(payload)
         mqtt_hub.send_thresholds(json_string)
 
 @app.get("/api/piante/startstop/{esp_status}")
-async def sync_mqtt(esp_status: str):
+async def start_stop(esp_status: str):
     payload = str(esp_status)
     mqtt_hub.send_start_stop(payload)
 
@@ -178,6 +166,50 @@ async def get_latest_data_pianta(nome_pianta: str):
         print(f"Errore durante la query: {e}")
     finally:
         client.close()
+
+
+@app.post("/api/plants/save")
+async def save_plant(
+    name: str = Form(...),
+    temp_min: float = Form(...),
+    temp_max: float = Form(...),
+    hum_min: float = Form(...),
+    hum_max: float = Form(...),
+    light_min: float = Form(...),
+    light_max: float = Form(...),
+    image: UploadFile = File(None) # Il file è opzionale in caso di update
+):
+    try:
+        img_path = None
+        if image:
+            # Crea un percorso sicuro per il file
+            file_extension = os.path.splitext(image.filename)[1]
+            # Usiamo lo slug del nome per rinominare il file immagine (es. monstera.jpg)
+            safe_filename = f"{db_manager.generate_id(name)}{file_extension}"
+            file_path = os.path.join(UPLOAD_DIR, safe_filename)
+            
+            # Salva il file sul disco
+            with open(file_path, "wb") as buffer:
+                shutil.copyfileobj(image.file, buffer)
+            
+            # Percorso che servirà al frontend (relativo alla cartella static)
+            img_path = f"{file_path}"
+
+        plant_id = db_manager.add_plant(
+            name=name,
+            img_path=img_path,
+            t_min=temp_min,
+            t_max=temp_max,
+            h_min=hum_min,
+            h_max=hum_max,
+            l_min=light_min,
+            l_max=light_max
+        )
+
+        return {"status": "success", "message": f"Pianta {name} salvata", "id": plant_id}
+
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 def _adc_to_klux(adc_value):
     if adc_value <= 0: return 0

@@ -9,12 +9,6 @@ console.log("DEBUG: File main.js caricato!");
 
 /* Active Plant */
 let activePlantIndex = 0;
-let plantArray = [
-  "test-lab",
-  "monstera_albo",
-  "nepenthes_rajah",
-  "ghost_orchid",
-];
 
 let activeField = "temp";
 let activeTime = "24h";
@@ -29,7 +23,7 @@ const COLOR_MAP = {
 /* ── renderChart ─────────────────────────────────────────────
    Clears and re-renders the bar chart for the given dataset.
    ─────────────────────────────────────────────────────────── */
-async function renderPlantChart(plantid, field, lastTime) {
+async function _renderPlantChart(plantid, field, lastTime) {
   const container = document.getElementById("chart-bars");
   if (!container) return;
 
@@ -47,12 +41,12 @@ async function renderPlantChart(plantid, field, lastTime) {
       container.innerHTML = "";
       document.getElementById("y-max").textContent = "No Data";
       document.getElementById("y-mid").textContent = "No Data";
-      updateXAxis(data);
+      _updateXAxis(data);
       return;
     }
 
-    updateYAxis(field_data);
-    updateXAxis(data);
+    _updateYAxis(field_data);
+    _updateXAxis(data);
     const max = Math.max(...field_data);
     container.innerHTML = "";
 
@@ -79,7 +73,7 @@ async function renderPlantChart(plantid, field, lastTime) {
   }
 }
 
-async function caricaSogliePianta(nomeId) {
+async function _caricaSogliePianta(nomeId) {
   try {
     // Effettua la chiamata alla tua REST API
     let response = await fetch(`/api/piante/soglie/${nomeId}`);
@@ -88,20 +82,19 @@ async function caricaSogliePianta(nomeId) {
 
     let data = await response.json();
     console.log(data);
-    let soglie = data.thresholds;
 
     // Aggiorna l'HTML con i dati ricevuti
     document.getElementById("plant-name").innerText = `${data.name}`;
-    document.getElementById("plant-img").src = `${data.img}`;
+    document.getElementById("plant-img").src = `${data.img_path}`;
 
     document.getElementById("temp-range").innerText =
-      `${soglie.temp.min}° - ${soglie.temp.max}°`;
+      `${data.temp_min}° - ${data.temp_max}°`;
 
     document.getElementById("hum-range").innerText =
-      `${soglie.hum.min}% - ${soglie.hum.max}%`;
+      `${data.hum_min}% - ${data.hum_max}%`;
 
     document.getElementById("light-range").innerText =
-      `${soglie.light.min} - ${soglie.light.max} (LDR)`;
+      `${data.light_min} - ${data.light_max} (LDR)`;
   } catch (error) {
     console.error("Errore nel caricamento:", error);
     document.getElementById("plant-name").innerText = "Errore Caricamento";
@@ -109,32 +102,45 @@ async function caricaSogliePianta(nomeId) {
 }
 
 async function loopPlants() {
-  // Incrementiamo l'indice
+  let plant = null;
+  let len = 0;
   activePlantIndex++;
+  try {
+    plant = await getCurrentIndexPlant();
+
+    let response = await fetch("/api/piante/count");
+    if (!response.ok) throw new Error("Errore nel db delle piante");
+
+    let data = await response.json();
+    len = data.count;
+  } catch (error) {
+    console.error("Errore nel caricamento:", error);
+  }
 
   // Se l'indice è uguale alla lunghezza dell'array, mostriamo il form
-  if (activePlantIndex === plantArray.length) {
-    showAddPlantForm();
+  if (activePlantIndex === len) {
+    _showAddPlantForm();
   }
   // Se superiamo anche il form, resettiamo a 0 (prima pianta)
-  else if (activePlantIndex > plantArray.length) {
+  else if (activePlantIndex > len) {
     activePlantIndex = 0;
-    showPlantData();
+    plant = await getCurrentIndexPlant();
+    _showPlantData(plant);
   }
   // Altrimenti, mostriamo la pianta corrente
   else {
-    showPlantData();
+    _showPlantData(plant);
   }
 }
 
-async function caricaLatestDatoPianta(nomeId) {
+async function _caricaLatestDatoPianta(nomeId) {
   try {
-    // Effettua la chiamata alla tua REST API
     let response = await fetch(`/api/piante/latestdata/${nomeId}`);
 
     if (!response.ok) throw new Error("Pianta non trovata");
 
     let data = await response.json();
+    console.log(data);
     // console.log(data);
     document.getElementById("plant-temp").innerText = data.temp;
     document.getElementById("plant-hum").innerText = data.hum;
@@ -144,20 +150,18 @@ async function caricaLatestDatoPianta(nomeId) {
   }
 }
 
-function showAddPlantForm() {
+async function _showAddPlantForm() {
   document.getElementById("plant-display-section").classList.add("hidden");
   document.getElementById("add-plant-form").classList.remove("hidden");
 }
 
-function showPlantData() {
-  const currentPlant = plantArray[activePlantIndex];
-
+async function _showPlantData(plant) {
   document.getElementById("plant-display-section").classList.remove("hidden");
   document.getElementById("add-plant-form").classList.add("hidden");
 
-  caricaLatestDatoPianta(currentPlant);
-  caricaSogliePianta(currentPlant);
-  renderPlantChart(currentPlant, activeField, activeTime);
+  _caricaLatestDatoPianta(plant.id);
+  _caricaSogliePianta(plant.id);
+  _renderPlantChart(plant.id, activeField, activeTime);
 }
 
 async function selectTabPlantField() {
@@ -178,7 +182,10 @@ async function selectTabPlantField() {
   );
   this.classList.replace("text-on-surface-variant", "text-primary");
   activeField = this.getAttribute("data-field");
-  renderPlantChart(plantArray[activePlantIndex], activeField, activeTime);
+  let plant = await getCurrentIndexPlant();
+  if (plant != null) {
+    _renderPlantChart(plant.id, activeField, activeTime);
+  }
 }
 
 async function selectTabPlantTime() {
@@ -199,15 +206,17 @@ async function selectTabPlantTime() {
   );
   this.classList.replace("text-on-surface-variant", "text-primary");
   activeTime = this.getAttribute("data-field");
-  renderPlantChart(plantArray[activePlantIndex], activeField, activeTime);
+  let plant = await getCurrentIndexPlant();
+  if (plant != null) {
+    _renderPlantChart(plant.id, activeField, activeTime);
+  }
 }
 
 async function syncMQTTSoglie() {
   try {
+    let plant = await getCurrentIndexPlant();
     // Effettua la chiamata alla tua REST API
-    let response = await fetch(
-      `/api/piante/syncmqtt/${plantArray[activePlantIndex]}`,
-    );
+    let response = await fetch(`/api/piante/syncmqtt/${plant.id}`);
 
     if (!response.ok) throw new Error("Pianta non trovata");
   } catch (error) {
@@ -235,13 +244,13 @@ async function startStopEsp8266() {
   }
 }
 
-async function updateYAxis(data) {
+async function _updateYAxis(data) {
   const max = Math.max(...data);
   document.getElementById("y-max").textContent = max;
   document.getElementById("y-mid").textContent = Math.round(max / 2);
 }
 
-async function updateXAxis(data) {
+async function _updateXAxis(data) {
   let xPoints = [];
   const container = document.getElementById("x-axe");
   container.innerHTML = "";
@@ -266,16 +275,78 @@ async function updateXAxis(data) {
   });
 }
 
+async function handleSavePlant() {
+  const nameInput = document.getElementById("new-name").value;
+  const imgInput = document.getElementById("new-img").files[0]; // Prende il file
+
+  // Creiamo il contenitore per i dati "multipart"
+  const formData = new FormData();
+  formData.append("name", nameInput);
+  formData.append("temp_min", document.getElementById("temp-min-input").value);
+  formData.append("temp_max", document.getElementById("temp-max-input").value);
+  formData.append("hum_min", document.getElementById("hum-min-input").value);
+  formData.append("hum_max", document.getElementById("hum-max-input").value);
+  formData.append("light_min", document.getElementById("lux-min-input").value);
+  formData.append("light_max", document.getElementById("lux-max-input").value);
+
+  // Aggiungiamo l'immagine solo se l'utente l'ha selezionata
+  if (imgInput) {
+    formData.append("image", imgInput);
+  }
+
+  const response = await fetch("/api/plants/save", {
+    method: "POST",
+    body: formData,
+  });
+
+  const result = await response.json();
+  if (response.ok) {
+    console.log("Salvataggio riuscito:", result);
+
+    const formContainer = document.getElementById("add-plant-form");
+    const inputs = formContainer.querySelectorAll("input");
+    inputs.forEach((input) => {
+      input.value = "";
+    });
+  } else {
+    alert("Errore nel salvataggio: " + result.detail);
+  }
+}
+
+async function getCurrentIndexPlant() {
+  const response = await fetch(
+    `/api/piante/soglie/position/${activePlantIndex}`,
+  );
+
+  if (!response.ok) {
+    return null;
+  }
+
+  const plant = await response.json();
+  return plant;
+}
+
+async function loadAtStart() {
+  activePlantIndex = 0;
+  const plant = await getCurrentIndexPlant();
+  if (plant == null) {
+    _showAddPlantForm();
+  } else {
+    _showPlantData(plant);
+  }
+}
+
 /* ── Boot ────────────────────────────────────────────────── */
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Boot avviato...");
-  caricaSogliePianta(plantArray[0]);
-  caricaLatestDatoPianta(plantArray[0]);
-  renderPlantChart(plantArray[0], activeField, activeTime);
+  loadAtStart();
+
   document.getElementById("plant-loop").addEventListener("click", loopPlants);
+
   document
     .getElementById("sync-mqtt")
     .addEventListener("click", syncMQTTSoglie);
+
   const ftabs = document.querySelectorAll("#chart-field-tabs span");
   ftabs.forEach((tab) => {
     tab.addEventListener("click", selectTabPlantField);
@@ -284,6 +355,10 @@ document.addEventListener("DOMContentLoaded", () => {
   ttabs.forEach((tab) => {
     tab.addEventListener("click", selectTabPlantTime);
   });
+
+  document
+    .getElementById("save-new-plant")
+    .addEventListener("click", handleSavePlant);
 
   document
     .getElementById("start-esp")
