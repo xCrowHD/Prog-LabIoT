@@ -219,14 +219,25 @@
 
           <!-- ── Row 1: Hardware Profile (4 cols) ── -->
           <div
-            class="md:col-span-4 bg-surface-container-low p-6 rounded-xl space-y-4"
+            class="md:col-span-4 bg-surface-container-low p-6 rounded-xl space-y-4 h-[250px] overflow-y-auto"
           >
-            <h3
-              class="text-xs font-bold tracking-widest text-on-surface-variant uppercase mb-4"
-            >
-              Hardware Profile
-            </h3>
-            <div class="space-y-3">
+            <div class="flex justify-between items-center">
+              <h3
+                id=""
+                class="text-xs font-bold tracking-widest text-on-surface-variant uppercase"
+              >
+                Hardware Profile
+              </h3>
+
+              <button
+                id="mcu-set-loop"
+                class="text-on-surface-variant hover:text-primary transition-colors"
+              >
+                <span class="material-symbols-outlined text-[18px]">sync</span>
+              </button>
+            </div>
+
+            <div id="mcu-info" class="">
               <div
                 class="flex justify-between items-center py-2 border-b border-outline-variant/10"
               >
@@ -263,6 +274,52 @@
                 <span class="text-sm font-mono text-on-surface"
                   >12d 04h 22m</span
                 >
+              </div>
+            </div>
+
+            <div id="set-mcu-form" class="hidden">
+              <div
+                class="flex justify-between items-center py-2 border-b border-outline-variant/10"
+              >
+                <span class="text-sm text-on-surface-variant">MCU Name</span>
+                <input
+                  id="mcu-name"
+                  type="text"
+                  class="bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-on-surface"
+                />
+              </div>
+
+              <div
+                class="flex justify-between items-center py-2 border-b border-outline-variant/10"
+              >
+                <span class="text-sm text-on-surface-variant">MCU Backup</span>
+                <input
+                  id="mcu-backup"
+                  type="checkbox"
+                  class="bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-on-surface"
+                />
+              </div>
+
+              <div
+                class="flex justify-between items-center py-2 border-b border-outline-variant/10"
+              >
+                <span class="text-sm text-on-surface-variant"
+                  >MCU Data Timer</span
+                >
+                <input
+                  id="mcu-timer"
+                  type="number"
+                  class="bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-on-surface"
+                />
+              </div>
+
+              <div class="">
+                <button
+                  id="set-mcu"
+                  class="w-full py-2 bg-primary/10 border border-primary/20 text-primary text-xs font-bold tracking-widest uppercase hover:bg-primary hover:text-on-primary transition-all rounded"
+                >
+                  Set MCU
+                </button>
               </div>
             </div>
           </div>

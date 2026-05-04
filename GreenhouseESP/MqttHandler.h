@@ -8,6 +8,7 @@
 
 #define TOPIC_THRESHOLD "lab_iot/mafogani/threshold"
 #define TOPIC_START_STOP "lab_iot/mafogani/start-stop"
+#define TOPIC_MCU_SET "lab_iot/mafogani/set-mcu"
 
 struct Thresholds {
   char platName[32];
@@ -19,6 +20,11 @@ struct Thresholds {
   int luxMax;
 };
 
+struct McuSettings {
+  char mcuName[32];
+  bool isBackup;
+  float timer;
+};
 
 class MqttHandler {
 private:
@@ -26,6 +32,7 @@ private:
   const char* _broker;
   int _port;
   Thresholds _plantThresholds;
+  McuSettings _settings;
   bool _isStartMode = false;
 
 public:
@@ -41,9 +48,11 @@ public:
   Thresholds getThresholds();
   bool isRunning();
 
+
 private:
   void handleThresholds(byte* payload, unsigned int length);
   void handleStartStop(byte* payload, unsigned int length);
+  void handleSettings(byte* payload, unsigned int length);
 };
 
 #endif

@@ -10,6 +10,9 @@ console.log("DEBUG: File main.js caricato!");
 /* Active Plant */
 let activePlantIndex = 0;
 
+// MCU Form
+let activeMcuFormIndex = 0;
+
 let activeField = "temp";
 let activeTime = "24h";
 
@@ -130,6 +133,74 @@ async function loopPlants() {
   // Altrimenti, mostriamo la pianta corrente
   else {
     _showPlantData(plant);
+  }
+}
+
+async function loopMcuInfo() {
+  activeMcuFormIndex++;
+
+  if (activeMcuFormIndex > 1 || activeMcuFormIndex == 0) {
+    activeMcuFormIndex = 0;
+    _showMcuInfo();
+  }
+  if (activeMcuFormIndex == 1) {
+    _showSetMcu();
+  }
+}
+
+async function _showMcuInfo() {
+  document.getElementById("set-mcu-form").classList.add("hidden");
+  document.getElementById("mcu-info").classList.remove("hidden");
+}
+
+async function _showSetMcu() {
+  document.getElementById("mcu-info").classList.add("hidden");
+  document.getElementById("set-mcu-form").classList.remove("hidden");
+}
+
+async function handleSetMcu() {
+  let name = document.getElementById("mcu-name").value;
+  let backup = document.getElementById("mcu-backup").value;
+  let timer = document.getElementById("mcu-timer").value;
+
+  const payload = {
+    name: name,
+    backup: backup,
+    timer: timer,
+  };
+
+  try {
+    const response = await fetch("/api/plants/set-mcu", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(payload), // Trasforma l'oggetto in stringa JSON
+    });
+
+    if (response.ok) {
+      const result = await response.json();
+      console.log("Configurazione inviata");
+      const formContainer = document.getElementById("set-mcu-form");
+      const inputs = formContainer.querySelectorAll("input");
+      inputs.forEach((input) => {
+        if (input.type == "checkbox") {
+          input.checked = false;
+        } else {
+          input.value = "";
+        }
+      });
+    } else {
+      const errorData = await response.json();
+      console.error("Errore del server:", errorData);
+      alert(
+        "Errore durante il salvataggio: " +
+          (errorData.detail || "Unknown error"),
+      );
+    }
+  } catch (error) {
+    console.error("Errore di rete:", error);
+    alert("Impossibile contattare il server.");
   }
 }
 
@@ -363,4 +434,10 @@ document.addEventListener("DOMContentLoaded", () => {
   document
     .getElementById("start-esp")
     .addEventListener("click", startStopEsp8266);
+
+  document
+    .getElementById("mcu-set-loop")
+    .addEventListener("click", loopMcuInfo);
+
+  document.getElementById("set-mcu").addEventListener("click", handleSetMcu);
 });

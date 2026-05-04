@@ -6,6 +6,7 @@ import json
 # NOTA PHOTORESISTOR 0 MOLTA LUCE 1024 BUIO (da sperimentare)
 
 TOPIC_TEST = "lab_iot/mafogani/test"
+TOPIC_SET_MCU = "lab_iot/mafogani/set-mcu"
 TOPIC_IS_ESP_ONLINE = "lab_iot/mafogani/esp_online"
 TOPIC_SET_ESP_THRESHOLD = "lab_iot/mafogani/threshold"
 TOPIC_SET_ESP_START_STOP = "lab_iot/mafogani/start-stop"
@@ -28,10 +29,12 @@ class MQTTManager:
         self.is_esp_online = (payload.lower() == "online")
         print(f"[MQTT] Stato ESP aggiornato: {self.is_esp_online}")
     
-    def send_thresholds(self, str_payload):
-        self.client.publish(TOPIC_SET_ESP_THRESHOLD, str_payload)
-    def send_start_stop(self, str_payload):
-        self.client.publish(TOPIC_SET_ESP_START_STOP, str_payload)
+    def send_thresholds(self, payload: str):
+        self.client.publish(TOPIC_SET_ESP_THRESHOLD, payload)
+    def send_start_stop(self, payload: str):
+        self.client.publish(TOPIC_SET_ESP_START_STOP, payload)
+    def send_set_mcu(self, payload: str):
+        self.client.publish(TOPIC_SET_MCU, payload)
 
 
     

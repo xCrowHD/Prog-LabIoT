@@ -22,6 +22,7 @@ void MqttHandler::reconnect() {
       Serial.println(F("Connesso!"));
       _client.subscribe(TOPIC_THRESHOLD);
       _client.subscribe(TOPIC_START_STOP);
+      _client.subscribe(TOPIC_MCU_SET);
     } else {
       Serial.print(F("fallito, rc="));
       Serial.print(_client.state());
@@ -40,6 +41,8 @@ void MqttHandler::processMessage(char* topic, byte* payload, unsigned int length
     handleThresholds(payload, length);
   } else if (strcmp(topic, TOPIC_START_STOP) == 0) {
     handleStartStop(payload, length);
+  } else if (strcmp(topic, TOPIC_MCU_SET) == 0) {
+    handleSettings(payload, length);
   }
 }
 
@@ -97,6 +100,12 @@ void MqttHandler::handleStartStop(byte* payload, unsigned int length) {
   } else {
     Serial.print(F("Comando sconosciuto di lunghezza: "));
     Serial.println(length);
+  }
+}
+
+void MqttHandler::handleSettings(byte* payload, unsigned int length) {
+  for (int i = 0; i < length; i++) {
+    Serial.print((char)payload[i]);
   }
 }
 

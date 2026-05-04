@@ -168,6 +168,12 @@ async def get_latest_data_pianta(nome_pianta: str):
         client.close()
 
 
+@app.post("/api/plants/set-mcu")
+async def save_plant(payload: dict):
+    payload_string = json.dumps(payload)
+    print(payload_string)
+    mqtt_hub.send_set_mcu(payload_string)
+
 @app.post("/api/plants/save")
 async def save_plant(
     name: str = Form(...),
