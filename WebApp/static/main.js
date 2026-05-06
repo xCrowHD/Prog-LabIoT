@@ -160,7 +160,7 @@ async function _showSetMcu() {
 
 async function handleSetMcu() {
   let name = document.getElementById("mcu-name").value;
-  let backup = document.getElementById("mcu-backup").value;
+  let backup = document.getElementById("mcu-backup").checked;
   let timer = document.getElementById("mcu-timer").value;
 
   const payload = {

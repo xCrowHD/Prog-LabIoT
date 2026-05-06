@@ -7,8 +7,6 @@
 #include "LCDHandler.h"
 #include "AlarmHandler.h"
 
-// LED RGB
-#define LED_ONBOARD LED_BUILTIN_AUX
 // D0, LED on the development board (between the ESP module and the USB port)
 //https://github.com/nodemcu/nodemcu-devkit-v1.0/blob/master/NODEMCU_DEVKIT_V1.0.PDF
 
@@ -51,7 +49,7 @@ Ticker tickerBlink;
 Ticker writeToInflux;
 Ticker writeLCD;
 Ticker tickerAlarm;
-
+float lastTimerValue = 20.0;
 
 volatile bool flagWriteInflux = false;
 
@@ -69,7 +67,7 @@ void setup() {
   sensor.begin();
   alarm.begin();
 
-  writeToInflux.attach(20.0, []() {
+  writeToInflux.attach((float)lastTimerValue, []() {
     flagWriteInflux = true;
   });
 
@@ -84,11 +82,20 @@ void setup() {
 
 void loop() {
   mqtt.handle();
+  if (!mqtt.isSet()) {
+    lcd.addMessage("Status", "Need Settings");
+    return;
+  }
   if (!mqtt.isRunning()) {
     lcd.addMessage("Status", "OFFLINE");
     return;
   } else {
     lcd.addMessage("Status", "ONLINE");
+  }
+
+  if (mqtt.getSettings().timer != lastTimerValue) {
+    lastTimerValue = mqtt.getSettings().timer;
+    updateInfluxTicker();
   }
 
   if (flagWriteInflux) {
@@ -239,4 +246,21 @@ long connectToWiFi() {
   }
 
   return rssi_strength;
+}
+
+void updateInfluxTicker() {
+  int newInterval = mqtt.getSettings().timer;
+
+  // Protezione: evita valori assurdi o zero che farebbero crashare l'ESP
+  if (newInterval <= 0) newInterval = 20;
+
+  Serial.print(F("Aggiornamento intervallo InfluxDB: "));
+  Serial.print(newInterval);
+  Serial.println(F(" secondi"));
+
+  // Stacchiamo il ticker e lo riattacchiamo con il nuovo valore
+  writeToInflux.detach();
+  writeToInflux.attach((float)newInterval, []() {
+    flagWriteInflux = true;
+  });
 }

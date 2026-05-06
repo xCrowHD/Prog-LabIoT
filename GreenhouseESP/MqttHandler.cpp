@@ -107,12 +107,50 @@ void MqttHandler::handleSettings(byte* payload, unsigned int length) {
   for (int i = 0; i < length; i++) {
     Serial.print((char)payload[i]);
   }
+  Serial.println();
+  StaticJsonDocument<512> doc;
+  DeserializationError error = deserializeJson(doc, payload, length);
+  if (!error) {
+    if (doc.containsKey("name")) {
+      const char* nameFromData = doc["name"];
+
+      // Copiamo il nome nel nostro array fisso (max 31 char + \0)
+      strncpy(_settings.mcuName, nameFromData, sizeof(_settings.mcuName) - 1);
+
+      // Assicuriamoci che la stringa sia chiusa correttamente
+      _settings.mcuName[sizeof(_settings.mcuName) - 1] = '\0';
+    }
+    _settings.isBackup = doc["backup"];
+    _settings.timer = doc["timer"];
+
+    Serial.println(F("--- Settings Aggiornati ---"));
+    Serial.print(F("Nome MCU: "));
+    Serial.println(_settings.mcuName);
+    Serial.print(F("Timer MCU: "));
+    Serial.println(_settings.timer);
+  } else {
+    Serial.println(F("Could no set settings"));
+  }
 }
 
 Thresholds MqttHandler::getThresholds() {
   return _plantThresholds;
 }
 
+McuSettings MqttHandler::getSettings() {
+  return _settings;
+}
+
 bool MqttHandler::isRunning() {
   return _isStartMode;
+}
+
+bool MqttHandler::isSet() {
+  if (_settings.mcuName[0] == '\0') {
+    return false;
+  }
+  if (_settings.timer <= 0) {
+    return false;
+  }
+  return true;
 }

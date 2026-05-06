@@ -47,6 +47,8 @@ public:
   void processMessage(char* topic, byte* payload, unsigned int length);
   Thresholds getThresholds();
   bool isRunning();
+  bool isSet();
+  McuSettings getSettings();
 
 
 private:
