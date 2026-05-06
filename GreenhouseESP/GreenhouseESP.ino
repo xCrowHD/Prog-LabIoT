@@ -6,6 +6,7 @@
 #include "SensorManager.h"
 #include "LCDHandler.h"
 #include "AlarmHandler.h"
+#include "WiFiHandler.h"
 
 // D0, LED on the development board (between the ESP module and the USB port)
 //https://github.com/nodemcu/nodemcu-devkit-v1.0/blob/master/NODEMCU_DEVKIT_V1.0.PDF
@@ -19,16 +20,8 @@ bool lastButtonState = HIGH;
 #define RSSI_THRESHOLD -80
 
 // WiFi config
-
-char ssid[] = SECRET_SSID;  // your network SSID (name)
-char pass[] = SECRET_PASS;  // your network password
-#ifdef IP
-IPAddress ip(IP);
-IPAddress subnet(SUBNET);
-IPAddress dns(DNS);
-IPAddress gateway(GATEWAY);
-#endif
 WiFiClient client;
+WiFiHandler wifiHandler;
 
 // InfluxDB cfg
 InfluxDBClient client_idb(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
@@ -59,7 +52,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 void setup() {
   Serial.begin(115200);
-  long _dc = connectToWiFi();
+  wifiHandler.begin();
   pinMode(RESET_ALARMS, INPUT_PULLUP);
 
   mqtt.begin(callback);
@@ -202,7 +195,7 @@ void sendDataToInflux() {
     lcd.addMessage("Thresholds", "SOME O.O.R");
   }
 
-  long rssi = connectToWiFi();
+  long rssi = wifiHandler.getRSSI();
   if (rssi < RSSI_THRESHOLD) {
     Serial.println(F("RSSI too low"));
     Serial.println(rssi);
@@ -220,32 +213,6 @@ void sendDataToInflux() {
   } else {
     Serial.println(client_idb.getLastErrorMessage());
   }
-}
-
-// WiFi connection
-long connectToWiFi() {
-  long rssi_strength;
-  // connect to WiFi (if not already connected)
-  if (WiFi.status() != WL_CONNECTED) {
-    Serial.print(F("Connecting to SSID: "));
-    Serial.println(ssid);
-
-#ifdef IP
-    WiFi.config(ip, dns, gateway, subnet);  // by default network is configured using DHCP
-#endif
-
-    WiFi.begin(ssid, pass);
-    while (WiFi.status() != WL_CONNECTED) {
-      Serial.print(F("."));
-      delay(250);
-    }
-    Serial.println(F("\nConnected!"));
-    rssi_strength = WiFi.RSSI();  // get wifi signal strength
-  } else {
-    rssi_strength = WiFi.RSSI();  // get wifi signal strength
-  }
-
-  return rssi_strength;
 }
 
 void updateInfluxTicker() {
