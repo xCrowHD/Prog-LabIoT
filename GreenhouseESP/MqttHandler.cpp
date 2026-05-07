@@ -57,15 +57,17 @@ void MqttHandler::handleThresholds(byte* payload, unsigned int length) {
   DeserializationError error = deserializeJson(doc, payload, length);
   if (!error) {
 
+    if (!isAddressedToMe(doc)) {
+      Serial.print(F("Msg Not for me"));
+      Serial.println();
+      return;
+    }
+
     if (doc.containsKey("name")) {
       const char* nameFromData = doc["name"];
-
-      // Copiamo il nome nel nostro array fisso (max 31 char + \0)
-      strncpy(_plantThresholds.platName, nameFromData, sizeof(_plantThresholds.platName) - 1);
-
-      // Assicuriamoci che la stringa sia chiusa correttamente
-      _plantThresholds.platName[sizeof(_plantThresholds.platName) - 1] = '\0';
+      strlcpy(_plantThresholds.platName, nameFromData, sizeof(_plantThresholds.platName));
     }
+
     JsonObject thresholds = doc["thresholds"];
     Serial.println(F("Aggiornamento soglie!"));
 
@@ -91,15 +93,19 @@ void MqttHandler::handleStartStop(byte* payload, unsigned int length) {
     Serial.print((char)payload[i]);
   }
   Serial.println();
-  if (length == 5 && memcmp(payload, "START", 5) == 0) {
-    _isStartMode = true;
-    Serial.println(F("Stato: ATTIVO"));
-  } else if (length == 4 && memcmp(payload, "STOP", 4) == 0) {
-    _isStartMode = false;
-    Serial.println(F("Stato: DISATTIVATO"));
-  } else {
-    Serial.print(F("Comando sconosciuto di lunghezza: "));
-    Serial.println(length);
+
+  StaticJsonDocument<128> doc;
+  DeserializationError error = deserializeJson(doc, payload, length);
+  if (!error) {
+    if (!isAddressedToMe(doc)) {
+      Serial.print(F("Msg Not for me"));
+      Serial.println();
+      return;
+    }
+
+    _isStartMode = doc["status"];
+    Serial.print(F("Stato aggiornato: "));
+    Serial.println(_isStartMode ? F("ATTIVO") : F("DISATTIVATO"));
   }
 }
 
@@ -111,14 +117,17 @@ void MqttHandler::handleSettings(byte* payload, unsigned int length) {
   StaticJsonDocument<512> doc;
   DeserializationError error = deserializeJson(doc, payload, length);
   if (!error) {
+
+    if (!isAddressedToMe(doc)) {
+      Serial.print(F("Msg Not for me"));
+      Serial.println();
+      return;
+    }
+
     if (doc.containsKey("name")) {
       const char* nameFromData = doc["name"];
 
-      // Copiamo il nome nel nostro array fisso (max 31 char + \0)
-      strncpy(_settings.mcuName, nameFromData, sizeof(_settings.mcuName) - 1);
-
-      // Assicuriamoci che la stringa sia chiusa correttamente
-      _settings.mcuName[sizeof(_settings.mcuName) - 1] = '\0';
+      strlcpy(_settings.mcuName, nameFromData, sizeof(_settings.mcuName));
     }
     _settings.isBackup = doc["backup"];
     _settings.timer = doc["timer"];
@@ -153,4 +162,13 @@ bool MqttHandler::isSet() {
     return false;
   }
   return true;
+}
+
+bool MqttHandler::isAddressedToMe(const JsonVariant& doc) {
+  char myMac[13];
+  WiFiHandler::getMacAddress(myMac);
+  if (strcmp(myMac, doc["id"]) == 0) {
+    return true;
+  }
+  return false;
 }

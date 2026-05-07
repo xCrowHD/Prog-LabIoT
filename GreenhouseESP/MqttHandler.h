@@ -5,7 +5,11 @@
 #include <ESP8266WiFi.h>
 #include <PubSubClient.h>
 #include <ArduinoJson.h>
+//usiamo staicJsonDocument cosi da mettere nello stack ed evita frammentazione
+//se usassimo JsonDocument lo metterebbe nell'heap portando possibile frammentazione in seguito
+#include "WiFiHandler.h"
 
+#define TOPIC_CONNECTION "lab_iot/mafogani/connection"
 #define TOPIC_THRESHOLD "lab_iot/mafogani/threshold"
 #define TOPIC_START_STOP "lab_iot/mafogani/start-stop"
 #define TOPIC_MCU_SET "lab_iot/mafogani/set-mcu"
@@ -52,6 +56,7 @@ public:
 
 
 private:
+  bool isAddressedToMe(const JsonVariant& doc);
   void handleThresholds(byte* payload, unsigned int length);
   void handleStartStop(byte* payload, unsigned int length);
   void handleSettings(byte* payload, unsigned int length);
