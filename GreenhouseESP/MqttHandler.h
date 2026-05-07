@@ -15,19 +15,19 @@
 #define TOPIC_MCU_SET "lab_iot/mafogani/set-mcu"
 
 struct Thresholds {
-  char platName[32];
-  float tempMin;
-  float tempMax;
-  float humMin;
-  float humMax;
-  int luxMin;
-  int luxMax;
+  char platName[32] = "";
+  float tempMin = 0;
+  float tempMax = 0;
+  float humMin = 0;
+  float humMax = 0;
+  int luxMin = 0;
+  int luxMax = 0;
 };
 
 struct McuSettings {
-  char mcuName[32];
-  bool isBackup;
-  float timer;
+  char mcuName[32] = "";
+  bool isBackup = false;
+  float timer = 0;
 };
 
 class MqttHandler {
@@ -38,6 +38,7 @@ private:
   Thresholds _plantThresholds;
   McuSettings _settings;
   bool _isStartMode = false;
+  char _id[13];
 
 public:
   // Costruttore
@@ -56,6 +57,7 @@ public:
 
 
 private:
+  void sendImOn();
   bool isAddressedToMe(const JsonVariant& doc);
   void handleThresholds(byte* payload, unsigned int length);
   void handleStartStop(byte* payload, unsigned int length);

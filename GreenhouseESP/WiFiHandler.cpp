@@ -18,6 +18,7 @@ long WiFiHandler::getRSSI() {
   return WiFi.RSSI();
 }
 
+//usiamo il MAC e non il chip ID perchè se gli ESP sono nello stesso batch hanno chip id uguale
 void WiFiHandler::getMacAddress(char* buffer_size_13) {
   uint8_t mac[6];
   WiFi.macAddress(mac);

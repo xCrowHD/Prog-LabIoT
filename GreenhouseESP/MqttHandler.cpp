@@ -1,7 +1,9 @@
 #include "MqttHandler.h"
 
 MqttHandler::MqttHandler(WiFiClient& wifiClient, const char* broker, int port)
-  : _client(wifiClient), _broker(broker), _port(port), _plantThresholds{} {}
+  : _client(wifiClient), _broker(broker), _port(port), _plantThresholds{} {
+    WiFiHandler::getMacAddress(_id);
+  }
 
 void MqttHandler::begin(MQTT_CALLBACK_SIGNATURE) {
   _client.setServer(_broker, _port);
@@ -18,11 +20,12 @@ void MqttHandler::handle() {
 void MqttHandler::reconnect() {
   while (!_client.connected()) {
     Serial.print(F("Tentativo connessione MQTT..."));
-    if (_client.connect("ESP8266_Serra_Client")) {
+    if (_client.connect(_id)) {
       Serial.println(F("Connesso!"));
       _client.subscribe(TOPIC_THRESHOLD);
       _client.subscribe(TOPIC_START_STOP);
       _client.subscribe(TOPIC_MCU_SET);
+      sendImOn();
     } else {
       Serial.print(F("fallito, rc="));
       Serial.print(_client.state());
@@ -165,10 +168,12 @@ bool MqttHandler::isSet() {
 }
 
 bool MqttHandler::isAddressedToMe(const JsonVariant& doc) {
-  char myMac[13];
-  WiFiHandler::getMacAddress(myMac);
-  if (strcmp(myMac, doc["id"]) == 0) {
+  if (strcmp(_id, doc["id"]) == 0) {
     return true;
   }
   return false;
+}
+
+void MqttHandler::sendImOn(){
+  return;
 }
