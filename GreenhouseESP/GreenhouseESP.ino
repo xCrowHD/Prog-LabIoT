@@ -21,8 +21,6 @@ bool lastButtonState = HIGH;
 
 // WiFi config
 WiFiClient client;
-WiFiHandler wifiHandler;
-
 // InfluxDB cfg
 InfluxDBClient client_idb(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
 
@@ -52,7 +50,7 @@ void callback(char* topic, byte* payload, unsigned int length) {
 
 void setup() {
   Serial.begin(115200);
-  wifiHandler.begin();
+  WiFiHandler::begin();
   pinMode(RESET_ALARMS, INPUT_PULLUP);
 
   mqtt.begin(callback);
@@ -195,7 +193,7 @@ void sendDataToInflux() {
     lcd.addMessage("Thresholds", "SOME O.O.R");
   }
 
-  long rssi = wifiHandler.getRSSI();
+  long rssi = WiFiHandler::getRSSI();
   if (rssi < RSSI_THRESHOLD) {
     Serial.println(F("RSSI too low"));
     Serial.println(rssi);

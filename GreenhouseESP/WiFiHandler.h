@@ -7,12 +7,12 @@
 
 class WiFiHandler {
 private:
-  WiFiManager _wifiManager;
+  static WiFiManager _wifiManager;
 public:
-  WiFiHandler();
-  void begin();
-  void resetCredentials();
-  long getRSSI();
+  static void begin();
+  static void resetCredentials();
+  static long getRSSI();
+  static void getMacAddress(char* buffer_size_13);
 };
 
 #endif

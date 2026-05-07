@@ -1,6 +1,6 @@
 #include "WiFiHandler.h"
 
-WiFiHandler::WiFiHandler() {}
+WiFiManager WiFiHandler::_wifiManager;
 
 void WiFiHandler::begin() {
   _wifiManager.autoConnect();
@@ -10,10 +10,16 @@ void WiFiHandler::resetCredentials() {
   _wifiManager.resetSettings();
 }
 
-long WiFiHandler::getRSSI(){
-  while (WiFi.status() != WL_CONNECTED){
+long WiFiHandler::getRSSI() {
+  while (WiFi.status() != WL_CONNECTED) {
     delay(200);
   }
 
   return WiFi.RSSI();
+}
+
+void WiFiHandler::getMacAddress(char* buffer_size_13) {
+  uint8_t mac[6];
+  WiFi.macAddress(mac);
+  sprintf(buffer_size_13, "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
 }
