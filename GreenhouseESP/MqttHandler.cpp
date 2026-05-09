@@ -175,5 +175,13 @@ bool MqttHandler::isAddressedToMe(const JsonVariant& doc) {
 }
 
 void MqttHandler::sendImOn(){
-  return;
+  StaticJsonDocument<96> doc;
+  char buffer[96];
+  doc["id"] = _id;
+  serializeJson(doc, buffer);
+
+  char dynamicTopic[128];
+  snprintf(dynamicTopic, sizeof(dynamicTopic), "%s/%s", TOPIC_CONNECTION, _id);
+
+  _client.publish(dynamicTopic, (const char*)buffer, true);
 }
