@@ -25,7 +25,7 @@ WiFiClient client;
 InfluxDBClient client_idb(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
 
 // MQTT Broker settings
-MqttHandler mqtt(client, "broker.emqx.io", 1883);
+MqttHandler mqtt;
 
 //Sensori
 SensorManager sensor;
@@ -44,16 +44,12 @@ float lastTimerValue = 20.0;
 
 volatile bool flagWriteInflux = false;
 
-void callback(char* topic, byte* payload, unsigned int length) {
-  mqtt.processMessage(topic, payload, length);
-}
-
 void setup() {
   Serial.begin(115200);
   WiFiHandler::begin();
   pinMode(RESET_ALARMS, INPUT_PULLUP);
 
-  mqtt.begin(callback);
+  mqtt.begin(client, "broker.emqx.io", 1883);
   lcd.begin();
   sensor.begin();
   alarm.begin();
