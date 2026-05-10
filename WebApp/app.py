@@ -68,9 +68,13 @@ async def get_soglie_pianta_by_pos(pos: int):
 @app.get("/api/piante/syncmqtt/{nome_pianta}")
 async def sync_mqtt(nome_pianta: str):
     pianta = db_manager.get_plant_by_id(nome_pianta)
+    current_esp_id = mqtt_hub.get_current_esp()
+    if current_esp_id == None:
+        return
     
     if pianta:
         payload = {
+            "id": current_esp_id,
             "name": nome_pianta,
             "thresholds": {
                 "temp": {"min": pianta.temp_min, "max": pianta.temp_max},
@@ -79,12 +83,23 @@ async def sync_mqtt(nome_pianta: str):
             }
         }
         json_string = json.dumps(payload)
+        print(json_string)
         mqtt_hub.send_thresholds(json_string)
 
-@app.get("/api/piante/startstop/{esp_status}")
-async def start_stop(esp_status: str):
-    payload = str(esp_status)
-    mqtt_hub.send_start_stop(payload)
+@app.post("/api/piante/startstop")
+async def start_stop(data: dict):
+    current_esp_id = mqtt_hub.get_current_esp()
+    if current_esp_id == None:
+        return
+
+    esp_payload = {
+        "id": current_esp_id,
+        "status": data.get("status", False)
+    }
+
+    print(esp_payload)
+    mqtt_hub.send_start_stop(json.dumps(esp_payload))
+    return {"message": "Comando inviato", "target": current_esp_id, "status": esp_payload["status"]}
 
 
 @app.get("/api/piante/data/{nome_pianta}/{last_time}")
@@ -169,7 +184,11 @@ async def get_latest_data_pianta(nome_pianta: str):
 
 
 @app.post("/api/plants/set-mcu")
-async def save_plant(payload: dict):
+async def set_mcu(payload: dict):
+    current_esp_id = mqtt_hub.get_current_esp()
+    if current_esp_id == None:
+        return
+    payload["id"] = current_esp_id
     payload_string = json.dumps(payload)
     print(payload_string)
     mqtt_hub.send_set_mcu(payload_string)
@@ -216,6 +235,24 @@ async def save_plant(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/plants/nextnode")
+async def get_next_node():
+    node = mqtt_hub.get_next_esp()
+    d = {
+        "id": node
+    }
+    return d
+
+
+@app.get("/api/plants/currentnode")
+async def get_current_node():
+    node = mqtt_hub.get_current_esp()
+    d = {
+        "id": node
+    }
+    print(d)
+    return d
 
 def _adc_to_klux(adc_value):
     if adc_value <= 0: return 0
