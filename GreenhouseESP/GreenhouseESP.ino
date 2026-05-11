@@ -40,13 +40,16 @@ Ticker tickerBlink;
 Ticker writeToInflux;
 Ticker writeLCD;
 Ticker tickerAlarm;
+Ticker idTick;
 float lastTimerValue = 20.0;
+char id[13];
 
 volatile bool flagWriteInflux = false;
 
 void setup() {
   Serial.begin(115200);
   WiFiHandler::begin();
+  WiFiHandler::getMacAddress(id);
   pinMode(RESET_ALARMS, INPUT_PULLUP);
 
   mqtt.begin(client, "broker.emqx.io", 1883);
@@ -64,6 +67,10 @@ void setup() {
 
   tickerAlarm.attach(1.5, []() {
     alarm.nextAlarmColor();
+  });
+
+  idTick.attach(5.0, []{
+    lcd.addMessage("ID:", id);
   });
 }
 

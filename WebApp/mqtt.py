@@ -44,7 +44,7 @@ class MQTTManager:
             if esp.get("settings") != None:
                 self.send_set_mcu(esp.get("settings"))
 
-        
+        self.esp_list[esp_id]["status"] = data.get("status")
         print(self.esp_list)
 
     def get_current_esp(self):

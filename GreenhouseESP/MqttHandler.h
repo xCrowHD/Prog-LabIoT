@@ -38,6 +38,7 @@ private:
   McuSettings _settings;
   bool _isStartMode = false;
   char _id[13];
+  char _dynamicTopic[128];
 
 public:
   // Costruttore

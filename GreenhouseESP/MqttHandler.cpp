@@ -8,6 +8,9 @@ void MqttHandler::begin(WiFiClient& wifiClient, const char* broker, int port) {
   snprintf(_lwtPayload, sizeof(_lwtPayload), "{\"id\":\"%s\",\"status\":\"OFFLINE\"}", _id);
   _client.begin(broker, port, wifiClient);
 
+  snprintf(_dynamicTopic, sizeof(_dynamicTopic), "%s/%s", TOPIC_CONNECTION, _id);
+  _client.setWill(_dynamicTopic, _lwtPayload, true, 1);
+
   _client.onMessageAdvanced([this](MQTTClient* c, char t[], char p[], int l) {
     this->processMessage(c, t, p, l);
   });
@@ -23,9 +26,8 @@ void MqttHandler::handle() {
 void MqttHandler::reconnect() {
   while (!_client.connected()) {
     Serial.print(F("Tentativo connessione MQTT..."));
-
-    _client.setWill(TOPIC_CONNECTION, _lwtPayload, true, 1);
-
+    _client.clearWill();
+    _client.setWill(_dynamicTopic, _lwtPayload, true, 1);
     if (_client.connect(_id)) {
       Serial.println(F("Connesso!"));
       _client.subscribe(TOPIC_THRESHOLD, 1);
@@ -182,8 +184,5 @@ void MqttHandler::sendImOn() {
   doc["status"] = "ONLINE";
   serializeJson(doc, buffer);
 
-  char dynamicTopic[128];
-  snprintf(dynamicTopic, sizeof(dynamicTopic), "%s/%s", TOPIC_CONNECTION, _id);
-
-  _client.publish(dynamicTopic, buffer, true, 1);
+  _client.publish(_dynamicTopic, buffer, true, 1);
 }
