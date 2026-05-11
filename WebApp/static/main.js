@@ -109,7 +109,7 @@ async function loopPlants() {
   let len = 0;
   activePlantIndex++;
   try {
-    plant = await getCurrentIndexPlant();
+    let plant = await getCurrentIndexPlant();
 
     let response = await fetch("/api/piante/count");
     if (!response.ok) throw new Error("Errore nel db delle piante");
@@ -462,6 +462,12 @@ document.addEventListener("DOMContentLoaded", () => {
   const intervalId = setInterval(async () => {
     getCurrentNodeMcu();
   }, 5000);
+
+  const intervalLastetsPlant = setInterval(async () => {
+    let plant = await getCurrentIndexPlant();
+    _caricaLatestDatoPianta(plant.id);
+    console.log("UPDATE");
+  }, 60000);
 
   document.getElementById("plant-loop").addEventListener("click", loopPlants);
 
