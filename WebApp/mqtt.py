@@ -1,169 +1,138 @@
-import paho.mqtt.client as mqtt
-from paho.mqtt import client as mqtt_client
-import json
+"""
+mqtt.py
+MQTT client manager.
+Handles node discovery, backup failover, and message dispatch.
+"""
 
-TOPIC_TEST = "lab_iot/mafogani/test"
-TOPIC_SET_MCU = "lab_iot/mafogani/set-mcu"
-TOPIC_CONNECTION = "lab_iot/mafogani/connection/+"
-TOPIC_SET_ESP_THRESHOLD = "lab_iot/mafogani/threshold"
-TOPIC_SET_ESP_START_STOP = "lab_iot/mafogani/start-stop"
-TOPIC_BACKUP = "lab_iot/mafogani/backup"
-MQTT_IP = "broker.emqx.io"
-MQTT_PORT = 1883
+import json
+from paho.mqtt import client as mqtt_client
+
+from config import (
+    MQTT_IP, MQTT_PORT,
+    TOPIC_TEST, TOPIC_SET_MCU, TOPIC_CONNECTION,
+    TOPIC_SET_THRESHOLD, TOPIC_SET_START_STOP, TOPIC_BACKUP,
+)
+
 
 class MQTTManager:
     def __init__(self):
-        self.esp_list = dict()
-        self.current_esp_index = 0
+        self.esp_list:dict[str, dict] = {}
+        self.current_esp_index: int = 0
+
         self.client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2)
-        self.client.connect(MQTT_IP, MQTT_PORT, 60)
+        self.client.connect(MQTT_IP, MQTT_PORT, keepalive=60)
         self.client.subscribe(TOPIC_CONNECTION)
-        self.client.message_callback_add(TOPIC_CONNECTION, self._esp_status_check)
+        self.client.message_callback_add(TOPIC_CONNECTION, self._on_node_status)
         self.client.publish(TOPIC_TEST, "MQTT Client ON")
         self.client.loop_start()
 
-    def _esp_status_check(self, client, userdata, msg):
-        payload = msg.payload.decode()
-        data = json.loads(payload)
-        esp_id = data.get("id")
-        current_status = data.get("status") # ONLINE o OFFLINE
+    # ── Internal callbacks ────────────────────────────────────────────────────
 
-        # 1. Inizializzazione se il nodo è nuovo
-        if self.esp_list.get(esp_id) is None:
+    def _on_node_status(self, client, userdata, msg):
+        """Handle connection/disconnection announcements from ESP nodes."""
+        data = json.loads(msg.payload.decode())
+        esp_id = data.get("id")
+        status = data.get("status")  # "ONLINE" | "OFFLINE"
+
+        # Initialise node entry if new
+        if esp_id not in self.esp_list:
             self.esp_list[esp_id] = {}
 
-        # Aggiorniamo lo stato nel dizionario
-        self.esp_list[esp_id]["status"] = current_status
+        self.esp_list[esp_id]["status"] = status
 
-        # 2. LOGICA SE IL NODO TORNA ONLINE
-        if current_status == "ONLINE":
-            esp = self.esp_list[esp_id]
-            
-            # RIPRISTINO PARAMETRI: Se abbiamo dati salvati, inviamoli subito all'ESP
-            if esp.get("plant-thr"):
-                self.send_thresholds(esp.get("plant-thr"))
-            if esp.get("start-stop"):
-                self.send_start_stop(esp.get("start-stop"))
-            if esp.get("settings"):
-                self.send_set_mcu(esp.get("settings"))
-            
-            # GESTIONE BACKUP: Se questo nodo è il "principale", cerchiamo il suo backup e mettiamolo in standby
-            # (Assumiamo che il backup abbia lo stesso nome ma il flag backup=True)
-            self._manage_backup_for(esp_id, activate_backup=False)
+        if status == "ONLINE":
+            self._restore_node_state(esp_id)
+            self._set_backup_standby(esp_id, in_standby=True)
+        elif status == "OFFLINE":
+            print(f"[MQTT] Node {esp_id} went offline — activating backup if present")
+            self._set_backup_standby(esp_id, in_standby=False)
 
-        # 3. LOGICA SE IL NODO VA OFFLINE (Last Will)
-        elif current_status == "OFFLINE":
-            print(f"ATTENZIONE: Nodo {esp_id} disconnesso! Cerco un sostituto...")
-            # Attiviamo il backup se esiste
-            self._manage_backup_for(esp_id, activate_backup=True)
+        print(f"[MQTT] {esp_id} → {status}")
 
-        print(f"Stato aggiornato: {esp_id} è ora {current_status}")
+    def _restore_node_state(self, esp_id: str):
+        """Re-send stored configuration to a node that just came back online."""
+        node = self.esp_list[esp_id]
+        if node.get("plant-thr"):
+            self.send_thresholds(node["plant-thr"])
+        if node.get("start-stop"):
+            self.send_start_stop(node["start-stop"])
+        if node.get("settings"):
+            self.send_set_mcu(node["settings"])
 
-    def _manage_backup_for(self, target_id, activate_backup: bool):
+    def _set_backup_standby(self, primary_id: str, *, in_standby: bool):
         """
-        Trova il backup del nodo 'target_id' e lo attiva o lo mette in standby.
+        Find the backup node for *primary_id* and toggle its standby state.
+        in_standby=True  → backup goes to sleep (primary is back online)
+        in_standby=False → backup wakes up   (primary went offline)
         """
-        target_node = self.esp_list.get(target_id)
-        if not target_node or "settings" not in target_node:
+        primary = self.esp_list.get(primary_id)
+        if not primary or "settings" not in primary:
             return
 
-        target_name = target_node["settings"].get("name")
+        primary_name = primary["settings"].get("name")
 
-        # Cerchiamo tra tutti gli altri nodi
-        for other_id, other_data in self.esp_list.items():
-            if other_id == target_id:
-                continue
-                
-            settings = other_data.get("settings")
-            if settings and settings.get("name") == target_name and settings.get("backup") is True:
-                # Abbiamo trovato il backup!
-                status_msg = {"id": other_id, "standby": not activate_backup}
-                
-                # Se activate_backup è True, standby sarà False (sveglia!)
-                # Se activate_backup è False, standby sarà True (nanna!)
-                self.client.publish(f"{TOPIC_BACKUP}/{other_id}", json.dumps(status_msg), 1, retain=True)
-                
-                azione = "ATTIVATO" if activate_backup else "messo in STANDBY"
-                print(f"Il backup {other_id} per {target_name} è stato {azione}")
-
-    def get_current_esp(self):
-        if len(self.esp_list) == 0:
-            return None
-        
-        current_id = sorted(list(self.esp_list))[self.current_esp_index]
-        d = {
-            "id": current_id,
-            "status": self.esp_list[current_id]["status"]
-        }
-
-        return d
-    
-    def get_next_esp(self):
-        if len(self.esp_list) == 0:
-            return None
-
-        self.current_esp_index += 1
-        if self.current_esp_index >= len(self.esp_list):
-            self.current_esp_index = 0
-
-        current_id = sorted(list(self.esp_list))[self.current_esp_index]
-        d = {
-            "id": current_id,
-            "status": self.esp_list[current_id]["status"]
-        }
-        return d
-
-    def _does_node_exist(self, payload: dict):
-        esp_id_target = payload.get("id")
-        new_name = payload.get("name")
-        is_backup = payload.get("backup", False)
         for node_id, node_data in self.esp_list.items():
-            if node_id == esp_id_target:
+            if node_id == primary_id:
                 continue
+            settings = node_data.get("settings", {})
+            if settings.get("name") == primary_name and settings.get("backup") is True:
+                msg    = {"id": node_id, "standby": in_standby}
+                self.client.publish(TOPIC_BACKUP, json.dumps(msg), qos=1, retain=True)
+                state  = "standby" if in_standby else "active"
+                print(f"[MQTT] Backup {node_id} for '{primary_name}' → {state}")
 
-            existing_settings = node_data.get("settings")
-            if existing_settings != None:
-                existing_name = existing_settings.get("name")
+    def _node_name_already_taken(self, payload: dict) -> bool:
+        """Return True if another (non-backup) node already uses the same name."""
+        target_id = payload.get("id")
+        new_name  = payload.get("name")
+        is_backup = payload.get("backup", False)
 
-                if existing_name == new_name:
-                # Se quello che stiamo settando NON è un backup, blocchiamo tutto
-                    if not is_backup:
-                        return True
+        for node_id, node_data in self.esp_list.items():
+            if node_id == target_id:
+                continue
+            existing_name = (node_data.get("settings") or {}).get("name")
+            if existing_name == new_name and not is_backup:
+                return True
         return False
-    
+
+    # ── Public API ────────────────────────────────────────────────────────────
+
+    def get_current_esp(self) -> dict | None:
+        if not self.esp_list:
+            return None
+        esp_id = sorted(self.esp_list)[self.current_esp_index]
+        return {"id": esp_id, "status": self.esp_list[esp_id]["status"]}
+
+    def get_next_esp(self) -> dict | None:
+        if not self.esp_list:
+            return None
+        self.current_esp_index = (self.current_esp_index + 1) % len(self.esp_list)
+        esp_id = sorted(self.esp_list)[self.current_esp_index]
+        return {"id": esp_id, "status": self.esp_list[esp_id]["status"]}
+
     def send_thresholds(self, payload: dict):
-        esp_id = payload.get("id")
-        print(payload)
+        esp_id = payload["id"]
         self.esp_list[esp_id]["plant-thr"] = payload
-        # print(self.esp_list.get(esp_id))
-        self.client.publish(TOPIC_SET_ESP_THRESHOLD, json.dumps(payload), 1)
+        self.client.publish(TOPIC_SET_THRESHOLD, json.dumps(payload), qos=1)
+
     def send_start_stop(self, payload: dict):
-        esp_id = payload.get("id")
-        print(payload)
+        esp_id = payload["id"]
         self.esp_list[esp_id]["start-stop"] = payload
-        # print(self.esp_list.get(esp_id))
-        self.client.publish(TOPIC_SET_ESP_START_STOP, json.dumps(payload), 1)
+        self.client.publish(TOPIC_SET_START_STOP, json.dumps(payload), qos=1)
 
     def send_set_mcu(self, payload: dict):
-        esp_id = payload.get("id")
+        esp_id = payload["id"]
         is_backup = payload.get("backup", False)
 
-        if self._does_node_exist(payload):
-            print(f"ERRORE: Nome già in uso e non è un backup!")
-            return 
+        if self._node_name_already_taken(payload):
+            print(f"[MQTT] ERROR: name '{payload.get('name')}' already in use by a non-backup node")
+            return
 
-        if is_backup:
-            d = {"id": esp_id, "standby": True}
-            self.client.publish(TOPIC_BACKUP, json.dumps(d), 1)
-        else:
-            d = {"id": esp_id, "standby": False}
-            self.client.publish(TOPIC_BACKUP, json.dumps(d), 1)
+        standby_msg = {"id": esp_id, "standby": is_backup}
+        self.client.publish(TOPIC_BACKUP, json.dumps(standby_msg), qos=1)
 
         self.esp_list[esp_id]["settings"] = payload
-        self.client.publish(TOPIC_SET_MCU, json.dumps(payload), 1)
+        self.client.publish(TOPIC_SET_MCU, json.dumps(payload), qos=1)
 
-
-    
 
 mqtt_hub = MQTTManager()
-

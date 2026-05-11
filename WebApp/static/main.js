@@ -1,504 +1,183 @@
 /* =============================================================
-   main.js – Chlorophyll Logic Dashboard
+   main.js
+   Application state, event wiring, and boot sequence.
+   Imports: api.js, ui.js, chart.js
    ============================================================= */
-console.log("DEBUG: File main.js caricato!");
-/* ── Chart data ──────────────────────────────────────────────
-   Each value represents a bar height as a percentage (0–100).
-   Replace with real telemetry data when available.
-   ─────────────────────────────────────────────────────────── */
 
-/* Active Plant */
+import {
+  fetchPlantCount,
+  fetchPlantByPosition,
+  fetchNextNode,
+  fetchCurrentNode,
+  syncMqttThresholds,
+  sendStartStop,
+  sendSetMcu,
+  savePlant,
+} from "./api.js";
+
+import {
+  showPlantData,
+  showAddPlantForm,
+  showMcuInfo,
+  showSetMcuForm,
+  renderNodeStatus,
+  activateTab,
+  clearFormInputs,
+} from "./ui.js";
+
+import { renderPlantChart } from "./chart.js";
+
+// ── Application state ─────────────────────────────────────────────────────────
 let activePlantIndex = 0;
-
-// MCU Form
-let activeMcuFormIndex = 0;
-
+let activeMcuFormStep = 0; // 0 = info panel, 1 = set-mcu form
 let activeField = "temp";
 let activeTime = "24h";
 
-/* Color map per dataset */
-const COLOR_MAP = {
-  temp: "bg-primary",
-  hum: "bg-secondary",
-  lux: "bg-tertiary",
-};
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-/* ── renderChart ─────────────────────────────────────────────
-   Clears and re-renders the bar chart for the given dataset.
-   ─────────────────────────────────────────────────────────── */
-async function _renderPlantChart(plantid, field, lastTime) {
-  const container = document.getElementById("chart-bars");
-  if (!container) return;
-
-  try {
-    let response = await fetch(`/api/piante/data/${plantid}/${lastTime}`);
-
-    if (!response.ok) throw new Error("Pianta non trovata");
-    let data = await response.json();
-    const colorClass = COLOR_MAP[field];
-    //console.log(data);
-    let field_data = data.map((record) => record[field]);
-    //console.log(field_data);
-
-    if (field_data.length == 0) {
-      container.innerHTML = "";
-      document.getElementById("y-max").textContent = "No Data";
-      document.getElementById("y-mid").textContent = "No Data";
-      _updateXAxis(data);
-      return;
-    }
-
-    _updateYAxis(field_data);
-    _updateXAxis(data);
-    const max = Math.max(...field_data);
-    container.innerHTML = "";
-
-    field_data.forEach((value) => {
-      const bar = document.createElement("div");
-      bar.className = [
-        "flex-1",
-        `${colorClass}/20`,
-        "rounded-t-sm",
-        `h-[${value}%]`,
-        `hover:${colorClass}`,
-        "transition-all",
-        "duration-300",
-      ].join(" ");
-
-      // Inline style fallback (Tailwind JIT won't see dynamic h-[] at runtime)
-      bar.style.height = `${(value / max) * 100}%`;
-
-      container.appendChild(bar);
-    });
-  } catch (error) {
-    console.error("Errore nel caricamento:", error);
-    container.innerHTML = "";
-  }
+async function getCurrentPlant() {
+  return fetchPlantByPosition(activePlantIndex);
 }
 
-async function _caricaSogliePianta(nomeId) {
-  try {
-    // Effettua la chiamata alla tua REST API
-    let response = await fetch(`/api/piante/soglie/${nomeId}`);
+// ── Event handlers ────────────────────────────────────────────────────────────
 
-    if (!response.ok) throw new Error("Pianta non trovata");
-
-    let data = await response.json();
-    console.log(data);
-
-    // Aggiorna l'HTML con i dati ricevuti
-    document.getElementById("plant-name").innerText = `${data.name}`;
-    document.getElementById("plant-img").src = `${data.img_path}`;
-
-    document.getElementById("temp-range").innerText =
-      `${data.temp_min}° - ${data.temp_max}°`;
-
-    document.getElementById("hum-range").innerText =
-      `${data.hum_min}% - ${data.hum_max}%`;
-
-    document.getElementById("light-range").innerText =
-      `${data.light_min} - ${data.light_max} (LDR)`;
-  } catch (error) {
-    console.error("Errore nel caricamento:", error);
-    document.getElementById("plant-name").innerText = "Errore Caricamento";
-  }
-}
-
-async function loopPlants() {
-  let plant = null;
-  let len = 0;
+async function onLoopPlants() {
   activePlantIndex++;
-  try {
-    plant = await getCurrentIndexPlant();
+  const [plant, { count }] = await Promise.all([
+    getCurrentPlant(),
+    fetchPlantCount(),
+  ]);
 
-    let response = await fetch("/api/piante/count");
-    if (!response.ok) throw new Error("Errore nel db delle piante");
-
-    let data = await response.json();
-    len = data.count;
-  } catch (error) {
-    console.error("Errore nel caricamento:", error);
-  }
-
-  // Se l'indice è uguale alla lunghezza dell'array, mostriamo il form
-  if (activePlantIndex === len) {
-    _showAddPlantForm();
-  }
-  // Se superiamo anche il form, resettiamo a 0 (prima pianta)
-  else if (activePlantIndex > len) {
+  if (activePlantIndex === count) {
+    showAddPlantForm();
+  } else if (activePlantIndex > count) {
     activePlantIndex = 0;
-    plant = await getCurrentIndexPlant();
-    console.log(plant);
-    _showPlantData(plant);
-  }
-  // Altrimenti, mostriamo la pianta corrente
-  else {
-    _showPlantData(plant);
+    const first = await getCurrentPlant();
+    showPlantData(first, activeField, activeTime);
+  } else {
+    showPlantData(plant, activeField, activeTime);
   }
 }
 
-async function loopMcuInfo() {
-  activeMcuFormIndex++;
+async function onLoopMcuInfo() {
+  activeMcuFormStep = (activeMcuFormStep + 1) % 2;
+  activeMcuFormStep === 0 ? showMcuInfo() : showSetMcuForm();
+}
 
-  if (activeMcuFormIndex > 1 || activeMcuFormIndex == 0) {
-    activeMcuFormIndex = 0;
-    _showMcuInfo();
+async function onSelectFieldTab() {
+  activateTab(this, document.querySelectorAll("#chart-field-tabs span"));
+  activeField = this.getAttribute("data-field");
+  const plant = await getCurrentPlant();
+  if (plant) renderPlantChart(plant.id, activeField, activeTime);
+}
+
+async function onSelectTimeTab() {
+  activateTab(this, document.querySelectorAll("#chart-time-tabs span"));
+  activeTime = this.getAttribute("data-field");
+  const plant = await getCurrentPlant();
+  if (plant) renderPlantChart(plant.id, activeField, activeTime);
+}
+
+async function onSyncMqtt() {
+  const plant = await getCurrentPlant();
+  if (!plant) return;
+  try {
+    await syncMqttThresholds(plant.id);
+  } catch (err) {
+    console.error("[main] syncMqtt:", err);
   }
-  if (activeMcuFormIndex == 1) {
-    _showSetMcu();
+}
+
+async function onStartStop() {
+  const btn = this;
+  const shouldStart = btn.getAttribute("data-field") === "START";
+  const statusTextEl = document.getElementById("start-stop-text");
+
+  try {
+    await sendStartStop(shouldStart);
+    btn.setAttribute("data-field", shouldStart ? "STOP" : "START");
+    statusTextEl.innerHTML = shouldStart ? "STOP ESP8266" : "START ESP8266";
+  } catch (err) {
+    console.error("[main] startStop:", err);
+    statusTextEl.innerHTML = "ERRORE CONNESSIONE";
   }
 }
 
-async function _showMcuInfo() {
-  document.getElementById("set-mcu-form").classList.add("hidden");
-  document.getElementById("mcu-info").classList.remove("hidden");
-}
-
-async function _showSetMcu() {
-  document.getElementById("mcu-info").classList.add("hidden");
-  document.getElementById("set-mcu-form").classList.remove("hidden");
-}
-
-async function handleSetMcu() {
-  let name = document.getElementById("mcu-name").value;
-  let backup = document.getElementById("mcu-backup").checked;
-  let timer = document.getElementById("mcu-timer").value;
-
+async function onSetMcu() {
   const payload = {
-    name: name,
-    backup: backup,
-    timer: timer,
+    name: document.getElementById("mcu-name").value,
+    backup: document.getElementById("mcu-backup").checked,
+    timer: document.getElementById("mcu-timer").value,
   };
 
   try {
-    const response = await fetch("/api/plants/set-mcu", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(payload), // Trasforma l'oggetto in stringa JSON
-    });
-
-    if (response.ok) {
-      const result = await response.json();
-      console.log("Configurazione inviata");
-      const formContainer = document.getElementById("set-mcu-form");
-      const inputs = formContainer.querySelectorAll("input");
-      inputs.forEach((input) => {
-        if (input.type == "checkbox") {
-          input.checked = false;
-        } else {
-          input.value = "";
-        }
-      });
-    } else {
-      const errorData = await response.json();
-      console.error("Errore del server:", errorData);
-      alert(
-        "Errore durante il salvataggio: " +
-          (errorData.detail || "Unknown error"),
-      );
-    }
-  } catch (error) {
-    console.error("Errore di rete:", error);
-    alert("Impossibile contattare il server.");
+    await sendSetMcu(payload);
+    clearFormInputs("set-mcu-form");
+  } catch (err) {
+    console.error("[main] setMcu:", err);
+    alert("Errore durante il salvataggio: " + err.message);
   }
 }
 
-async function _caricaLatestDatoPianta(nomeId) {
+async function onSavePlant() {
   try {
-    let response = await fetch(`/api/piante/latestdata/${nomeId}`);
-
-    if (!response.ok) throw new Error("Pianta non trovata");
-
-    let data = await response.json();
-    console.log(data);
-    // console.log(data);
-    document.getElementById("plant-temp").innerText = data.temp;
-    document.getElementById("plant-hum").innerText = data.hum;
-    document.getElementById("plant-lux").innerText = data.klux;
-  } catch (error) {
-    console.error("Errore nel caricamento:", error);
-  }
-}
-
-async function _showAddPlantForm() {
-  document.getElementById("plant-display-section").classList.add("hidden");
-  document.getElementById("add-plant-form").classList.remove("hidden");
-}
-
-async function _showPlantData(plant) {
-  document.getElementById("plant-display-section").classList.remove("hidden");
-  document.getElementById("add-plant-form").classList.add("hidden");
-  console.log(plant);
-  _caricaLatestDatoPianta(plant.id);
-  _caricaSogliePianta(plant.id);
-  _renderPlantChart(plant.id, activeField, activeTime);
-}
-
-async function selectTabPlantField() {
-  const tabs = document.querySelectorAll("#chart-field-tabs span");
-  tabs.forEach((t) => {
-    t.classList.remove("border", "border-primary/20");
-    t.classList.replace(
-      "bg-surface-container-highest",
-      "bg-surface-container-lowest",
-    );
-    t.classList.replace("text-primary", "text-on-surface-variant");
-  });
-
-  this.classList.add("border", "border-primary/20");
-  this.classList.replace(
-    "bg-surface-container-lowest",
-    "bg-surface-container-highest",
-  );
-  this.classList.replace("text-on-surface-variant", "text-primary");
-  activeField = this.getAttribute("data-field");
-  let plant = await getCurrentIndexPlant();
-  if (plant != null) {
-    _renderPlantChart(plant.id, activeField, activeTime);
-  }
-}
-
-async function selectTabPlantTime() {
-  const tabs = document.querySelectorAll("#chart-time-tabs span");
-  tabs.forEach((t) => {
-    t.classList.remove("border", "border-primary/20");
-    t.classList.replace(
-      "bg-surface-container-highest",
-      "bg-surface-container-lowest",
-    );
-    t.classList.replace("text-primary", "text-on-surface-variant");
-  });
-
-  this.classList.add("border", "border-primary/20");
-  this.classList.replace(
-    "bg-surface-container-lowest",
-    "bg-surface-container-highest",
-  );
-  this.classList.replace("text-on-surface-variant", "text-primary");
-  activeTime = this.getAttribute("data-field");
-  let plant = await getCurrentIndexPlant();
-  if (plant != null) {
-    _renderPlantChart(plant.id, activeField, activeTime);
-  }
-}
-
-async function syncMQTTSoglie() {
-  try {
-    let plant = await getCurrentIndexPlant();
-    // Effettua la chiamata alla tua REST API
-    let response = await fetch(`/api/piante/syncmqtt/${plant.id}`);
-
-    if (!response.ok) throw new Error("Pianta non trovata");
-  } catch (error) {
-    console.error("Errore:", error);
-  }
-}
-
-async function startStopEsp8266() {
-  try {
-    const btn = this; // Riferimento al bottone
-    const currentStatus = btn.getAttribute("data-field");
-
-    const shouldStart = currentStatus === "START";
-
-    const response = await fetch("/api/piante/startstop", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        status: shouldStart,
-      }),
+    await savePlant({
+      name: document.getElementById("new-name").value,
+      image: document.getElementById("new-img").files[0],
+      temp_min: document.getElementById("temp-min-input").value,
+      temp_max: document.getElementById("temp-max-input").value,
+      hum_min: document.getElementById("hum-min-input").value,
+      hum_max: document.getElementById("hum-max-input").value,
+      light_min: document.getElementById("lux-min-input").value,
+      light_max: document.getElementById("lux-max-input").value,
     });
-
-    if (!response.ok) throw new Error("Errore nella risposta del server");
-
-    if (shouldStart) {
-      btn.setAttribute("data-field", "STOP");
-      document.getElementById("start-stop-text").innerHTML = "STOP ESP8266";
-    } else {
-      btn.setAttribute("data-field", "START");
-      document.getElementById("start-stop-text").innerHTML = "START ESP8266";
-    }
-  } catch (error) {
-    console.error("Errore durante il comando Start/Stop:", error);
-    document.getElementById("start-stop-text").innerHTML = "ERRORE CONNESSIONE";
+    clearFormInputs("add-plant-form");
+  } catch (err) {
+    alert("Errore nel salvataggio: " + err.message);
   }
 }
 
-async function _updateYAxis(data) {
-  const max = Math.max(...data);
-  document.getElementById("y-max").textContent = max;
-  document.getElementById("y-mid").textContent = Math.round(max / 2);
+async function onNextNode() {
+  const data = await fetchNextNode();
+  renderNodeStatus(data);
 }
 
-async function _updateXAxis(data) {
-  let xPoints = [];
-  const container = document.getElementById("x-axe");
-  container.innerHTML = "";
-  if (!data || data.length === 0) return;
-  const lastIdx = data.length - 1;
-  if (data.length <= 5) {
-    xPoints = data.map((d) => d.timestamp);
-  } else {
-    xPoints = [
-      data[0].timestamp,
-      data[Math.floor(lastIdx * 0.25)].timestamp,
-      data[Math.floor(lastIdx * 0.5)].timestamp,
-      data[Math.floor(lastIdx * 0.75)].timestamp,
-      data[lastIdx].timestamp,
-    ];
-  }
+// ── Boot ──────────────────────────────────────────────────────────────────────
 
-  xPoints.forEach((time) => {
-    const span = document.createElement("span");
-    span.textContent = time;
-    container.appendChild(span);
-  });
-}
-
-async function handleSavePlant() {
-  const nameInput = document.getElementById("new-name").value;
-  const imgInput = document.getElementById("new-img").files[0]; // Prende il file
-
-  // Creiamo il contenitore per i dati "multipart"
-  const formData = new FormData();
-  formData.append("name", nameInput);
-  formData.append("temp_min", document.getElementById("temp-min-input").value);
-  formData.append("temp_max", document.getElementById("temp-max-input").value);
-  formData.append("hum_min", document.getElementById("hum-min-input").value);
-  formData.append("hum_max", document.getElementById("hum-max-input").value);
-  formData.append("light_min", document.getElementById("lux-min-input").value);
-  formData.append("light_max", document.getElementById("lux-max-input").value);
-
-  // Aggiungiamo l'immagine solo se l'utente l'ha selezionata
-  if (imgInput) {
-    formData.append("image", imgInput);
-  }
-
-  const response = await fetch("/api/plants/save", {
-    method: "POST",
-    body: formData,
-  });
-
-  const result = await response.json();
-  if (response.ok) {
-    console.log("Salvataggio riuscito:", result);
-
-    const formContainer = document.getElementById("add-plant-form");
-    const inputs = formContainer.querySelectorAll("input");
-    inputs.forEach((input) => {
-      input.value = "";
-    });
-  } else {
-    alert("Errore nel salvataggio: " + result.detail);
-  }
-}
-
-async function getNextNodeMcu() {
-  const response = await fetch("/api/plants/nextnode");
-  const data = await response.json();
-  //console.log(data);
-  _changeMcuStatus(data);
-}
-
-async function getCurrentNodeMcu() {
-  const response = await fetch("/api/plants/currentnode");
-  const data = await response.json();
-  //console.log(data);
-  _changeMcuStatus(data);
-}
-
-async function _changeMcuStatus(data) {
-  if (data.status == "OFFLINE") {
-    document
-      .getElementById("esp-status")
-      .classList.replace("text-primary", "text-red");
-    document
-      .getElementById("eps-status-icon")
-      .classList.replace("bg-primary", "bg-red");
-  } else {
-    document
-      .getElementById("esp-status")
-      .classList.replace("text-red", "text-primary");
-    document
-      .getElementById("eps-status-icon")
-      .classList.replace("bg-red", "bg-primary");
-  }
-  document.getElementById("node-id").innerText =
-    `Monitoring Node: MCU-${data.id}`;
-  document.getElementById("esp-status").innerText = `System ${data.status}`;
-}
-
-async function getCurrentIndexPlant() {
-  const response = await fetch(
-    `/api/piante/soglie/position/${activePlantIndex}`,
-  );
-
-  if (!response.ok) {
-    return null;
-  }
-
-  const plant = await response.json();
-  return plant;
-}
-
-async function loadAtStart() {
+async function boot() {
   activePlantIndex = 0;
-  const plant = await getCurrentIndexPlant();
-  if (plant == null) {
-    _showAddPlantForm();
+  const plant = await getCurrentPlant();
+  if (plant) {
+    showPlantData(plant, activeField, activeTime);
   } else {
-    _showPlantData(plant);
+    showAddPlantForm();
   }
+
+  const nodeData = await fetchCurrentNode();
+  renderNodeStatus(nodeData);
 }
 
-/* ── Boot ────────────────────────────────────────────────── */
 document.addEventListener("DOMContentLoaded", () => {
-  console.log("Boot avviato...");
-  loadAtStart();
-  getCurrentNodeMcu();
-  const intervalId = setInterval(async () => {
-    getCurrentNodeMcu();
-  }, 5000);
+  boot();
 
-  const intervalLastetsPlant = setInterval(async () => {
-    let plant = await getCurrentIndexPlant();
-    _caricaLatestDatoPianta(plant.id);
-    console.log("UPDATE");
-  }, 60000);
-
-  document.getElementById("plant-loop").addEventListener("click", loopPlants);
-
-  document
-    .getElementById("sync-mqtt")
-    .addEventListener("click", syncMQTTSoglie);
-
-  const ftabs = document.querySelectorAll("#chart-field-tabs span");
-  ftabs.forEach((tab) => {
-    tab.addEventListener("click", selectTabPlantField);
-  });
-  const ttabs = document.querySelectorAll("#chart-time-tabs span");
-  ttabs.forEach((tab) => {
-    tab.addEventListener("click", selectTabPlantTime);
-  });
-
+  document.getElementById("plant-loop").addEventListener("click", onLoopPlants);
+  document.getElementById("sync-mqtt").addEventListener("click", onSyncMqtt);
   document
     .getElementById("save-new-plant")
-    .addEventListener("click", handleSavePlant);
-
-  document
-    .getElementById("start-esp")
-    .addEventListener("click", startStopEsp8266);
-
+    .addEventListener("click", onSavePlant);
+  document.getElementById("start-esp").addEventListener("click", onStartStop);
   document
     .getElementById("mcu-set-loop")
-    .addEventListener("click", loopMcuInfo);
-
-  document.getElementById("set-mcu").addEventListener("click", handleSetMcu);
+    .addEventListener("click", onLoopMcuInfo);
+  document.getElementById("set-mcu").addEventListener("click", onSetMcu);
   document
     .getElementById("next-node-btn")
-    .addEventListener("click", getNextNodeMcu);
+    .addEventListener("click", onNextNode);
+
+  document
+    .querySelectorAll("#chart-field-tabs span")
+    .forEach((tab) => tab.addEventListener("click", onSelectFieldTab));
+  document
+    .querySelectorAll("#chart-time-tabs span")
+    .forEach((tab) => tab.addEventListener("click", onSelectTimeTab));
 });
