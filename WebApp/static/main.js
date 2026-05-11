@@ -297,21 +297,33 @@ async function syncMQTTSoglie() {
 
 async function startStopEsp8266() {
   try {
-    let status = this.getAttribute("data-field");
-    // Effettua la chiamata alla tua REST API
-    let response = await fetch(`/api/piante/startstop/${status}`);
-    if (status == "START") {
-      this.setAttribute("data-field", "STOP");
+    const btn = this; // Riferimento al bottone
+    const currentStatus = btn.getAttribute("data-field");
+
+    const shouldStart = currentStatus === "START";
+
+    const response = await fetch("/api/piante/startstop", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        status: shouldStart,
+      }),
+    });
+
+    if (!response.ok) throw new Error("Errore nella risposta del server");
+
+    if (shouldStart) {
+      btn.setAttribute("data-field", "STOP");
       document.getElementById("start-stop-text").innerHTML = "STOP ESP8266";
-    } else if (status == "STOP") {
-      this.setAttribute("data-field", "START");
-      document.getElementById("start-stop-text").innerHTML = "START ESP8266";
     } else {
-      document.getElementById("start-stop-text").innerHTML = "ERRORE";
+      btn.setAttribute("data-field", "START");
+      document.getElementById("start-stop-text").innerHTML = "START ESP8266";
     }
-    //console.log("Called It");
   } catch (error) {
-    console.error("Errore:", error);
+    console.error("Errore durante il comando Start/Stop:", error);
+    document.getElementById("start-stop-text").innerHTML = "ERRORE CONNESSIONE";
   }
 }
 
@@ -384,6 +396,22 @@ async function handleSavePlant() {
   }
 }
 
+async function getNextNodeMcu() {
+  const response = await fetch("/api/plants/nextnode");
+  const data = await response.json();
+  //console.log(data);
+  document.getElementById("node-id").innerText =
+    `Monitoring Node: MCU-${data.id}`;
+}
+
+async function getCurrentNodeMcu() {
+  const response = await fetch("/api/plants/currentnode");
+  const data = await response.json();
+  //console.log(data);
+  document.getElementById("node-id").innerText =
+    `Monitoring Node: MCU-${data.id}`;
+}
+
 async function getCurrentIndexPlant() {
   const response = await fetch(
     `/api/piante/soglie/position/${activePlantIndex}`,
@@ -411,7 +439,7 @@ async function loadAtStart() {
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Boot avviato...");
   loadAtStart();
-
+  getCurrentNodeMcu();
   document.getElementById("plant-loop").addEventListener("click", loopPlants);
 
   document
@@ -440,4 +468,7 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("click", loopMcuInfo);
 
   document.getElementById("set-mcu").addEventListener("click", handleSetMcu);
+  document
+    .getElementById("next-node-btn")
+    .addEventListener("click", getNextNodeMcu);
 });

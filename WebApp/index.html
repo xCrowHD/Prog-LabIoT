@@ -103,15 +103,26 @@
         <header
           class="flex flex-col md:flex-row justify-between items-start md:items-end gap-4"
         >
-          <div>
-            <h1
-              class="font-headline text-4xl font-bold tracking-tight text-on-surface"
+          <div class="flex items-center gap-4">
+            <div>
+              <h1
+                class="font-headline text-4xl font-bold tracking-tight text-on-surface"
+              >
+                Dashboard Overview
+              </h1>
+              <p id="node-id" class="text-on-surface-variant font-medium">
+                Monitoring Node: ESP-NODE-MCU1.0
+              </p>
+            </div>
+
+            <button
+              id="next-node-btn"
+              class="text-on-surface-variant hover:text-primary transition-colors flex items-center justify-center p-2"
             >
-              Dashboard Overview
-            </h1>
-            <p class="text-on-surface-variant font-medium">
-              Monitoring Node: ESP-NODE-MCU1.0
-            </p>
+              <span class="material-symbols-outlined text-[40px]">
+                chevron_right
+              </span>
+            </button>
           </div>
           <div
             class="flex items-center gap-3 bg-surface-container-high px-4 py-2 rounded-lg"
