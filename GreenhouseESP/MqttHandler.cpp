@@ -1,13 +1,19 @@
 #include "MqttHandler.h"
 
-MqttHandler::MqttHandler(WiFiClient& wifiClient, const char* broker, int port)
-  : _client(wifiClient), _broker(broker), _port(port), _plantThresholds{} {
-    WiFiHandler::getMacAddress(_id);
-  }
+MqttHandler::MqttHandler()
+  : _client(512), _plantThresholds{}, _settings{} {}
 
-void MqttHandler::begin(MQTT_CALLBACK_SIGNATURE) {
-  _client.setServer(_broker, _port);
-  _client.setCallback(callback);
+void MqttHandler::begin(WiFiClient& wifiClient, const char* broker, int port) {
+  WiFiHandler::getMacAddress(_id);
+  snprintf(_lwtPayload, sizeof(_lwtPayload), "{\"id\":\"%s\",\"status\":\"OFFLINE\"}", _id);
+  _client.begin(broker, port, wifiClient);
+
+  snprintf(_dynamicTopic, sizeof(_dynamicTopic), "%s/%s", TOPIC_CONNECTION, _id);
+  _client.setWill(_dynamicTopic, _lwtPayload, true, 1);
+
+  _client.onMessageAdvanced([this](MQTTClient* c, char t[], char p[], int l) {
+    this->processMessage(c, t, p, l);
+  });
 }
 
 void MqttHandler::handle() {
@@ -20,15 +26,18 @@ void MqttHandler::handle() {
 void MqttHandler::reconnect() {
   while (!_client.connected()) {
     Serial.print(F("Tentativo connessione MQTT..."));
+    _client.clearWill();
+    _client.setWill(_dynamicTopic, _lwtPayload, true, 1);
     if (_client.connect(_id)) {
       Serial.println(F("Connesso!"));
-      _client.subscribe(TOPIC_THRESHOLD);
-      _client.subscribe(TOPIC_START_STOP);
-      _client.subscribe(TOPIC_MCU_SET);
+      _client.subscribe(TOPIC_THRESHOLD, 1);
+      _client.subscribe(TOPIC_START_STOP, 1);
+      _client.subscribe(TOPIC_MCU_SET, 1);
+      _client.subscribe(TOPIC_BACKUP, 1);
       sendImOn();
     } else {
-      Serial.print(F("fallito, rc="));
-      Serial.print(_client.state());
+      Serial.print(F("fallito, err="));
+      Serial.print(_client.lastError());
       Serial.println(F(" riprovo tra 2 secondi"));
       delay(2000);  // Un po' di respiro
     }
@@ -39,21 +48,21 @@ bool MqttHandler::connected() {
   return _client.connected();
 }
 
-void MqttHandler::processMessage(char* topic, byte* payload, unsigned int length) {
+void MqttHandler::processMessage(MQTTClient* client, char topic[], char payload[], int length) {
   if (strcmp(topic, TOPIC_THRESHOLD) == 0) {
     handleThresholds(payload, length);
   } else if (strcmp(topic, TOPIC_START_STOP) == 0) {
     handleStartStop(payload, length);
   } else if (strcmp(topic, TOPIC_MCU_SET) == 0) {
     handleSettings(payload, length);
+  } else if (strcmp(topic, TOPIC_BACKUP) == 0) {
+    handleStandBy(payload, length);
   }
 }
 
-void MqttHandler::handleThresholds(byte* payload, unsigned int length) {
+void MqttHandler::handleThresholds(char* payload, unsigned int length) {
   Serial.print(F("Payload ricevuto: "));
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-  }
+  Serial.write(payload, length);
   Serial.println();
 
   StaticJsonDocument<512> doc;
@@ -90,11 +99,9 @@ void MqttHandler::handleThresholds(byte* payload, unsigned int length) {
   }
 }
 
-void MqttHandler::handleStartStop(byte* payload, unsigned int length) {
+void MqttHandler::handleStartStop(char* payload, unsigned int length) {
   Serial.print(F("Payload ricevuto: "));
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
-  }
+  Serial.write(payload, length);
   Serial.println();
 
   StaticJsonDocument<128> doc;
@@ -112,10 +119,28 @@ void MqttHandler::handleStartStop(byte* payload, unsigned int length) {
   }
 }
 
-void MqttHandler::handleSettings(byte* payload, unsigned int length) {
-  for (int i = 0; i < length; i++) {
-    Serial.print((char)payload[i]);
+void MqttHandler::handleStandBy(char* payload, unsigned int length) {
+  Serial.print(F("Payload ricevuto: "));
+  Serial.write(payload, length);
+  Serial.println();
+
+  StaticJsonDocument<128> doc;
+  DeserializationError error = deserializeJson(doc, payload, length);
+  if (!error) {
+    if (!isAddressedToMe(doc)) {
+      Serial.print(F("Msg Not for me"));
+      Serial.println();
+      return;
+    }
+    Serial.println(F("--- Standby Aggiornato ---"));
+    _isStandBy = doc["standby"];
+    Serial.println(_isStandBy ? F("Standby") : F("Not Standby"));
   }
+}
+
+void MqttHandler::handleSettings(char* payload, unsigned int length) {
+  Serial.print(F("Payload ricevuto: "));
+  Serial.write(payload, length);
   Serial.println();
   StaticJsonDocument<512> doc;
   DeserializationError error = deserializeJson(doc, payload, length);
@@ -157,6 +182,10 @@ bool MqttHandler::isRunning() {
   return _isStartMode;
 }
 
+bool MqttHandler::isStandBy() {
+  return _isStandBy;
+}
+
 bool MqttHandler::isSet() {
   if (_settings.mcuName[0] == '\0') {
     return false;
@@ -174,14 +203,12 @@ bool MqttHandler::isAddressedToMe(const JsonVariant& doc) {
   return false;
 }
 
-void MqttHandler::sendImOn(){
+void MqttHandler::sendImOn() {
   StaticJsonDocument<96> doc;
   char buffer[96];
   doc["id"] = _id;
+  doc["status"] = "ONLINE";
   serializeJson(doc, buffer);
 
-  char dynamicTopic[128];
-  snprintf(dynamicTopic, sizeof(dynamicTopic), "%s/%s", TOPIC_CONNECTION, _id);
-
-  _client.publish(dynamicTopic, (const char*)buffer, true);
+  _client.publish(_dynamicTopic, buffer, true, 1);
 }

@@ -23,4 +23,5 @@ void WiFiHandler::getMacAddress(char* buffer_size_13) {
   uint8_t mac[6];
   WiFi.macAddress(mac);
   sprintf(buffer_size_13, "%02X%02X%02X%02X%02X%02X", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+  Serial.print(buffer_size_13);
 }

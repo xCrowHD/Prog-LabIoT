@@ -25,7 +25,7 @@ WiFiClient client;
 InfluxDBClient client_idb(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
 
 // MQTT Broker settings
-MqttHandler mqtt(client, "broker.emqx.io", 1883);
+MqttHandler mqtt;
 
 //Sensori
 SensorManager sensor;
@@ -40,20 +40,19 @@ Ticker tickerBlink;
 Ticker writeToInflux;
 Ticker writeLCD;
 Ticker tickerAlarm;
+Ticker idTick;
 float lastTimerValue = 20.0;
+char id[13];
 
 volatile bool flagWriteInflux = false;
-
-void callback(char* topic, byte* payload, unsigned int length) {
-  mqtt.processMessage(topic, payload, length);
-}
 
 void setup() {
   Serial.begin(115200);
   WiFiHandler::begin();
+  WiFiHandler::getMacAddress(id);
   pinMode(RESET_ALARMS, INPUT_PULLUP);
 
-  mqtt.begin(callback);
+  mqtt.begin(client, "broker.emqx.io", 1883);
   lcd.begin();
   sensor.begin();
   alarm.begin();
@@ -69,10 +68,19 @@ void setup() {
   tickerAlarm.attach(1.5, []() {
     alarm.nextAlarmColor();
   });
+
+  idTick.attach(5.0, []{
+    lcd.addMessage("ID:", id);
+  });
 }
 
 void loop() {
   mqtt.handle();
+  if (mqtt.isStandBy()){
+    lcd.addMessage("Status", "StandByMode");
+    return;
+  }
+
   if (!mqtt.isSet()) {
     lcd.addMessage("Status", "Need Settings");
     return;

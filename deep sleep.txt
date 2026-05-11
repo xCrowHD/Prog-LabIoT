@@ -1,0 +1,117 @@
+deep sleep
+
+Servono WiFiEvenTahndler per eventi di connessione e disconnessione
+
+#include <ESP8266WiFi.h>
+#include <PubSubClient.h>
+#include "DHT.h"
+
+#define DURATION_SLEEP  300   //Duration sleep in seconds
+
+// WiFi
+const char *ssid = "SSID"; // Enter your WiFi name
+const char *password = "PASSWD";  // Enter WiFi password
+
+// MQTT Broker
+const char *mqtt_broker = "192.168.0.38";  //Remplacer par l'IP local du broker
+ 
+const char *topic_temp = "salon/temp";
+const char *topic_hum = "salon/hum";
+//const char *mqtt_username = "emqx";  //si utile
+//const char *mqtt_password = "public";  //si utile
+const int mqtt_port = 1883;
+
+//DHT
+#define DHTPIN 13 
+#define DHTTYPE DHT22 
+DHT dht(DHTPIN, DHTTYPE);
+float temp;
+char tempString[6];
+float hum;
+char humString[6];
+
+WiFiClient espClient;
+PubSubClient client(espClient);
+
+
+
+// ----------------------------------------------- SETUP -------------------
+
+void setup() {
+  // Set software serial baud to 115200;
+  Serial.begin(115200);
+  // connecting to a WiFi network
+  WiFi.begin(ssid, password);
+  Serial.println("Connecting to WiFi");
+  while (WiFi.status() != WL_CONNECTED) {
+      delay(500);
+      Serial.print(".");
+  }
+  
+  Serial.println("Connected to the WiFi network");
+  //connecting to a mqtt broker
+  client.setServer(mqtt_broker, mqtt_port);
+  client.setCallback(callback);
+  while (!client.connected()) {
+      String client_id = "esp8266-client-";
+      client_id += String(WiFi.macAddress());
+      Serial.printf("The client %s connects to the public mqtt broker\n", client_id.c_str());
+      if (client.connect(client_id.c_str())) {
+          Serial.println("Public emqx mqtt broker connected");
+      } else {
+          Serial.print("failed with state ");
+          Serial.print(client.state());
+          delay(2000);
+      }
+  }
+
+
+
+  dht.begin();
+  
+
+}
+
+// ----------------------------------------- CALLBACK -----------------------------------------
+
+void callback(char *topic, byte *payload, unsigned int length) {
+  Serial.print("Message arrived in topic: ");
+  Serial.println(topic);
+  Serial.print("Message:");
+  for (int i = 0; i < length; i++) {
+      Serial.print((char) payload[i]);
+  }
+  Serial.println();
+  Serial.println("-----------------------");
+}
+
+//-------------------------------------------------- LOOP -------------------------------
+void loop() {
+  client.loop();
+  
+  //TEMPERATURE
+  temp = dht.readTemperature();
+  dtostrf(temp, 2, 2, tempString);
+  Serial.println(tempString);
+
+  //HUMIDITE
+  hum = dht.readHumidity();
+  dtostrf(hum, 2, 2, humString);
+  Serial.println(humString);
+  
+
+    // publish and subscribe
+  // Version originale :   
+  //client.publish(topic, "hello emqx");
+    client.publish(topic_temp, tempString); 
+    client.subscribe(topic_temp);
+    client.publish(topic_hum, humString);  
+    client.subscribe(topic_hum);
+  delay(1000);
+
+  //DEEPSLEEP
+  WiFi.disconnect();
+  client.disconnect();
+
+  ESP.deepSleep(DURATION_SLEEP*1000000);
+}

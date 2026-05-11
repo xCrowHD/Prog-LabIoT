@@ -62,15 +62,18 @@ async def get_soglie_pianta_by_pos(pos: int):
     
     if plant is None:
         return None
-        
     return plant
 
 @app.get("/api/piante/syncmqtt/{nome_pianta}")
 async def sync_mqtt(nome_pianta: str):
     pianta = db_manager.get_plant_by_id(nome_pianta)
+    current_esp_id = mqtt_hub.get_current_esp()
+    if current_esp_id == None:
+        return
     
     if pianta:
         payload = {
+            "id": current_esp_id["id"],
             "name": nome_pianta,
             "thresholds": {
                 "temp": {"min": pianta.temp_min, "max": pianta.temp_max},
@@ -78,13 +81,20 @@ async def sync_mqtt(nome_pianta: str):
                 "light": {"min": pianta.light_min, "max": pianta.light_max}
             }
         }
-        json_string = json.dumps(payload)
-        mqtt_hub.send_thresholds(json_string)
+        mqtt_hub.send_thresholds(payload)
 
-@app.get("/api/piante/startstop/{esp_status}")
-async def start_stop(esp_status: str):
-    payload = str(esp_status)
-    mqtt_hub.send_start_stop(payload)
+@app.post("/api/piante/startstop")
+async def start_stop(data: dict):
+    current_esp_id = mqtt_hub.get_current_esp()
+    if current_esp_id == None:
+        return
+
+    esp_payload = {
+        "id": current_esp_id["id"],
+        "status": data.get("status", False)
+    }
+    mqtt_hub.send_start_stop(esp_payload)
+    return {"message": "Comando inviato", "target": current_esp_id, "status": esp_payload["status"]}
 
 
 @app.get("/api/piante/data/{nome_pianta}/{last_time}")
@@ -169,10 +179,12 @@ async def get_latest_data_pianta(nome_pianta: str):
 
 
 @app.post("/api/plants/set-mcu")
-async def save_plant(payload: dict):
-    payload_string = json.dumps(payload)
-    print(payload_string)
-    mqtt_hub.send_set_mcu(payload_string)
+async def set_mcu(payload: dict):
+    current_esp_id = mqtt_hub.get_current_esp()
+    if current_esp_id == None:
+        return
+    payload["id"] = current_esp_id["id"]
+    mqtt_hub.send_set_mcu(payload)
 
 @app.post("/api/plants/save")
 async def save_plant(
@@ -216,6 +228,17 @@ async def save_plant(
 
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+@app.get("/api/plants/nextnode")
+async def get_next_node():
+    node = mqtt_hub.get_next_esp()
+    return node
+
+
+@app.get("/api/plants/currentnode")
+async def get_current_node():
+    node = mqtt_hub.get_current_esp()
+    return node
 
 def _adc_to_klux(adc_value):
     if adc_value <= 0: return 0

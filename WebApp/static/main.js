@@ -128,6 +128,7 @@ async function loopPlants() {
   else if (activePlantIndex > len) {
     activePlantIndex = 0;
     plant = await getCurrentIndexPlant();
+    console.log(plant);
     _showPlantData(plant);
   }
   // Altrimenti, mostriamo la pianta corrente
@@ -229,7 +230,7 @@ async function _showAddPlantForm() {
 async function _showPlantData(plant) {
   document.getElementById("plant-display-section").classList.remove("hidden");
   document.getElementById("add-plant-form").classList.add("hidden");
-
+  console.log(plant);
   _caricaLatestDatoPianta(plant.id);
   _caricaSogliePianta(plant.id);
   _renderPlantChart(plant.id, activeField, activeTime);
@@ -297,21 +298,33 @@ async function syncMQTTSoglie() {
 
 async function startStopEsp8266() {
   try {
-    let status = this.getAttribute("data-field");
-    // Effettua la chiamata alla tua REST API
-    let response = await fetch(`/api/piante/startstop/${status}`);
-    if (status == "START") {
-      this.setAttribute("data-field", "STOP");
+    const btn = this; // Riferimento al bottone
+    const currentStatus = btn.getAttribute("data-field");
+
+    const shouldStart = currentStatus === "START";
+
+    const response = await fetch("/api/piante/startstop", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        status: shouldStart,
+      }),
+    });
+
+    if (!response.ok) throw new Error("Errore nella risposta del server");
+
+    if (shouldStart) {
+      btn.setAttribute("data-field", "STOP");
       document.getElementById("start-stop-text").innerHTML = "STOP ESP8266";
-    } else if (status == "STOP") {
-      this.setAttribute("data-field", "START");
-      document.getElementById("start-stop-text").innerHTML = "START ESP8266";
     } else {
-      document.getElementById("start-stop-text").innerHTML = "ERRORE";
+      btn.setAttribute("data-field", "START");
+      document.getElementById("start-stop-text").innerHTML = "START ESP8266";
     }
-    //console.log("Called It");
   } catch (error) {
-    console.error("Errore:", error);
+    console.error("Errore durante il comando Start/Stop:", error);
+    document.getElementById("start-stop-text").innerHTML = "ERRORE CONNESSIONE";
   }
 }
 
@@ -384,6 +397,41 @@ async function handleSavePlant() {
   }
 }
 
+async function getNextNodeMcu() {
+  const response = await fetch("/api/plants/nextnode");
+  const data = await response.json();
+  //console.log(data);
+  _changeMcuStatus(data);
+}
+
+async function getCurrentNodeMcu() {
+  const response = await fetch("/api/plants/currentnode");
+  const data = await response.json();
+  //console.log(data);
+  _changeMcuStatus(data);
+}
+
+async function _changeMcuStatus(data) {
+  if (data.status == "OFFLINE") {
+    document
+      .getElementById("esp-status")
+      .classList.replace("text-primary", "text-red");
+    document
+      .getElementById("eps-status-icon")
+      .classList.replace("bg-primary", "bg-red");
+  } else {
+    document
+      .getElementById("esp-status")
+      .classList.replace("text-red", "text-primary");
+    document
+      .getElementById("eps-status-icon")
+      .classList.replace("bg-red", "bg-primary");
+  }
+  document.getElementById("node-id").innerText =
+    `Monitoring Node: MCU-${data.id}`;
+  document.getElementById("esp-status").innerText = `System ${data.status}`;
+}
+
 async function getCurrentIndexPlant() {
   const response = await fetch(
     `/api/piante/soglie/position/${activePlantIndex}`,
@@ -411,6 +459,16 @@ async function loadAtStart() {
 document.addEventListener("DOMContentLoaded", () => {
   console.log("Boot avviato...");
   loadAtStart();
+  getCurrentNodeMcu();
+  const intervalId = setInterval(async () => {
+    getCurrentNodeMcu();
+  }, 5000);
+
+  const intervalLastetsPlant = setInterval(async () => {
+    let plant = await getCurrentIndexPlant();
+    _caricaLatestDatoPianta(plant.id);
+    console.log("UPDATE");
+  }, 60000);
 
   document.getElementById("plant-loop").addEventListener("click", loopPlants);
 
@@ -440,4 +498,7 @@ document.addEventListener("DOMContentLoaded", () => {
     .addEventListener("click", loopMcuInfo);
 
   document.getElementById("set-mcu").addEventListener("click", handleSetMcu);
+  document
+    .getElementById("next-node-btn")
+    .addEventListener("click", getNextNodeMcu);
 });
