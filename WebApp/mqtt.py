@@ -25,27 +25,66 @@ class MQTTManager:
     def _esp_status_check(self, client, userdata, msg):
         payload = msg.payload.decode()
         data = json.loads(payload)
-        # print(data)
         esp_id = data.get("id")
+        current_status = data.get("status") # ONLINE o OFFLINE
 
-        if self.esp_list.get(esp_id) == None:
-            self.esp_list[esp_id] = {}   
-        else:
+        # 1. Inizializzazione se il nodo è nuovo
+        if self.esp_list.get(esp_id) is None:
+            self.esp_list[esp_id] = {}
+
+        # Aggiorniamo lo stato nel dizionario
+        self.esp_list[esp_id]["status"] = current_status
+
+        # 2. LOGICA SE IL NODO TORNA ONLINE
+        if current_status == "ONLINE":
             esp = self.esp_list[esp_id]
-            if esp.get("plant-thr") != None:
+            
+            # RIPRISTINO PARAMETRI: Se abbiamo dati salvati, inviamoli subito all'ESP
+            if esp.get("plant-thr"):
                 self.send_thresholds(esp.get("plant-thr"))
-                print(esp.get("plant-thr"))
-            if esp.get("start-stop") != None:
+            if esp.get("start-stop"):
                 self.send_start_stop(esp.get("start-stop"))
-            if esp.get("settings") != None:
+            if esp.get("settings"):
                 self.send_set_mcu(esp.get("settings"))
+            
+            # GESTIONE BACKUP: Se questo nodo è il "principale", cerchiamo il suo backup e mettiamolo in standby
+            # (Assumiamo che il backup abbia lo stesso nome ma il flag backup=True)
+            self._manage_backup_for(esp_id, activate_backup=False)
 
-        self.esp_list[esp_id]["status"] = data.get("status")
+        # 3. LOGICA SE IL NODO VA OFFLINE (Last Will)
+        elif current_status == "OFFLINE":
+            print(f"ATTENZIONE: Nodo {esp_id} disconnesso! Cerco un sostituto...")
+            # Attiviamo il backup se esiste
+            self._manage_backup_for(esp_id, activate_backup=True)
 
-        # if data.get("status") == "OFFLINE":
+        print(f"Stato aggiornato: {esp_id} è ora {current_status}")
 
+    def _manage_backup_for(self, target_id, activate_backup: bool):
+        """
+        Trova il backup del nodo 'target_id' e lo attiva o lo mette in standby.
+        """
+        target_node = self.esp_list.get(target_id)
+        if not target_node or "settings" not in target_node:
+            return
 
-        print(self.esp_list)
+        target_name = target_node["settings"].get("name")
+
+        # Cerchiamo tra tutti gli altri nodi
+        for other_id, other_data in self.esp_list.items():
+            if other_id == target_id:
+                continue
+                
+            settings = other_data.get("settings")
+            if settings and settings.get("name") == target_name and settings.get("backup") is True:
+                # Abbiamo trovato il backup!
+                status_msg = {"id": other_id, "standby": not activate_backup}
+                
+                # Se activate_backup è True, standby sarà False (sveglia!)
+                # Se activate_backup è False, standby sarà True (nanna!)
+                self.client.publish(f"{TOPIC_BACKUP}/{other_id}", json.dumps(status_msg), 1, retain=True)
+                
+                azione = "ATTIVATO" if activate_backup else "messo in STANDBY"
+                print(f"Il backup {other_id} per {target_name} è stato {azione}")
 
     def get_current_esp(self):
         if len(self.esp_list) == 0:
