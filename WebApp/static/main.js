@@ -109,7 +109,7 @@ async function loopPlants() {
   let len = 0;
   activePlantIndex++;
   try {
-    let plant = await getCurrentIndexPlant();
+    plant = await getCurrentIndexPlant();
 
     let response = await fetch("/api/piante/count");
     if (!response.ok) throw new Error("Errore nel db delle piante");
@@ -128,6 +128,7 @@ async function loopPlants() {
   else if (activePlantIndex > len) {
     activePlantIndex = 0;
     plant = await getCurrentIndexPlant();
+    console.log(plant);
     _showPlantData(plant);
   }
   // Altrimenti, mostriamo la pianta corrente
@@ -229,7 +230,7 @@ async function _showAddPlantForm() {
 async function _showPlantData(plant) {
   document.getElementById("plant-display-section").classList.remove("hidden");
   document.getElementById("add-plant-form").classList.add("hidden");
-
+  console.log(plant);
   _caricaLatestDatoPianta(plant.id);
   _caricaSogliePianta(plant.id);
   _renderPlantChart(plant.id, activeField, activeTime);

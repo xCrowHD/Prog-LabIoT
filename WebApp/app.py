@@ -62,7 +62,6 @@ async def get_soglie_pianta_by_pos(pos: int):
     
     if plant is None:
         return None
-        
     return plant
 
 @app.get("/api/piante/syncmqtt/{nome_pianta}")
@@ -74,7 +73,7 @@ async def sync_mqtt(nome_pianta: str):
     
     if pianta:
         payload = {
-            "id": current_esp_id,
+            "id": current_esp_id["id"],
             "name": nome_pianta,
             "thresholds": {
                 "temp": {"min": pianta.temp_min, "max": pianta.temp_max},
@@ -91,7 +90,7 @@ async def start_stop(data: dict):
         return
 
     esp_payload = {
-        "id": current_esp_id,
+        "id": current_esp_id["id"],
         "status": data.get("status", False)
     }
     mqtt_hub.send_start_stop(esp_payload)
@@ -184,7 +183,7 @@ async def set_mcu(payload: dict):
     current_esp_id = mqtt_hub.get_current_esp()
     if current_esp_id == None:
         return
-    payload["id"] = current_esp_id
+    payload["id"] = current_esp_id["id"]
     mqtt_hub.send_set_mcu(payload)
 
 @app.post("/api/plants/save")
@@ -233,7 +232,6 @@ async def save_plant(
 @app.get("/api/plants/nextnode")
 async def get_next_node():
     node = mqtt_hub.get_next_esp()
-    print(node)
     return node
 
 
