@@ -76,6 +76,11 @@ void setup() {
 
 void loop() {
   mqtt.handle();
+  if (mqtt.isStandBy()){
+    lcd.addMessage("Status", "StandByMode");
+    return;
+  }
+
   if (!mqtt.isSet()) {
     lcd.addMessage("Status", "Need Settings");
     return;

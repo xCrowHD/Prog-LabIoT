@@ -13,6 +13,7 @@
 #define TOPIC_THRESHOLD "lab_iot/mafogani/threshold"
 #define TOPIC_START_STOP "lab_iot/mafogani/start-stop"
 #define TOPIC_MCU_SET "lab_iot/mafogani/set-mcu"
+#define TOPIC_BACKUP "lab_iot/mafogani/backup"
 
 struct Thresholds {
   char platName[32] = "";
@@ -37,6 +38,7 @@ private:
   Thresholds _plantThresholds;
   McuSettings _settings;
   bool _isStartMode = false;
+  bool _isStandBy = false;
   char _id[13];
   char _dynamicTopic[128];
 
@@ -53,6 +55,7 @@ public:
   bool isRunning();
   bool isSet();
   McuSettings getSettings();
+  bool isStandBy();
 
 
 private:
@@ -62,6 +65,7 @@ private:
   void handleThresholds(char* payload, unsigned int length);
   void handleStartStop(char* payload, unsigned int length);
   void handleSettings(char* payload, unsigned int length);
+  void handleStandBy(char* payload, unsigned int length);
 };
 
 #endif

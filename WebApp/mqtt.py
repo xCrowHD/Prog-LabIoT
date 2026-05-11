@@ -41,6 +41,10 @@ class MQTTManager:
                 self.send_set_mcu(esp.get("settings"))
 
         self.esp_list[esp_id]["status"] = data.get("status")
+
+        # if data.get("status") == "OFFLINE":
+
+
         print(self.esp_list)
 
     def get_current_esp(self):
@@ -69,6 +73,24 @@ class MQTTManager:
             "status": self.esp_list[current_id]["status"]
         }
         return d
+
+    def _does_node_exist(self, payload: dict):
+        esp_id_target = payload.get("id")
+        new_name = payload.get("name")
+        is_backup = payload.get("backup", False)
+        for node_id, node_data in self.esp_list.items():
+            if node_id == esp_id_target:
+                continue
+
+            existing_settings = node_data.get("settings")
+            if existing_settings != None:
+                existing_name = existing_settings.get("name")
+
+                if existing_name == new_name:
+                # Se quello che stiamo settando NON è un backup, blocchiamo tutto
+                    if not is_backup:
+                        return True
+        return False
     
     def send_thresholds(self, payload: dict):
         esp_id = payload.get("id")
@@ -82,29 +104,23 @@ class MQTTManager:
         self.esp_list[esp_id]["start-stop"] = payload
         # print(self.esp_list.get(esp_id))
         self.client.publish(TOPIC_SET_ESP_START_STOP, json.dumps(payload), 1)
+
     def send_set_mcu(self, payload: dict):
-        esp_id_target = payload.get("id")
-        new_name = payload.get("name")
+        esp_id = payload.get("id")
         is_backup = payload.get("backup", False)
-        print(payload)
 
-        for node_id, node_data in self.esp_list.items():
-            if node_id == esp_id_target:
-                continue
+        if self._does_node_exist(payload):
+            print(f"ERRORE: Nome già in uso e non è un backup!")
+            return 
 
-            existing_settings = node_data.get("settings")
-            if existing_settings != None:
-                existing_name = existing_settings.get("name")
+        if is_backup:
+            d = {"id": esp_id, "standby": True}
+            self.client.publish(TOPIC_BACKUP, json.dumps(d), 1)
+        else:
+            d = {"id": esp_id, "standby": False}
+            self.client.publish(TOPIC_BACKUP, json.dumps(d), 1)
 
-                if existing_name == new_name:
-                # Se quello che stiamo settando NON è un backup, blocchiamo tutto
-                    if not is_backup:
-                        print(f"ERRORE: Il nome '{new_name}' è già in uso da un nodo attivo!")
-                        return
-
-        print("Tutto Apposto nel settare MCU")
-        self.esp_list[esp_id_target]["settings"] = payload
-        # print(self.esp_list.get(esp_id))
+        self.esp_list[esp_id]["settings"] = payload
         self.client.publish(TOPIC_SET_MCU, json.dumps(payload), 1)
 
 

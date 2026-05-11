@@ -33,6 +33,7 @@ void MqttHandler::reconnect() {
       _client.subscribe(TOPIC_THRESHOLD, 1);
       _client.subscribe(TOPIC_START_STOP, 1);
       _client.subscribe(TOPIC_MCU_SET, 1);
+      _client.subscribe(TOPIC_BACKUP, 1);
       sendImOn();
     } else {
       Serial.print(F("fallito, err="));
@@ -54,6 +55,8 @@ void MqttHandler::processMessage(MQTTClient* client, char topic[], char payload[
     handleStartStop(payload, length);
   } else if (strcmp(topic, TOPIC_MCU_SET) == 0) {
     handleSettings(payload, length);
+  } else if (strcmp(topic, TOPIC_BACKUP) == 0) {
+    handleStandBy(payload, length);
   }
 }
 
@@ -116,6 +119,25 @@ void MqttHandler::handleStartStop(char* payload, unsigned int length) {
   }
 }
 
+void MqttHandler::handleStandBy(char* payload, unsigned int length) {
+  Serial.print(F("Payload ricevuto: "));
+  Serial.write(payload, length);
+  Serial.println();
+
+  StaticJsonDocument<128> doc;
+  DeserializationError error = deserializeJson(doc, payload, length);
+  if (!error) {
+    if (!isAddressedToMe(doc)) {
+      Serial.print(F("Msg Not for me"));
+      Serial.println();
+      return;
+    }
+    Serial.println(F("--- Standby Aggiornato ---"));
+    _isStandBy = doc["standby"];
+    Serial.println(_isStandBy ? F("Standby") : F("Not Standby"));
+  }
+}
+
 void MqttHandler::handleSettings(char* payload, unsigned int length) {
   Serial.print(F("Payload ricevuto: "));
   Serial.write(payload, length);
@@ -158,6 +180,10 @@ McuSettings MqttHandler::getSettings() {
 
 bool MqttHandler::isRunning() {
   return _isStartMode;
+}
+
+bool MqttHandler::isStandBy() {
+  return _isStandBy;
 }
 
 bool MqttHandler::isSet() {
