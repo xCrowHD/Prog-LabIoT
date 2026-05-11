@@ -82,9 +82,7 @@ async def sync_mqtt(nome_pianta: str):
                 "light": {"min": pianta.light_min, "max": pianta.light_max}
             }
         }
-        json_string = json.dumps(payload)
-        print(json_string)
-        mqtt_hub.send_thresholds(json_string)
+        mqtt_hub.send_thresholds(payload)
 
 @app.post("/api/piante/startstop")
 async def start_stop(data: dict):
@@ -96,9 +94,7 @@ async def start_stop(data: dict):
         "id": current_esp_id,
         "status": data.get("status", False)
     }
-
-    print(esp_payload)
-    mqtt_hub.send_start_stop(json.dumps(esp_payload))
+    mqtt_hub.send_start_stop(esp_payload)
     return {"message": "Comando inviato", "target": current_esp_id, "status": esp_payload["status"]}
 
 
@@ -189,9 +185,7 @@ async def set_mcu(payload: dict):
     if current_esp_id == None:
         return
     payload["id"] = current_esp_id
-    payload_string = json.dumps(payload)
-    print(payload_string)
-    mqtt_hub.send_set_mcu(payload_string)
+    mqtt_hub.send_set_mcu(payload)
 
 @app.post("/api/plants/save")
 async def save_plant(

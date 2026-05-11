@@ -7,12 +7,13 @@ TOPIC_SET_MCU = "lab_iot/mafogani/set-mcu"
 TOPIC_CONNECTION = "lab_iot/mafogani/connection/+"
 TOPIC_SET_ESP_THRESHOLD = "lab_iot/mafogani/threshold"
 TOPIC_SET_ESP_START_STOP = "lab_iot/mafogani/start-stop"
+TOPIC_BACKUP = "lab_iot/mafogani/backup"
 MQTT_IP = "broker.emqx.io"
 MQTT_PORT = 1883
 
 class MQTTManager:
     def __init__(self):
-        self.esp_list = set()
+        self.esp_list = dict()
         # self.esp_list.add("TESTID0")
         # self.esp_list.add("TESTID1")
         # self.esp_list.add("TESTID2")
@@ -30,7 +31,21 @@ class MQTTManager:
         data = json.loads(payload)
         print(data)
         esp_id = data.get("id")
-        self.esp_list.add(esp_id)
+
+        if self.esp_list.get(esp_id) == None:
+            self.esp_list[esp_id] = {}   
+        else:
+            esp = self.esp_list[esp_id]
+            if esp.get("plant-thr") != None:
+                self.send_thresholds(esp.get("plant-thr"))
+                print(esp.get("plant-thr"))
+            if esp.get("start-stop") != None:
+                self.send_start_stop(esp.get("start-stop"))
+            if esp.get("settings") != None:
+                self.send_set_mcu(esp.get("settings"))
+
+        
+        print(self.esp_list)
 
     def get_current_esp(self):
         if len(self.esp_list) == 0:
@@ -49,12 +64,21 @@ class MQTTManager:
         return sorted(list(self.esp_list))[self.current_esp_index]
 
     
-    def send_thresholds(self, payload: str):
-        self.client.publish(TOPIC_SET_ESP_THRESHOLD, payload, 1)
-    def send_start_stop(self, payload: str):
-        self.client.publish(TOPIC_SET_ESP_START_STOP, payload, 1)
-    def send_set_mcu(self, payload: str):
-        self.client.publish(TOPIC_SET_MCU, payload, 1)
+    def send_thresholds(self, payload: dict):
+        esp_id = payload.get("id")
+        self.esp_list[esp_id]["plant-thr"] = payload
+        # print(self.esp_list.get(esp_id))
+        self.client.publish(TOPIC_SET_ESP_THRESHOLD, json.dumps(payload), 1)
+    def send_start_stop(self, payload: dict):
+        esp_id = payload.get("id")
+        self.esp_list[esp_id]["start-stop"] = payload
+        # print(self.esp_list.get(esp_id))
+        self.client.publish(TOPIC_SET_ESP_START_STOP, json.dumps(payload), 1)
+    def send_set_mcu(self, payload: dict):
+        esp_id = payload.get("id")
+        self.esp_list[esp_id]["settings"] = payload
+        # print(self.esp_list.get(esp_id))
+        self.client.publish(TOPIC_SET_MCU, json.dumps(payload), 1)
 
 
     
