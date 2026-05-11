@@ -20,6 +20,7 @@ class MQTTManager:
         self.current_esp_index = 0
         self.client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2)
         self.client.connect(MQTT_IP, MQTT_PORT, 60)
+        self.client.subscribe(TOPIC_CONNECTION)
         self.client.message_callback_add(TOPIC_CONNECTION, self._esp_status_check)
         self.client.publish(TOPIC_TEST, "MQTT Client ON")
         self.client.loop_start()

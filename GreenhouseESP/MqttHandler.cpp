@@ -1,13 +1,11 @@
 #include "MqttHandler.h"
 
 MqttHandler::MqttHandler()
-  : _client(512), _plantThresholds{}, _settings{} {
-
-  WiFiHandler::getMacAddress(_id);
-  snprintf(_lwtPayload, sizeof(_lwtPayload), "{\"id\":\"%s\",\"status\":\"OFFLINE\"}", _id);
-}
+  : _client(512), _plantThresholds{}, _settings{} {}
 
 void MqttHandler::begin(WiFiClient& wifiClient, const char* broker, int port) {
+  WiFiHandler::getMacAddress(_id);
+  snprintf(_lwtPayload, sizeof(_lwtPayload), "{\"id\":\"%s\",\"status\":\"OFFLINE\"}", _id);
   _client.begin(broker, port, wifiClient);
 
   _client.onMessageAdvanced([this](MQTTClient* c, char t[], char p[], int l) {
