@@ -14,10 +14,6 @@ MQTT_PORT = 1883
 class MQTTManager:
     def __init__(self):
         self.esp_list = dict()
-        # self.esp_list.add("TESTID0")
-        # self.esp_list.add("TESTID1")
-        # self.esp_list.add("TESTID2")
-        # self.esp_list.add("TESTID3")
         self.current_esp_index = 0
         self.client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2)
         self.client.connect(MQTT_IP, MQTT_PORT, 60)
@@ -29,7 +25,7 @@ class MQTTManager:
     def _esp_status_check(self, client, userdata, msg):
         payload = msg.payload.decode()
         data = json.loads(payload)
-        print(data)
+        # print(data)
         esp_id = data.get("id")
 
         if self.esp_list.get(esp_id) == None:
@@ -45,13 +41,19 @@ class MQTTManager:
                 self.send_set_mcu(esp.get("settings"))
 
         self.esp_list[esp_id]["status"] = data.get("status")
-        print(self.esp_list)
+        # print(self.esp_list)
 
     def get_current_esp(self):
         if len(self.esp_list) == 0:
             return None
+        
+        current_id = sorted(list(self.esp_list))[self.current_esp_index]
+        d = {
+            "id": current_id,
+            "status": self.esp_list[current_id]["status"]
+        }
 
-        return sorted(list(self.esp_list))[self.current_esp_index]
+        return d
     
     def get_next_esp(self):
         if len(self.esp_list) == 0:
@@ -61,8 +63,12 @@ class MQTTManager:
         if self.current_esp_index >= len(self.esp_list):
             self.current_esp_index = 0
 
-        return sorted(list(self.esp_list))[self.current_esp_index]
-
+        current_id = sorted(list(self.esp_list))[self.current_esp_index]
+        d = {
+            "id": current_id,
+            "status": self.esp_list[current_id]["status"]
+        }
+        return d
     
     def send_thresholds(self, payload: dict):
         esp_id = payload.get("id")

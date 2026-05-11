@@ -233,20 +233,14 @@ async def save_plant(
 @app.get("/api/plants/nextnode")
 async def get_next_node():
     node = mqtt_hub.get_next_esp()
-    d = {
-        "id": node
-    }
-    return d
+    print(node)
+    return node
 
 
 @app.get("/api/plants/currentnode")
 async def get_current_node():
     node = mqtt_hub.get_current_esp()
-    d = {
-        "id": node
-    }
-    print(d)
-    return d
+    return node
 
 def _adc_to_klux(adc_value):
     if adc_value <= 0: return 0

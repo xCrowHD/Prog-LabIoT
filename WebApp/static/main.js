@@ -400,16 +400,49 @@ async function getNextNodeMcu() {
   const response = await fetch("/api/plants/nextnode");
   const data = await response.json();
   //console.log(data);
+  if (data.status == "OFFLINE") {
+    document
+      .getElementById("esp-status")
+      .classList.replace("text-primary", "text-red");
+    document
+      .getElementById("eps-status-icon")
+      .classList.replace("bg-primary", "bg-red");
+  } else {
+    document
+      .getElementById("esp-status")
+      .classList.replace("text-red", "text-primary");
+    document
+      .getElementById("eps-status-icon")
+      .classList.replace("bg-red", "bg-primary");
+  }
+
   document.getElementById("node-id").innerText =
     `Monitoring Node: MCU-${data.id}`;
+  document.getElementById("esp-status").innerText = `System ${data.status}`;
 }
 
 async function getCurrentNodeMcu() {
   const response = await fetch("/api/plants/currentnode");
   const data = await response.json();
   //console.log(data);
+  if (data.status == "OFFLINE") {
+    document
+      .getElementById("esp-status")
+      .classList.replace("text-primary", "text-red");
+    document
+      .getElementById("eps-status-icon")
+      .classList.replace("bg-primary", "bg-red");
+  } else {
+    document
+      .getElementById("esp-status")
+      .classList.replace("text-red", "text-primary");
+    document
+      .getElementById("eps-status-icon")
+      .classList.replace("bg-red", "bg-primary");
+  }
   document.getElementById("node-id").innerText =
     `Monitoring Node: MCU-${data.id}`;
+  document.getElementById("esp-status").innerText = `System ${data.status}`;
 }
 
 async function getCurrentIndexPlant() {
