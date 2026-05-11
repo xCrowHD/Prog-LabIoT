@@ -23,6 +23,7 @@ import {
   renderNodeStatus,
   activateTab,
   clearFormInputs,
+  loadLatestSensorData,
 } from "./ui.js";
 
 import { renderPlantChart } from "./chart.js";
@@ -142,6 +143,30 @@ async function onNextNode() {
   renderNodeStatus(data);
 }
 
+// ── Timers / Polling ──────────────────────────────────────────────────────────
+
+function startPollers() {
+  // Polling Stato Nodo (Ogni 10 secondi)
+  setInterval(async () => {
+    try {
+      const nodeData = await fetchCurrentNode();
+      if (nodeData) renderNodeStatus(nodeData);
+    } catch (err) {
+      console.error("[poll] Node Status Error:", err);
+    }
+  }, 10000);
+
+  // Polling Ultimi Dati Sensori (Ogni 60 secondi)
+  setInterval(async () => {
+    try {
+      const plant = await getCurrentPlant();
+      if (plant) loadLatestSensorData(plant.id);
+    } catch (err) {
+      console.error("[poll] Sensor Data Error:", err);
+    }
+  }, 60000);
+}
+
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
 async function boot() {
@@ -159,7 +184,7 @@ async function boot() {
 
 document.addEventListener("DOMContentLoaded", () => {
   boot();
-
+  startPollers();
   document.getElementById("plant-loop").addEventListener("click", onLoopPlants);
   document.getElementById("sync-mqtt").addEventListener("click", onSyncMqtt);
   document
