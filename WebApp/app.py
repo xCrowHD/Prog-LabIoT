@@ -1,261 +1,33 @@
+"""
+app.py
+FastAPI application entry point.
+Only wires together the app, static files, and routers.
+
+Start with:
+    python -m uvicorn app:app --reload --host 127.0.0.1 --port 8000
+"""
+
+import os
 from fastapi import FastAPI
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
-import os
-from mqtt import mqtt_hub
-from plants_db import db_manager
-import json
-from influxdb_client import InfluxDBClient
-from fastapi import FastAPI, HTTPException, UploadFile, File, Form
-import shutil
-from dotenv import load_dotenv
 
-# 1. Carica il file .env
-load_dotenv()
+from config import UPLOAD_DIR
+from plants_db import db_manager
+from routers import plants, nodes
+
+# ── Initialisation ────────────────────────────────────────────────────────────
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 db_manager.delete_plant_by_id("test")
 
-#COMANDO PER AVVIARE IL SERVER: python -m uvicorn app:app --reload --host 127.0.0.1 --port 8000
-
-#Req web app
-# App per lab Iot per microcontrollore esp2286
-# comandi di Start and stop (sleep) per esp2286 con anche quanto tempo esp2286 deve andare in sleep
-# un bel grafico linebar che mostri i dati di influxdb
-# poter impostare delle trashhold a seconda della piante e poterle madnare a un serve MQTT e poi esp2286 se le pulla
-# nella web app voglio selezionare la pianta e vedere le soglie 
-# i valori pullati dall'influx db sono temperatura umidita quanta luce c'è i miei grafiici e le treshhold sono su questi valori
-
-INFLUXDB_TOKEN = os.getenv("INFLUXDB_TOKEN")
-INFLUXDB_ORG = os.getenv("INFLUXDB_ORG")
-INFLUXDB_BUCKET = os.getenv("INFLUXDB_BUCKET")
-INFLUXDB_URL = os.getenv("INFLUXDB_URL")
-
-UPLOAD_DIR = "./static/uploads"
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-
-app = FastAPI()
+# ── App ───────────────────────────────────────────────────────────────────────
+app = FastAPI(title="Chlorophyll IoT Dashboard")
 app.mount("/static", StaticFiles(directory="static"), name="static")
+
+app.include_router(plants.router)
+app.include_router(nodes.router)
+
 
 @app.get("/")
 async def home():
-    return FileResponse('index.html')
-
-
-@app.get("/api/piante/soglie/{nome_pianta}")
-async def get_soglie_pianta(nome_pianta: str):
-    plant = db_manager.get_plant_by_id(nome_pianta)
-    
-    if plant is None:
-        # Ritorna un errore 404 (Not Found) invece di un semplice 'null'
-        raise HTTPException(status_code=404, detail="Pianta non trovata")
-        
-    return plant
-
-@app.get("/api/piante/count")
-async def get_numero_piante():
-    count = db_manager.get_plants_count()
-    return {"count": count}
-
-
-@app.get("/api/piante/soglie/position/{pos}")
-async def get_soglie_pianta_by_pos(pos: int):
-    plant = db_manager.get_plant_by_position(pos)
-    
-    if plant is None:
-        return None
-    return plant
-
-@app.get("/api/piante/syncmqtt/{nome_pianta}")
-async def sync_mqtt(nome_pianta: str):
-    pianta = db_manager.get_plant_by_id(nome_pianta)
-    current_esp_id = mqtt_hub.get_current_esp()
-    if current_esp_id == None:
-        return
-    
-    if pianta:
-        payload = {
-            "id": current_esp_id["id"],
-            "name": nome_pianta,
-            "thresholds": {
-                "temp": {"min": pianta.temp_min, "max": pianta.temp_max},
-                "hum": {"min": pianta.hum_min, "max": pianta.hum_max},
-                "light": {"min": pianta.light_min, "max": pianta.light_max}
-            }
-        }
-        mqtt_hub.send_thresholds(payload)
-
-@app.post("/api/piante/startstop")
-async def start_stop(data: dict):
-    current_esp_id = mqtt_hub.get_current_esp()
-    if current_esp_id == None:
-        return
-
-    esp_payload = {
-        "id": current_esp_id["id"],
-        "status": data.get("status", False)
-    }
-    mqtt_hub.send_start_stop(esp_payload)
-    return {"message": "Comando inviato", "target": current_esp_id, "status": esp_payload["status"]}
-
-
-@app.get("/api/piante/data/{nome_pianta}/{last_time}")
-async def get_data_pianta(nome_pianta: str, last_time:str):
-    client = InfluxDBClient(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG)
-    query_api = client.query_api()
-    query = f'''
-    from(bucket: "{INFLUXDB_BUCKET}")
-    |> range(start: -{last_time})
-    |> filter(fn: (r) => r["_measurement"] == "Serra")
-    |> filter(fn: (r) => r["pianta"] == "{nome_pianta}")
-    |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-    |> group()
-    |> sort(columns: ["_time"], desc: false)
-    '''
-
-    try:
-        
-        results = query_api.query(org=INFLUXDB_ORG, query=query)
-        lista_punti = []
-        # Influx restituisce i dati organizzati in 'tabelle' (una per ogni campo/serie)
-
-        for table in results:
-            for record in table.records:
-                punto = {
-                    "timestamp": record.get_time().strftime('%d/%m/%Y %H:%M'),
-                    "pianta": record["pianta"],
-                    "temp": record.values.get("temp"),
-                    "hum": record.values.get("hum"),
-                    "lux": record.values.get("lux"),
-                    # Se vuoi già i kLux convertiti, usa la tua funzione qui:
-                    "klux": _adc_to_klux(float(record.values.get("lux"))) if record.values.get("lux") is not None else 0
-                }
-                lista_punti.append(punto)
-
-        return lista_punti
-
-    except Exception as e:
-        print(f"Errore durante la query: {e}")
-    finally:
-        client.close()
-
-
-@app.get("/api/piante/latestdata/{nome_pianta}")
-async def get_latest_data_pianta(nome_pianta: str):
-    client = InfluxDBClient(url=INFLUXDB_URL, token=INFLUXDB_TOKEN, org=INFLUXDB_ORG)
-    query_api = client.query_api()
-    query = f'''
-    from(bucket: "{INFLUXDB_BUCKET}")
-    |> range(start: 0)
-    |> filter(fn: (r) => r["_measurement"] == "Serra")
-    |> filter(fn: (r) => r["pianta"] == "{nome_pianta}")
-    |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
-    |> group() 
-    |> sort(columns: ["_time"], desc: true)
-    |> limit(n: 1)
-    '''
-
-    try:
-        results = query_api.query(org=INFLUXDB_ORG, query=query)
-        if not results or len(results) == 0:
-            return {"status": "error", "message": "Nessun dato trovato per questa pianta"}
-        record = results[0].records[0]
-        
-        # Costruiamo il dizionario da restituire come JSON
-        data = {
-            "timestamp": record.get_time().strftime('%d/%m/%Y %H:%M'),
-            "pianta": record.values.get("pianta"),
-            "temp": record.values.get("temp"),
-            "hum": record.values.get("hum"),
-            "lux": record.values.get("lux"),
-            # Se vuoi già i kLux convertiti, usa la tua funzione qui:
-            "klux": _adc_to_klux(float(record.values.get("lux"))) if record.values.get("lux") is not None else 0
-        }
-        
-        return data
-
-    except Exception as e:
-        print(f"Errore durante la query: {e}")
-    finally:
-        client.close()
-
-
-@app.post("/api/plants/set-mcu")
-async def set_mcu(payload: dict):
-    current_esp_id = mqtt_hub.get_current_esp()
-    if current_esp_id == None:
-        return
-    payload["id"] = current_esp_id["id"]
-    mqtt_hub.send_set_mcu(payload)
-
-@app.post("/api/plants/save")
-async def save_plant(
-    name: str = Form(...),
-    temp_min: float = Form(...),
-    temp_max: float = Form(...),
-    hum_min: float = Form(...),
-    hum_max: float = Form(...),
-    light_min: float = Form(...),
-    light_max: float = Form(...),
-    image: UploadFile = File(None) # Il file è opzionale in caso di update
-):
-    try:
-        img_path = None
-        if image:
-            # Crea un percorso sicuro per il file
-            file_extension = os.path.splitext(image.filename)[1]
-            # Usiamo lo slug del nome per rinominare il file immagine (es. monstera.jpg)
-            safe_filename = f"{db_manager.generate_id(name)}{file_extension}"
-            file_path = os.path.join(UPLOAD_DIR, safe_filename)
-            
-            # Salva il file sul disco
-            with open(file_path, "wb") as buffer:
-                shutil.copyfileobj(image.file, buffer)
-            
-            # Percorso che servirà al frontend (relativo alla cartella static)
-            img_path = f"{file_path}"
-
-        plant_id = db_manager.add_plant(
-            name=name,
-            img_path=img_path,
-            t_min=temp_min,
-            t_max=temp_max,
-            h_min=hum_min,
-            h_max=hum_max,
-            l_min=light_min,
-            l_max=light_max
-        )
-
-        return {"status": "success", "message": f"Pianta {name} salvata", "id": plant_id}
-
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
-
-@app.get("/api/plants/nextnode")
-async def get_next_node():
-    node = mqtt_hub.get_next_esp()
-    return node
-
-
-@app.get("/api/plants/currentnode")
-async def get_current_node():
-    node = mqtt_hub.get_current_esp()
-    return node
-
-def _adc_to_klux(adc_value):
-    if adc_value <= 0: return 0
-    if adc_value >= 1023: return 1000 # Evitiamo errori di calcolo al limite
-    
-    # 1. Calcoliamo la tensione (assumendo 3.3V se usi ESP8266 o 5V se usi Arduino)
-    # Cambia 3.3 in 5.0 se alimenti il sensore a 5V
-    v_out = (adc_value * 3.3) / 1024.0
-    
-    # 2. Calcoliamo la resistenza della fotoresistenza (R_LDR)
-    # Il modulo KY-018 ha una resistenza fissa R_fixed = 10k ohm
-    # Se con molta luce il valore ADC è ALTO:
-    r_ldr = (10000.0 * (3.3 - v_out)) / v_out
-    
-    # 3. Formula empirica per trasformare la Resistenza in Lux
-    # Molte LDR seguono la curva Lux = 500 / (R_LDR in kOhm)
-    # Nota: il valore 1000 serve per passare da Ohm a kOhm
-    lux = 500 / (r_ldr / 1000.0)
-    
-    return round(lux / 1000, 2)
+    return FileResponse("index.html")
