@@ -29,25 +29,42 @@ class MQTTManager:
     # ── Internal callbacks ────────────────────────────────────────────────────
 
     def _on_node_status(self, client, userdata, msg):
-        """Handle connection/disconnection announcements from ESP nodes."""
         data = json.loads(msg.payload.decode())
         esp_id = data.get("id")
-        status = data.get("status")  # "ONLINE" | "OFFLINE"
+        status = data.get("status")
 
-        # Initialise node entry if new
         if esp_id not in self.esp_list:
             self.esp_list[esp_id] = {}
-
         self.esp_list[esp_id]["status"] = status
 
         if status == "ONLINE":
-            self._restore_node_state(esp_id)
-            self._set_backup_standby(esp_id, in_standby=True)
-        elif status == "OFFLINE":
-            print(f"[MQTT] Node {esp_id} went offline — activating backup if present")
-            self._set_backup_standby(esp_id, in_standby=False)
+            self._restore_node_state(esp_id) # Ripristina soglie/timer
+            
+            # LOGICA FAILOVER DINAMICA
+            settings = self.esp_list[esp_id].get("settings", {})
+            node_name = settings.get("name")
+            is_backup = settings.get("backup", False)
 
-        print(f"[MQTT] {esp_id} → {status}")
+            if node_name:
+                if not is_backup:
+                    # Sono un MAIN: metto il mio backup in standby
+                    self._set_backup_standby(esp_id, in_standby=True)
+                else:
+                    # Sono un BACKUP: devo attivarmi o stare in standby?
+                    main_id, main_data = self._get_partner_node(esp_id, node_name, look_for_backup=False)
+                    
+                    # Se il main è ONLINE, io sto in standby. Altrimenti mi attivo.
+                    should_standby = (main_data is not None and main_data.get("status") == "ONLINE")
+                    
+                    msg = {"id": esp_id, "standby": should_standby}
+                    self.client.publish(TOPIC_BACKUP, json.dumps(msg), qos=1, retain=True)
+                    print(f"[MQTT] Backup {esp_id} checked partner: standby={should_standby}")
+
+        elif status == "OFFLINE":
+            # Se un Main muore, svegliamo il backup
+            self._set_backup_standby(esp_id, in_standby=False)
+        
+        print(self.esp_list)
 
     def _restore_node_state(self, esp_id: str):
         """Re-send stored configuration to a node that just came back online."""
@@ -82,19 +99,51 @@ class MQTTManager:
                 print(f"[MQTT] Backup {node_id} for '{primary_name}' → {state}")
 
     def _node_name_already_taken(self, payload: dict) -> bool:
-        """Return True if another (non-backup) node already uses the same name."""
+        """
+        Ritorna True solo se esiste un ALTRO nodo che sta usando lo stesso nome 
+        senza essere un backup (ovvero se c'è un conflitto tra due Main).
+        """
         target_id = payload.get("id")
         new_name  = payload.get("name")
         is_backup = payload.get("backup", False)
 
+        # 1. Se il nodo che stiamo configurando ORA è un Backup, 
+        # non ci interessa se il nome è già preso (perché DEVE essere lo stesso del Main).
+        if is_backup:
+            return False
+
+        # 2. Se invece stiamo configurando un MAIN, dobbiamo assicurarci che 
+        # non esistano altri nodi MAIN con lo stesso nome.
         for node_id, node_data in self.esp_list.items():
+            
+            # Salta il controllo se l'ID è lo stesso (sono io che mi sto riconnettendo)
             if node_id == target_id:
                 continue
-            existing_name = (node_data.get("settings") or {}).get("name")
-            if existing_name == new_name and not is_backup:
-                return True
+            
+            settings = node_data.get("settings", {})
+            existing_name = settings.get("name")
+            existing_is_backup = settings.get("backup", False)
+
+            # Controlliamo il conflitto:
+            if existing_name == new_name:
+                # Se il nome è uguale, c'è errore SOLO SE l'altro nodo 
+                # non è un backup (quindi è un altro Main abusivo)
+                if not existing_is_backup:
+                    return True
+        
+        # Se siamo arrivati qui, il nome è libero o l'unico che lo usa è il nostro Backup
         return False
 
+    def _get_partner_node(self, current_id: str, name: str, look_for_backup: bool):
+        """Trova il partner (main o backup) basandosi sul nome."""
+        for node_id, node_data in self.esp_list.items():
+            if node_id == current_id:
+                continue
+            settings = node_data.get("settings", {})
+            if settings.get("name") == name and settings.get("backup") == look_for_backup:
+                return node_id, node_data
+        return None, None
+    
     # ── Public API ────────────────────────────────────────────────────────────
 
     def get_current_esp(self) -> dict | None:
