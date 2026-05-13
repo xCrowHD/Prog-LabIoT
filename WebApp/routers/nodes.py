@@ -43,3 +43,13 @@ async def set_mcu(payload: dict):
 
     mqtt_hub.send_set_mcu(current_esp["id"], payload["name"], payload["backup"], payload["timer"])
     return {"status": "ok", "target": current_esp["id"]}
+
+@router.get("/syncplant/{plant_name}")
+async def sync_mqtt_thresholds(plant_name: str):
+    current_esp = mqtt_hub.get_current_esp()
+
+    if current_esp is None:
+        raise HTTPException(status_code=503, detail="Nessun nodo ESP disponibile")
+
+    mqtt_hub.send_thresholds(current_esp["id"], plant_name)
+    return {"status": "ok"}

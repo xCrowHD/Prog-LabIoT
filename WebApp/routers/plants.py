@@ -53,20 +53,6 @@ async def get_latest_plant_reading(plant_name: str):
         raise HTTPException(status_code=404, detail="Nessun dato trovato per questa pianta")
     return data
 
-
-# ── MQTT sync ─────────────────────────────────────────────────────────────────
-
-@router.get("/syncmqtt/{plant_name}")
-async def sync_mqtt_thresholds(plant_name: str):
-    current_esp = mqtt_hub.get_current_esp()
-
-    if current_esp is None:
-        raise HTTPException(status_code=503, detail="Nessun nodo ESP disponibile")
-
-    mqtt_hub.send_thresholds(current_esp["id"], plant_name)
-    return {"status": "ok"}
-
-
 # ── Write ─────────────────────────────────────────────────────────────────────
 
 @router.post("/save")

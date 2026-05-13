@@ -43,7 +43,7 @@ export async function fetchLatestPlantData(plantId) {
 }
 
 export async function syncMqttThresholds(plantId) {
-  const res = await fetch(`/api/plants/syncmqtt/${plantId}`);
+  const res = await fetch(`/api/nodes/syncplant/${plantId}`);
   return _checkResponse(res);
 }
 
