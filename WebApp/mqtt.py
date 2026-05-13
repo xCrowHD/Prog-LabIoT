@@ -40,11 +40,12 @@ class MQTTManager:
             self.esp_list[esp_id] = {}
         self.esp_list[esp_id]["status"] = status
 
+        settings_db_manager.ensure_node_exists(esp_id)
+        node_db = settings_db_manager.get_node_settings_by_id(esp_id)
 
         if status == "CONNECTING":
             self._send_dynamic_topics_list(esp_id)
-        settings_db_manager.ensure_node_exists(esp_id)
-        node_db = settings_db_manager.get_node_settings_by_id(esp_id)
+        
 
         if status == "ONLINE":
             self._restore_node_state(esp_id) # Ripristina soglie/timer
