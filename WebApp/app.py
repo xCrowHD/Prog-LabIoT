@@ -13,12 +13,12 @@ from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 
 from config import UPLOAD_DIR
-from plants_db import db_manager
+from db.plants_db import plant_db_manager
 from routers import plants, nodes
 
 # ── Initialisation ────────────────────────────────────────────────────────────
 os.makedirs(UPLOAD_DIR, exist_ok=True)
-db_manager.delete_plant_by_id("test")
+# plant_db_manager.delete_plant_by_id("test")
 
 # ── App ───────────────────────────────────────────────────────────────────────
 app = FastAPI(title="Chlorophyll IoT Dashboard")
