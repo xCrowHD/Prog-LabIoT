@@ -31,12 +31,8 @@ async def start_stop_esp(data: dict):
     if current_esp is None:
         raise HTTPException(status_code=503, detail="Nessun nodo disponibile")
 
-    payload = {
-        "id":     current_esp["id"],
-        "status": data.get("status", False),
-    }
-    mqtt_hub.send_start_stop(payload)
-    return {"message": "Comando inviato", "target": current_esp, "status": payload["status"]}
+    mqtt_hub.send_start_stop(current_esp["id"], data.get("status", False))
+    return {"message": "Comando inviato", "target": current_esp, "status": data["status"]}
 
 
 @router.post("/set-mcu")
@@ -45,6 +41,5 @@ async def set_mcu(payload: dict):
     if current_esp is None:
         raise HTTPException(status_code=503, detail="Nessun nodo disponibile")
 
-    payload["id"] = current_esp["id"]
-    mqtt_hub.send_set_mcu(payload)
+    mqtt_hub.send_set_mcu(current_esp["id"], payload["name"], payload["backup"], payload["timer"])
     return {"status": "ok", "target": current_esp["id"]}

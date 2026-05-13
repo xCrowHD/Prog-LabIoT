@@ -6,6 +6,9 @@ Handles node discovery, backup failover, and message dispatch.
 
 import json
 from paho.mqtt import client as mqtt_client
+from db.plants_db import plant_db_manager
+from db.node_settings_db import settings_db_manager
+
 
 from config import (
     MQTT_IP, MQTT_PORT,
@@ -37,112 +40,132 @@ class MQTTManager:
             self.esp_list[esp_id] = {}
         self.esp_list[esp_id]["status"] = status
 
+        settings_db_manager.ensure_node_exists(esp_id)
+        node_db = settings_db_manager.get_node_settings_by_id(esp_id)
+
         if status == "ONLINE":
             self._restore_node_state(esp_id) # Ripristina soglie/timer
-            
-            # LOGICA FAILOVER DINAMICA
-            settings = self.esp_list[esp_id].get("settings", {})
-            node_name = settings.get("name")
-            is_backup = settings.get("backup", False)
 
-            if node_name:
-                if not is_backup:
+            if node_db and node_db.name:
+                if not node_db.is_backup:
                     # Sono un MAIN: metto il mio backup in standby
                     self._set_backup_standby(esp_id, in_standby=True)
                 else:
                     # Sono un BACKUP: devo attivarmi o stare in standby?
-                    main_id, main_data = self._get_partner_node(esp_id, node_name, look_for_backup=False)
+                    main_id = self._get_partner_node(node_db.name, node_db.id)
                     
                     # Se il main è ONLINE, io sto in standby. Altrimenti mi attivo.
-                    should_standby = (main_data is not None and main_data.get("status") == "ONLINE")
+                    should_standby = (main_id is not None and self.esp_list.get(main_id, {}).get("status") == "ONLINE")
                     
                     msg = {"id": esp_id, "standby": should_standby}
-                    self.client.publish(TOPIC_BACKUP, json.dumps(msg), qos=1, retain=True)
+                    self.client.publish(TOPIC_BACKUP, json.dumps(msg), qos=1)
                     print(f"[MQTT] Backup {esp_id} checked partner: standby={should_standby}")
 
         elif status == "OFFLINE":
-            # Se un Main muore, svegliamo il backup
-            self._set_backup_standby(esp_id, in_standby=False)
+            if node_db and not node_db.is_backup:
+                # Se un Main muore, svegliamo il backup
+                self._set_backup_standby(esp_id, in_standby=False)
         
         print(self.esp_list)
 
     def _restore_node_state(self, esp_id: str):
-        """Re-send stored configuration to a node that just came back online."""
-        node = self.esp_list[esp_id]
-        if node.get("plant-thr"):
-            self.send_thresholds(node["plant-thr"])
-        if node.get("start-stop"):
-            self.send_start_stop(node["start-stop"])
-        if node.get("settings"):
-            self.send_set_mcu(node["settings"])
+        """
+        Recupera le impostazioni dal DB e le re-invia al nodo 
+        che è appena tornato online.
+        """
+        print(f"[MQTT] Ripristino stato per il nodo: {esp_id}")
+        
+        # Recupera i dati dal Database
+        node_db = settings_db_manager.get_node_settings_by_id(esp_id)
+        
+        if not node_db:
+            print(f"[MQTT] Nessuna configurazione salvata per {esp_id}. Salto il ripristino.")
+            return
+
+        # Ripristino START/STOP (is_running)
+        if node_db.is_running is not None:
+            self.send_start_stop(esp_id, node_db.is_running)
+
+        # Ripristino SOGLIE PIANTA (plant_id)
+        if node_db.plant_id:
+            self.send_thresholds(esp_id, node_db.plant_id)
+
+        # Ripristino CONFIGURAZIONE MCU (name, timer, backup)
+        # Inviato se il nome è stato configurato
+        if node_db.name is not None and node_db.timer is not None:
+            self.send_set_mcu(esp_id, node_db.name, node_db.is_backup, node_db.timer)
+            
+        print(f"[MQTT] Ripristino completato per {esp_id}")
 
     def _set_backup_standby(self, primary_id: str, *, in_standby: bool):
         """
-        Find the backup node for *primary_id* and toggle its standby state.
-        in_standby=True  → backup goes to sleep (primary is back online)
-        in_standby=False → backup wakes up   (primary went offline)
+        Trova il backup nel DB basandosi sul nome del primario (primary_id)
+        e invia il comando di standby/wake-up.
         """
-        primary = self.esp_list.get(primary_id)
-        if not primary or "settings" not in primary:
+        # Recuperiamo i dati del primario dal DB per conoscerne il nome
+        primary_db = settings_db_manager.get_node_settings_by_id(primary_id)
+        
+        if not primary_db or not primary_db.name:
+            # Se il primario non ha un nome, non possiamo trovare il suo backup
             return
 
-        primary_name = primary["settings"].get("name")
+        primary_name = primary_db.name
 
-        for node_id, node_data in self.esp_list.items():
-            if node_id == primary_id:
-                continue
-            settings = node_data.get("settings", {})
-            if settings.get("name") == primary_name and settings.get("backup") is True:
-                msg    = {"id": node_id, "standby": in_standby}
-                self.client.publish(TOPIC_BACKUP, json.dumps(msg), qos=1, retain=True)
-                state  = "standby" if in_standby else "active"
-                print(f"[MQTT] Backup {node_id} for '{primary_name}' → {state}")
+        # Cerchiamo se esiste un backup con lo stesso nome nel DB
+        backup_node = settings_db_manager.get_backup_node_by_name(primary_name)
 
-    def _node_name_already_taken(self, payload: dict) -> bool:
+        if backup_node:
+            # Prepariamo il comando MQTT
+            # Nota: backup_node.id è il MAC address del backup
+            msg = {"id": backup_node.id, "standby": in_standby}
+            
+            self.client.publish(TOPIC_BACKUP, json.dumps(msg), qos=1)
+            
+            state = "STANDBY (Sleep)" if in_standby else "ACTIVE (Wake Up)"
+            print(f"[MQTT] Failover: Backup {backup_node.id} per '{primary_name}' → {state}")
+        else:
+            # Opzionale: log se non esiste un backup per questo nodo
+            print(f"[MQTT] Nessun backup configurato per il nodo '{primary_name}'")
+            pass
+
+    def _node_name_already_taken(self, target_id: str, new_name: str, is_backup: bool) -> bool:
         """
-        Ritorna True solo se esiste un ALTRO nodo che sta usando lo stesso nome 
-        senza essere un backup (ovvero se c'è un conflitto tra due Main).
+        Verifica nel DB se esiste un conflitto di nomi tra nodi Main.
         """
-        target_id = payload.get("id")
-        new_name  = payload.get("name")
-        is_backup = payload.get("backup", False)
 
-        # 1. Se il nodo che stiamo configurando ORA è un Backup, 
-        # non ci interessa se il nome è già preso (perché DEVE essere lo stesso del Main).
         if is_backup:
             return False
 
-        # 2. Se invece stiamo configurando un MAIN, dobbiamo assicurarci che 
-        # non esistano altri nodi MAIN con lo stesso nome.
-        for node_id, node_data in self.esp_list.items():
-            
-            # Salta il controllo se l'ID è lo stesso (sono io che mi sto riconnettendo)
-            if node_id == target_id:
+        # 2. Cerchiamo nel DB tutti i nodi con lo stesso nome
+        existing_nodes = settings_db_manager.get_nodes_by_name(new_name)
+
+        for node in existing_nodes:
+            # Se il nodo trovato è lo stesso che stiamo configurando, non è un conflitto
+            if node.id == target_id:
                 continue
             
-            settings = node_data.get("settings", {})
-            existing_name = settings.get("name")
-            existing_is_backup = settings.get("backup", False)
+            # Se troviamo un ALTRO nodo con lo stesso nome che NON è un backup,
+            # allora abbiamo un conflitto tra due Main.
+            if not node.is_backup:
+                print(f"[MQTT] Conflitto: Il nome '{new_name}' è già usato dal Main {node.id}")
+                return True
 
-            # Controlliamo il conflitto:
-            if existing_name == new_name:
-                # Se il nome è uguale, c'è errore SOLO SE l'altro nodo 
-                # non è un backup (quindi è un altro Main abusivo)
-                if not existing_is_backup:
-                    return True
-        
-        # Se siamo arrivati qui, il nome è libero o l'unico che lo usa è il nostro Backup
+        # Nessun conflitto trovato
         return False
 
-    def _get_partner_node(self, current_id: str, name: str, look_for_backup: bool):
-        """Trova il partner (main o backup) basandosi sul nome."""
-        for node_id, node_data in self.esp_list.items():
-            if node_id == current_id:
-                continue
-            settings = node_data.get("settings", {})
-            if settings.get("name") == name and settings.get("backup") == look_for_backup:
-                return node_id, node_data
-        return None, None
+    def _get_partner_node(self, name: str, current_id: str) -> str | None:
+        """
+        Ritorna l'ID del nodo Main associato al nome fornito, 
+        escludendo l'ID del nodo che effettua la richiesta.
+        """
+        # Cerchiamo nel DB il nodo Main con quel nome
+        main_id = settings_db_manager.get_main_id_by_name(name)
+        
+        # Restituiamo l'ID trovato solo se non è quello attuale
+        if main_id and main_id != current_id:
+            return main_id
+            
+        return None
     
     # ── Public API ────────────────────────────────────────────────────────────
 
@@ -159,28 +182,67 @@ class MQTTManager:
         esp_id = sorted(self.esp_list)[self.current_esp_index]
         return {"id": esp_id, "status": self.esp_list[esp_id]["status"]}
 
-    def send_thresholds(self, payload: dict):
-        esp_id = payload["id"]
-        self.esp_list[esp_id]["plant-thr"] = payload
-        self.client.publish(TOPIC_SET_THRESHOLD, json.dumps(payload), qos=1)
+    def send_thresholds(self, node_id: str, plant_id: str):
+        """
+        Recupera le soglie dal DB e le invia al nodo specifico.
+        """
+        plant = plant_db_manager.get_plant_by_id(plant_id)
 
-    def send_start_stop(self, payload: dict):
-        esp_id = payload["id"]
-        self.esp_list[esp_id]["start-stop"] = payload
-        self.client.publish(TOPIC_SET_START_STOP, json.dumps(payload), qos=1)
-
-    def send_set_mcu(self, payload: dict):
-        esp_id = payload["id"]
-        is_backup = payload.get("backup", False)
-
-        if self._node_name_already_taken(payload):
-            print(f"[MQTT] ERROR: name '{payload.get('name')}' already in use by a non-backup node")
+        if not plant:
+            print(f"[MQTT] Errore: Pianta '{plant_id}' non trovata nel DB.")
             return
 
-        standby_msg = {"id": esp_id, "standby": is_backup}
-        self.client.publish(TOPIC_BACKUP, json.dumps(standby_msg), qos=1)
+        payload = {
+            "id": node_id,
+            "name": plant_id,
+            "thresholds": {
+                "temp": {"min": plant.temp_min, "max": plant.temp_max},
+                "hum": {"min": plant.hum_min, "max": plant.hum_max},
+                "light": {"min": plant.light_min, "max": plant.light_max}
+            }
+        }
+        
+        settings_db_manager.update_node_plant(node_id, plant_id)
 
-        self.esp_list[esp_id]["settings"] = payload
+        self.client.publish(TOPIC_SET_THRESHOLD, json.dumps(payload), qos=1)
+        print(f"[MQTT] Soglie inviate a {node_id} per la pianta {plant.name}")
+
+    def send_start_stop(self, node_id: str, is_running: bool):
+
+        payload = {
+            "id": node_id,
+            "status": is_running
+        }
+        settings_db_manager.update_node_running_state(node_id, is_running)
+        self.client.publish(TOPIC_SET_START_STOP, json.dumps(payload), qos=1)
+
+    def send_set_mcu(self, node_id: str, name: str, is_backup: bool, timer: float):
+        if self._node_name_already_taken(node_id, name, is_backup):
+            print(f"[MQTT] ERROR: name '{name}' already in use by a non-backup node")
+            return
+
+        settings_db_manager.update_node_settings(node_id, name, is_backup, timer)
+
+        if is_backup:
+            # Se sto diventando un backup, controllo se il mio (nuovo) main è online
+            main_id = self._get_partner_node(name, node_id)
+            main_status = self.esp_list.get(main_id, {}).get("status") if main_id else None
+            should_standby = (main_status == "ONLINE")
+        else:
+            # SE DIVENTO UN MAIN, DEVO SVEGLIARMI SEMPRE
+            # (Risolve il tuo problema del nodo che rimane in standby)
+            should_standby = False
+
+        standby_msg = {"id": node_id, "standby": should_standby}
+        self.client.publish(TOPIC_BACKUP, json.dumps(standby_msg), qos=1)
+        print(f"[MQTT] Standby impostato per {node_id} -> {should_standby}")
+
+        payload = {
+            "id": node_id,
+            "name": name,
+            "backup": is_backup,
+            "timer": timer
+        }
         self.client.publish(TOPIC_SET_MCU, json.dumps(payload), qos=1)
 
 

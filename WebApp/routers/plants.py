@@ -8,7 +8,7 @@ import shutil
 
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from mqtt import mqtt_hub
-from plants_db import db_manager
+from db.plants_db import plant_db_manager
 from services.influx_service import get_plant_data, get_latest_plant_data
 from config import UPLOAD_DIR
 
@@ -19,12 +19,12 @@ router = APIRouter(prefix="/api/plants", tags=["plants"])
 
 @router.get("/count")
 async def get_plant_count():
-    return {"count": db_manager.get_plants_count()}
+    return {"count": plant_db_manager.get_plants_count()}
 
 
 @router.get("/soglie/{plant_name}")
 async def get_plant_thresholds(plant_name: str):
-    plant = db_manager.get_plant_by_id(plant_name)
+    plant = plant_db_manager.get_plant_by_id(plant_name)
     if plant is None:
         raise HTTPException(status_code=404, detail="Pianta non trovata")
     return plant
@@ -32,7 +32,7 @@ async def get_plant_thresholds(plant_name: str):
 
 @router.get("/soglie/position/{pos}")
 async def get_plant_thresholds_by_position(pos: int):
-    plant = db_manager.get_plant_by_position(pos)
+    plant = plant_db_manager.get_plant_by_position(pos)
     if plant is None:
         return None
     return plant
@@ -58,25 +58,13 @@ async def get_latest_plant_reading(plant_name: str):
 
 @router.get("/syncmqtt/{plant_name}")
 async def sync_mqtt_thresholds(plant_name: str):
-    plant = db_manager.get_plant_by_id(plant_name)
     current_esp = mqtt_hub.get_current_esp()
 
     if current_esp is None:
         raise HTTPException(status_code=503, detail="Nessun nodo ESP disponibile")
-    if plant is None:
-        raise HTTPException(status_code=404, detail="Pianta non trovata")
 
-    payload = {
-        "id": current_esp["id"],
-        "name": plant_name,
-        "thresholds": {
-            "temp":  {"min": plant.temp_min,  "max": plant.temp_max},
-            "hum":   {"min": plant.hum_min,   "max": plant.hum_max},
-            "light": {"min": plant.light_min, "max": plant.light_max},
-        },
-    }
-    mqtt_hub.send_thresholds(payload)
-    return {"status": "ok", "payload": payload}
+    mqtt_hub.send_thresholds(current_esp["id"], plant_name)
+    return {"status": "ok"}
 
 
 # ── Write ─────────────────────────────────────────────────────────────────────
@@ -96,13 +84,13 @@ async def save_plant(
         img_path = None
         if image:
             ext          = os.path.splitext(image.filename)[1]
-            safe_name    = f"{db_manager.generate_id(name)}{ext}"
+            safe_name    = f"{plant_db_manager.generate_id(name)}{ext}"
             file_path    = os.path.join(UPLOAD_DIR, safe_name)
             with open(file_path, "wb") as buf:
                 shutil.copyfileobj(image.file, buf)
             img_path = file_path
 
-        plant_id = db_manager.add_plant(
+        plant_id = plant_db_manager.add_plant(
             name=name,
             img_path=img_path,
             t_min=temp_min, t_max=temp_max,
