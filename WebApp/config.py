@@ -20,6 +20,7 @@ MQTT_IP   = "broker.emqx.io"
 MQTT_PORT = 1883
 
 TOPIC_TEST            = "lab_iot/mafogani/test"
+TOPIC_TOPICS          = "lab_iot/mafogani/topics"
 TOPIC_SET_MCU         = "lab_iot/mafogani/set-mcu"
 TOPIC_CONNECTION      = "lab_iot/mafogani/connection/+"
 TOPIC_SET_THRESHOLD   = "lab_iot/mafogani/threshold"

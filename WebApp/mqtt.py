@@ -10,7 +10,7 @@ from paho.mqtt import client as mqtt_client
 from config import (
     MQTT_IP, MQTT_PORT,
     TOPIC_TEST, TOPIC_SET_MCU, TOPIC_CONNECTION,
-    TOPIC_SET_THRESHOLD, TOPIC_SET_START_STOP, TOPIC_BACKUP,
+    TOPIC_SET_THRESHOLD, TOPIC_SET_START_STOP, TOPIC_BACKUP, TOPIC_TOPICS
 )
 
 
@@ -36,6 +36,10 @@ class MQTTManager:
         if esp_id not in self.esp_list:
             self.esp_list[esp_id] = {}
         self.esp_list[esp_id]["status"] = status
+
+
+        if status == "CONNECTING":
+            self._send_dynamic_topics_list(esp_id)
 
         if status == "ONLINE":
             self._restore_node_state(esp_id) # Ripristina soglie/timer
@@ -65,6 +69,18 @@ class MQTTManager:
             self._set_backup_standby(esp_id, in_standby=False)
         
         print(self.esp_list)
+
+    def _send_dynamic_topics_list(self, esp_id: str):
+        
+        topics_list = {
+            "id": esp_id,
+            "set": TOPIC_SET_MCU,
+            "backup": TOPIC_BACKUP,
+            "thr": TOPIC_SET_THRESHOLD,
+            "running": TOPIC_SET_START_STOP
+        }
+
+        self.client.publish(TOPIC_TOPICS, json.dumps(topics_list), qos=1)
 
     def _restore_node_state(self, esp_id: str):
         """Re-send stored configuration to a node that just came back online."""

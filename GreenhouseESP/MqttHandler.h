@@ -10,10 +10,11 @@
 #include "WiFiHandler.h"
 
 #define TOPIC_CONNECTION "lab_iot/mafogani/connection"
-#define TOPIC_THRESHOLD "lab_iot/mafogani/threshold"
-#define TOPIC_START_STOP "lab_iot/mafogani/start-stop"
-#define TOPIC_MCU_SET "lab_iot/mafogani/set-mcu"
-#define TOPIC_BACKUP "lab_iot/mafogani/backup"
+#define TOPIC_TOPICS "lab_iot/mafogani/topics"
+//#define TOPIC_THRESHOLD "lab_iot/mafogani/threshold"
+//#define TOPIC_START_STOP "lab_iot/mafogani/start-stop"
+//#define TOPIC_MCU_SET "lab_iot/mafogani/set-mcu"
+//#define TOPIC_BACKUP "lab_iot/mafogani/backup"
 
 struct Thresholds {
   char platName[32] = "";
@@ -25,10 +26,23 @@ struct Thresholds {
   int luxMax = 0;
 };
 
+struct Topics {
+  char threshold[32] = "";
+  char running[32] = "";
+  char set[32] = "";
+  char backup[32] = "";
+};
+
 struct McuSettings {
   char mcuName[32] = "";
   bool isBackup = false;
   float timer = 0;
+};
+
+enum class Status{
+  ONLINE,
+  CONNECTING,
+  OFFLINE,
 };
 
 class MqttHandler {
@@ -41,6 +55,8 @@ private:
   bool _isStandBy = false;
   char _id[13];
   char _dynamicTopic[128];
+  Topics _topics;
+  Status _status = Status::OFFLINE;
 
 public:
   // Costruttore
@@ -59,13 +75,15 @@ public:
 
 
 private:
+  const char* statusToString(Status s);
   void processMessage(MQTTClient* client, char topic[], char payload[], int length);
-  void sendImOn();
+  void sendStatus(Status status);
   bool isAddressedToMe(const JsonVariant& doc);
   void handleThresholds(char* payload, unsigned int length);
   void handleStartStop(char* payload, unsigned int length);
   void handleSettings(char* payload, unsigned int length);
   void handleStandBy(char* payload, unsigned int length);
+  void handleTopics(char* payload, unsigned int length);
 };
 
 #endif
