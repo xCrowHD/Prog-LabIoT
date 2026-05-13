@@ -160,6 +160,7 @@ class MQTTManager:
         return {"id": esp_id, "status": self.esp_list[esp_id]["status"]}
 
     def send_thresholds(self, payload: dict):
+        print(payload)
         esp_id = payload["id"]
         self.esp_list[esp_id]["plant-thr"] = payload
         self.client.publish(TOPIC_SET_THRESHOLD, json.dumps(payload), qos=1)

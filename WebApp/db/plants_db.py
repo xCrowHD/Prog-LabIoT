@@ -1,35 +1,15 @@
-from sqlalchemy import create_engine, Column, Integer, String, Float
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
 import re
+from .models import PlantModel, NodeSettingsModel
+from .base import init_db, SessionLocal, engine
 
-Base = declarative_base()
 
-# Definiamo lo Schema (la tabella)
-class PlantModel(Base):
-    __tablename__ = "plants"
-    id = Column(String, primary_key=True)
-    name = Column(String, nullable=False)
-    img_path = Column(String)
-    temp_min = Column(Float)
-    temp_max = Column(Float)
-    hum_min = Column(Float)
-    hum_max = Column(Float)
-    light_min = Column(Float)
-    light_max = Column(Float)
-
-class DatabaseManager:
-    def __init__(self, db_url="sqlite:///./plants.db"):
-        # Crea il motore e la sessione
-        self.engine = create_engine(db_url, connect_args={"check_same_thread": False})
-        self.SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=self.engine)
-        
-        # Crea le tabelle se non esistono
-        Base.metadata.create_all(bind=self.engine)
-        print("[DB] Database e tabelle pronti.")
+class PlantDatabaseManager:
+    def __init__(self):
+        NodeSettingsModel.__table__.drop(bind=engine, checkfirst=True)
+        init_db()
 
     def add_plant(self, name, img_path, t_min, t_max, h_min, h_max, l_min, l_max):
-        session = self.SessionLocal()
+        session = SessionLocal()
         plant_id = self.generate_id(name) # Generiamo l'ID dal nome
         
         try:
@@ -71,13 +51,14 @@ class DatabaseManager:
             session.close()
 
     def get_all_plants(self):
-        session = self.SessionLocal()
+        session = SessionLocal()
         plants = session.query(PlantModel).all()
+        print(f"[DEBUG] Piante trovate nel DB: {len(plants)}")
         session.close()
         return plants
     
     def delete_plant_by_id(self, plant_id):
-        session = self.SessionLocal()
+        session = SessionLocal()
         try:
             # Cerchiamo la pianta
             plant = session.query(PlantModel).filter(PlantModel.id == plant_id).first()
@@ -96,19 +77,19 @@ class DatabaseManager:
             session.close()
 
     def get_plant_by_position(self, position):
-        session = self.SessionLocal()
+        session = SessionLocal()
         plant = session.query(PlantModel).offset(position).first()
         session.close()
         return plant
     
     def get_plant_by_id(self, plant_id):
-        session = self.SessionLocal()
+        session = SessionLocal()
         plant = session.query(PlantModel).filter(PlantModel.id == plant_id).first()
         session.close()
         return plant
     
     def get_plants_count(self):
-        session = self.SessionLocal()
+        session = SessionLocal()
         # Esegue una query di conteggio direttamente sul database
         count = session.query(PlantModel).count()
         session.close()
@@ -122,4 +103,4 @@ class DatabaseManager:
         return name
 
 # Istanza singola (Singleton) da importare ovunque
-db_manager = DatabaseManager()
+plant_db_manager = PlantDatabaseManager()
