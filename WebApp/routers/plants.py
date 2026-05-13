@@ -58,25 +58,13 @@ async def get_latest_plant_reading(plant_name: str):
 
 @router.get("/syncmqtt/{plant_name}")
 async def sync_mqtt_thresholds(plant_name: str):
-    plant = plant_db_manager.get_plant_by_id(plant_name)
     current_esp = mqtt_hub.get_current_esp()
 
     if current_esp is None:
         raise HTTPException(status_code=503, detail="Nessun nodo ESP disponibile")
-    if plant is None:
-        raise HTTPException(status_code=404, detail="Pianta non trovata")
 
-    payload = {
-        "id": current_esp["id"],
-        "name": plant_name,
-        "thresholds": {
-            "temp":  {"min": plant.temp_min,  "max": plant.temp_max},
-            "hum":   {"min": plant.hum_min,   "max": plant.hum_max},
-            "light": {"min": plant.light_min, "max": plant.light_max},
-        },
-    }
-    mqtt_hub.send_thresholds(payload)
-    return {"status": "ok", "payload": payload}
+    mqtt_hub.send_thresholds(current_esp["id"], plant_name)
+    return {"status": "ok"}
 
 
 # ── Write ─────────────────────────────────────────────────────────────────────

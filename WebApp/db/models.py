@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float, Boolean, ForeignKey
+from sqlalchemy import Column, String, Float, Boolean, ForeignKey
 from sqlalchemy.orm import relationship
 from .base import Base
 
@@ -21,9 +21,9 @@ class NodeSettingsModel(Base):
     __tablename__ = "node_settings"
     # Usiamo il MAC address come ID primario
     id = Column(String, primary_key=True) 
-    name = Column(String, nullable=False)
+    name = Column(String, nullable=True)
     is_backup = Column(Boolean, default=False)
-    timer = Column(Integer, default=30)
+    timer = Column(Float, nullable=True)
     is_running = Column(Boolean, default=False)
     # Chiave esterna verso la pianta
     plant_id = Column(String, ForeignKey("plants.id"))

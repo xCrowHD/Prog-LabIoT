@@ -1,11 +1,10 @@
 import re
-from .models import PlantModel, NodeSettingsModel
-from .base import init_db, SessionLocal, engine
+from .models import PlantModel
+from .base import init_db, SessionLocal
 
 
 class PlantDatabaseManager:
     def __init__(self):
-        NodeSettingsModel.__table__.drop(bind=engine, checkfirst=True)
         init_db()
 
     def add_plant(self, name, img_path, t_min, t_max, h_min, h_max, l_min, l_max):
