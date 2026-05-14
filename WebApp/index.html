@@ -136,10 +136,6 @@
               class="text-xs font-bold tracking-widest text-primary uppercase"
               >System Online</span
             >
-            <span
-              class="text-xs text-on-surface-variant border-l border-outline-variant/30 pl-3"
-              >22ms Latency</span
-            >
           </div>
         </header>
 
@@ -256,38 +252,59 @@
               <div
                 class="flex justify-between items-center py-2 border-b border-outline-variant/10"
               >
-                <span class="text-sm text-on-surface-variant">SSID</span>
-                <span class="text-sm font-mono text-secondary"
-                  >CHLORO_WIFI_EXT</span
+                <span class="text-sm text-on-surface-variant">Name</span>
+                <span
+                  id="mcu-name-info"
+                  class="text-sm font-mono text-secondary"
+                  >None</span
                 >
               </div>
 
               <div
                 class="flex justify-between items-center py-2 border-b border-outline-variant/10"
               >
-                <span class="text-sm text-on-surface-variant">IP Address</span>
-                <span class="text-sm font-mono text-on-surface"
-                  >192.168.1.142</span
+                <span class="text-sm text-on-surface-variant">is Backup?</span>
+                <span
+                  id="mcu-backup-info"
+                  class="text-sm font-mono text-on-surface"
+                  >No</span
                 >
               </div>
 
               <div
                 class="flex justify-between items-center py-2 border-b border-outline-variant/10"
               >
-                <span class="text-sm text-on-surface-variant">RSSI</span>
+                <span class="text-sm text-on-surface-variant"
+                  >Data Timer (s)</span
+                >
                 <div class="flex items-center gap-1">
-                  <span class="text-sm font-mono text-primary">-54 dBm</span>
                   <span
+                    id="mcu-timer-info"
+                    class="text-sm font-mono text-primary"
+                    >0</span
+                  >
+                  <!-- <span
                     class="material-symbols-outlined text-[16px] text-primary"
                     >signal_cellular_alt</span
-                  >
+                  > -->
                 </div>
               </div>
 
               <div class="flex justify-between items-center py-2">
-                <span class="text-sm text-on-surface-variant">Uptime</span>
-                <span class="text-sm font-mono text-on-surface"
-                  >12d 04h 22m</span
+                <span class="text-sm text-on-surface-variant">is Running?</span>
+                <span
+                  id="mcu-running-info"
+                  class="text-sm font-mono text-on-surface"
+                  >No</span
+                >
+              </div>
+
+              <div class="flex justify-between items-center py-2">
+                <span class="text-sm text-on-surface-variant">Plant Sync</span>
+                <span
+                  id="mcu-plantsync-info"
+                  class="text-sm font-mono text-on-surface"
+                  >None</span
                 >
               </div>
             </div>

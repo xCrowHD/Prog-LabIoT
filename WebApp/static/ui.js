@@ -5,7 +5,12 @@
    No fetch calls here — use api.js for those.
    ============================================================= */
 
-import { fetchPlantThresholds, fetchLatestPlantData } from "./api.js";
+import {
+  fetchPlantThresholds,
+  fetchLatestPlantData,
+  fetchCurrentNode,
+  fecthNodeSettings,
+} from "./api.js";
 import { renderPlantChart } from "./chart.js";
 
 // ── Plant display ─────────────────────────────────────────────────────────────
@@ -66,8 +71,20 @@ export async function loadLatestSensorData(plantId) {
 // ── MCU panel ─────────────────────────────────────────────────────────────────
 
 export function showMcuInfo() {
+  loadMcuInfo();
   _toggle("set-mcu-form", false);
   _toggle("mcu-info", true);
+}
+
+export async function loadMcuInfo() {
+  const node = await fetchCurrentNode();
+  //console.log(nodeId);
+  const data = await fecthNodeSettings(node.id);
+  document.getElementById("mcu-name-info").innerText = data.name;
+  document.getElementById("mcu-backup-info").innerText = data.is_backup;
+  document.getElementById("mcu-timer-info").innerText = data.timer;
+  document.getElementById("mcu-running-info").innerText = data.is_running;
+  document.getElementById("mcu-plantsync-info").innerText = data.plant_id;
 }
 
 export function showSetMcuForm() {

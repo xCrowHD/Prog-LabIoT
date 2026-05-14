@@ -5,6 +5,7 @@ Routes for managing ESP8266 nodes: start/stop, MCU configuration, and node navig
 
 from fastapi import APIRouter, HTTPException
 from mqtt import mqtt_hub
+from db.node_settings_db import settings_db_manager
 
 router = APIRouter(prefix="/api/nodes", tags=["nodes"])
 
@@ -53,3 +54,10 @@ async def sync_mqtt_thresholds(plant_name: str):
 
     mqtt_hub.send_thresholds(current_esp["id"], plant_name)
     return {"status": "ok"}
+
+@router.get("/nodeinfo/{node_id}")
+async def get_node_info(node_id: str):
+    node_settings = settings_db_manager.get_node_settings_by_id(node_id)
+    if node_settings is None:
+        raise HTTPException(status_code=503, detail="Nessun setting nodo ESP disponibile")
+    return node_settings

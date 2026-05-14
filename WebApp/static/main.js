@@ -24,6 +24,7 @@ import {
   activateTab,
   clearFormInputs,
   loadLatestSensorData,
+  loadMcuInfo,
 } from "./ui.js";
 
 import { renderPlantChart } from "./chart.js";
@@ -84,6 +85,7 @@ async function onSyncMqtt() {
   if (!plant) return;
   try {
     await syncMqttThresholds(plant.id);
+    loadMcuInfo();
   } catch (err) {
     console.error("[main] syncMqtt:", err);
   }
@@ -98,6 +100,7 @@ async function onStartStop() {
     await sendStartStop(shouldStart);
     btn.setAttribute("data-field", shouldStart ? "STOP" : "START");
     statusTextEl.innerHTML = shouldStart ? "STOP ESP8266" : "START ESP8266";
+    loadMcuInfo();
   } catch (err) {
     console.error("[main] startStop:", err);
     statusTextEl.innerHTML = "ERRORE CONNESSIONE";
@@ -141,6 +144,7 @@ async function onSavePlant() {
 async function onNextNode() {
   const data = await fetchNextNode();
   renderNodeStatus(data);
+  loadMcuInfo();
 }
 
 // ── Timers / Polling ──────────────────────────────────────────────────────────
@@ -177,7 +181,7 @@ async function boot() {
   } else {
     showAddPlantForm();
   }
-
+  loadMcuInfo();
   const nodeData = await fetchCurrentNode();
   renderNodeStatus(nodeData);
 }

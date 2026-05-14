@@ -42,11 +42,6 @@ export async function fetchLatestPlantData(plantId) {
   return _checkResponse(res);
 }
 
-export async function syncMqttThresholds(plantId) {
-  const res = await fetch(`/api/nodes/syncplant/${plantId}`);
-  return _checkResponse(res);
-}
-
 /**
  * @param {{ name: string, temp_min: number, temp_max: number,
  *            hum_min: number, hum_max: number,
@@ -97,5 +92,15 @@ export async function sendSetMcu(config) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(config),
   });
+  return _checkResponse(res);
+}
+
+export async function syncMqttThresholds(plantId) {
+  const res = await fetch(`/api/nodes/syncplant/${plantId}`);
+  return _checkResponse(res);
+}
+
+export async function fecthNodeSettings(nodeId) {
+  const res = await fetch(`/api/nodes/nodeinfo/${nodeId}`);
   return _checkResponse(res);
 }
