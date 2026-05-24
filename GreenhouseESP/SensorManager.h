@@ -1,8 +1,13 @@
 #ifndef SENSOR_MANAGER_H
 #define SENSOR_MANAGER_H
 
+#if ARDUINO
 #include <Arduino.h>
 #include <DHT.h>
+#else
+#include "MockLibraries/Arduino.h"
+#include "MockLibraries/DHT.h"
+#endif
 
 // Definizione dei Pin (Puoi cambiarli qui e cambieranno ovunque)
 #define DHTPIN D7

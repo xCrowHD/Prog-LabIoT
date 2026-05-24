@@ -1,18 +1,23 @@
 #ifndef ALARMHANDLER_H
 #define ALARMHANDLER_H
 
-#include <Arduino.h>
-#include <set>
+#ifdef ARDUINO
+#include <Arduino.h> // Vero ambiente Arduino sulla scheda
+#else
+#include "MockLibraries/Arduino.h" // Il finto Arduino.h che abbiamo appena creato sul PC
+#endif
+#include "MqttHandler.h"
 
-#define LED_RED D0
-#define LED_GREEN D4
-#define LED_BLUE D3
+#include <set>
+#include <vector>
 
 enum class AlarmType { NONE,
                  ALL_OK,
                  SENSOR_ERROR,
                  ALL_THRESHOLDS_OUT,
                  SOME_THRESHOLDS_OUT,
+                 CONNECTION_ERROR,
+                 INFLUX_ERROR,
                  NO_SEND_DATA,
                  NUM_ALARM_TYPES };  //NUM_ALARM_TYPE = #elementi di enum
 
@@ -30,6 +35,8 @@ public:
   void nextAlarmColor();
   void flipEnabled();
   bool getAlarmStatus();
+  std::vector<AlarmType> getActiveAlarms();
+  void clearAlarms();
 
 private:
   void ledOff();

@@ -1,6 +1,6 @@
 #include <Ticker.h>
 #include <ESP8266WiFi.h>
-#include <InfluxDbClient.h>
+#include "InfluxHandler.h"
 #include "secrets.h"
 #include "MqttHandler.h"
 #include "SensorManager.h"
@@ -92,14 +92,61 @@ void loop() {
     lcd.addMessage("Status", "ONLINE");
   }
 
-  if (mqtt.getSettings().timer != lastTimerValue) {
-    lastTimerValue = mqtt.getSettings().timer;
-    updateInfluxTicker();
+  float mqttTimer = mqtt.getSettings().timer;
+  if (mqttTimer != lastTimerValue) {
+    client_idb.updateInterval(mqttTimer);
+    lastTimerValue = mqttTimer;
   }
+  
+  long rssi = WiFiHandler::getRSSI();
+  PlantData data = sensor.getAllData();
+  Thresholds currentThr = mqtt.getThresholds();
 
-  if (flagWriteInflux) {
-    flagWriteInflux = false;
-    sendDataToInflux();
+  bool connectionOK = (rssi >= RSSI_THRESHOLD); 
+  bool dataOK = data.valid;
+
+  if (client_idb.isReadyToWrite() && connectionOK && dataOK){
+      InfluxStatus status = client_idb.sendDataToInflux(data, rssi, "Serra", "NodeMCU", currentThr);
+      handleInfluxException(status);
+  }  
+
+  if (flagCheckSensor) {
+    flagCheckSensor = false; 
+
+    // Eseguiamo TUTTI i controlli in modo indipendente.
+    // Ognuno di loro aggiungerà o rimuoverà il proprio allarme specifico.
+    bool connStatus   = handleConnectionException();
+    bool dataStatus   = handleDataException(data);
+    bool mqttStatus   = handleMqttExceptions(currentThr);
+    bool thrStatus    = true; // Di base assumiamo siano OK, cambieranno solo se controllati
+    bool influxStatus = true; 
+
+    // Controlliamo le soglie solo se i dati del sensore sono effettivamente validi
+    if (dataStatus) {
+      thrStatus = handleThresholds(data, currentThr);
+      
+      // Controlliamo Influx solo se siamo online
+      if (connStatus) {
+        InfluxStatus status = client_idb.influxStatus(data, currentThr);
+        influxStatus = handleInfluxException(status);
+      } else {
+        // Se non c'è connessione, non possiamo testare Influx adesso. 
+        // Rimuoviamo il vecchio errore Influx per non bloccare la logica futura.
+        alarm.removeAlarm(AlarmType::INFLUX_ERROR);
+      }
+    } else {
+      // Se i dati del sensore non sono validi, non possiamo testare le soglie.
+      alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
+      alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
+    }
+
+    // Rimuoviamo l'ALL_OK preventivamente per aggiornarlo alla fine
+    alarm.removeAlarm(AlarmType::ALL_OK);
+
+    // SE tutti i report dei singoli handler dicono che è tutto a posto
+    if (connStatus && dataStatus && mqttStatus && thrStatus && influxStatus) {
+        handleSuccess();
+    }
   }
 
   int reading = digitalRead(RESET_ALARMS);
@@ -126,114 +173,83 @@ void loop() {
   lastButtonState = reading;
 }
 
-// Influx DB operations
-
-bool check_influxdb() {
-  // check InfluxDB server connection
-  if (client_idb.validateConnection()) {
-    Serial.print(F("Connected to InfluxDB: "));
-    Serial.println(client_idb.getServerUrl());
-    return true;
-  } else {
-    Serial.print(F("InfluxDB connection failed: "));
-    Serial.println(client_idb.getLastErrorMessage());
+bool handleMqttExceptions(Thresholds & currentThr){
+  if (currentThr.plantName == nullptr || currentThr.plantName[0] == '\0'){
+    alarm.clearAlarms();
+    alarm.addAlarm(AlarmType::NO_SEND_DATA);
+    lcd.addMessage("Error", "Missing plant!");
     return false;
   }
+  return true;
 }
 
-void sendDataToInflux() {
-
-  if (!check_influxdb()) {
-    Serial.println(F("Not Connected To InfluxDB"));
-    return;
-  }
-
-  Serial.print(F("Sending to InfluxDB... "));
-
-  Point sensorData("Serra");
-  sensorData.addTag("device", "NodeMCU");
-
-  Thresholds currentThr = mqtt.getThresholds();
-
-  // Controlla se il primo carattere NON è lo zero (stringa non vuota)
-  if (currentThr.platName[0] != '\0') {
-    sensorData.addTag("pianta", currentThr.platName);
-  } else {
-    Serial.println(F("Plant Name not Found"));
-    alarm.addAlarm(AlarmType::SENSOR_ERROR);
-    alarm.removeAlarm(AlarmType::ALL_OK);
-    lcd.addMessage("ERROR", "Plant null");
-    return;
-  }
-
-  alarm.removeAlarm(AlarmType::SENSOR_ERROR);
-
-  PlantData data = sensor.getAllData();
-  if (!data.valid) {
-    Serial.println(F("Datas are not valid"));
-    alarm.addAlarm(AlarmType::SENSOR_ERROR);
-    alarm.removeAlarm(AlarmType::ALL_OK);
-    lcd.addMessage("ERROR", "Sensors Error");
-    return;
-  }
-
-  alarm.removeAlarm(AlarmType::SENSOR_ERROR);
-
+bool handleThresholds(PlantData& data, Thresholds& currentThr) {
   bool tempInRange = data.temperature >= currentThr.tempMin && data.temperature <= currentThr.tempMax;
-  bool humInRange = data.temperature >= currentThr.humMin && data.temperature <= currentThr.humMax;
-  bool luxInrange = data.light >= currentThr.luxMin && data.light <= currentThr.luxMax;
+  bool humInRange = data.humidity >= currentThr.humMin && data.humidity <= currentThr.humMax;
+  bool luxInRange = data.light >= currentThr.luxMin && data.light <= currentThr.luxMax;
 
-  if (tempInRange && humInRange && luxInrange) {
-    alarm.addAlarm(AlarmType::ALL_OK);
-    // Se tutto è OK, potresti voler rimuovere gli altri errori
-    alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
-    alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
-    lcd.addMessage("Thresholds", "ALL OK");
-  } else if (!tempInRange && !humInRange && !luxInrange) {
+  if (!tempInRange && !humInRange && !luxInRange) {
     alarm.addAlarm(AlarmType::ALL_THRESHOLDS_OUT);
-    alarm.removeAlarm(AlarmType::ALL_OK);
-    alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
     lcd.addMessage("Thresholds", "ALL O.O.R");
-  } else {
-    alarm.addAlarm(AlarmType::SOME_THRESHOLDS_OUT);
-    alarm.removeAlarm(AlarmType::ALL_OK);
-    alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
+    Serial.println(F("All thresholds out of range"));
+    return false;
+  } 
+  else if (!tempInRange || !humInRange || !luxInRange) {
+    alarm.addAlarm(AlarmType::SOME_THRESHOLDS_OUT);      
     lcd.addMessage("Thresholds", "SOME O.O.R");
+    Serial.println(F("Some thresholds out of range!"));
+    return false;
   }
 
-  long rssi = WiFiHandler::getRSSI();
-  if (rssi < RSSI_THRESHOLD) {
-    Serial.println(F("RSSI too low"));
-    Serial.println(rssi);
-    return;
-  }
-
-  sensorData.addField("temp", data.temperature);
-  sensorData.addField("hum", data.humidity);
-  sensorData.addField("lux", data.light);
-  sensorData.addField("rssi", rssi);
-
-  if (client_idb.writePoint(sensorData)) {
-    Serial.print(F("Sent to data to influxDB"));
-    lcd.addMessagePlantData(data.temperature, data.humidity, data.light);
-  } else {
-    Serial.println(client_idb.getLastErrorMessage());
-  }
+    alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
+    alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
+  return true;
 }
 
-void updateInfluxTicker() {
-  int newInterval = mqtt.getSettings().timer;
+bool handleInfluxException(InfluxStatus status){
+  if (status == InfluxStatus::ERR_INFLUX_CONNECTION) {
+    alarm.addAlarm(AlarmType::INFLUX_ERROR);
+    Serial.print(F("Connection Error: "));
+    Serial.println(client_idb.getInfluxClient().getLastErrorMessage());
+    return false;
+  }
 
-  // Protezione: evita valori assurdi o zero che farebbero crashare l'ESP
-  if (newInterval <= 0) newInterval = 20;
+  alarm.removeAlarm(AlarmType::INFLUX_ERROR);
+  return true;
+}
 
-  Serial.print(F("Aggiornamento intervallo InfluxDB: "));
-  Serial.print(newInterval);
-  Serial.println(F(" secondi"));
+bool handleDataException(PlantData& data){
 
-  // Stacchiamo il ticker e lo riattacchiamo con il nuovo valore
-  writeToInflux.detach();
-  writeToInflux.attach((float)newInterval, []() {
-    flagWriteInflux = true;
-  });
+    if (!data.valid){
+      alarm.clearAlarms();
+      alarm.addAlarm(AlarmType::SENSOR_ERROR);
+      lcd.addMessage("Error", "Sensor Error");
+      Serial.println(F("Sensor Error!"));
+      return false;
+
+    }
+    alarm.removeAlarm(AlarmType::SENSOR_ERROR);
+    return true;
+
+}
+
+bool handleConnectionException(){
+    long rssi = WiFiHandler::getRSSI();
+    if (rssi < RSSI_THRESHOLD){
+      alarm.addAlarm(AlarmType::CONNECTION_ERROR);
+      lcd.addMessage("Error", "Connection Error");
+      Serial.print(F("RSSI too low: "));
+      Serial.println(rssi);
+      return false;
+    }
+    alarm.removeAlarm(AlarmType::CONNECTION_ERROR);
+    return true;
+}
+
+
+void handleSuccess(){
+  alarm.clearAlarms();
+  alarm.addAlarm(AlarmType::ALL_OK);
+  lcd.addMessage("All OK!");
+  Serial.println(F("All OK!"));
 }

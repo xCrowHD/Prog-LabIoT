@@ -1,0 +1,1 @@
+g++ -std=c++17 AlarmTest.cpp AlarmHandler.cpp -o AlarmTest

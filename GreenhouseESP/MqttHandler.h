@@ -1,6 +1,7 @@
 #ifndef MQTT_HANDLER_H
 #define MQTT_HANDLER_H
 
+#if ARDUINO
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <MQTT.h>
@@ -8,6 +9,11 @@
 //usiamo staicJsonDocument cosi da mettere nello stack ed evita frammentazione
 //se usassimo JsonDocument lo metterebbe nell'heap portando possibile frammentazione in seguito
 #include "WiFiHandler.h"
+#else
+#include "MockLibraries/Arduino.h"
+#include "MockLibraries/Mqtt.h"
+#include "MockLibraries/ArduinoJson.h"
+#endif
 
 #define TOPIC_CONNECTION "lab_iot/mafogani/connection"
 #define TOPIC_TOPICS "lab_iot/mafogani/topics"

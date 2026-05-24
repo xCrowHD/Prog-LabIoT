@@ -1,10 +1,11 @@
 #ifndef LCD_HANDLER_H
 #define LCD_HANDLER_H
-
+#include <deque>
 #include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
 #include <Wire.h>
-#include <deque>
+
+
 
 #define DISPLAY_CHARS 16
 #define DISPLAY_LINES 2

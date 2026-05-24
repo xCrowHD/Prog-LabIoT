@@ -30,6 +30,18 @@ void AlarmHandler::manageLEDerrors(AlarmType alarm) {
     case AlarmType::SENSOR_ERROR:
       setLedRGB(HIGH, LOW, LOW);  // Rosso
       break;
+<<<<<<< Updated upstream
+=======
+    case AlarmType::CONNECTION_ERROR:
+      setLedRGB(LOW, LOW, HIGH); // Blu
+      break;
+    case AlarmType::INFLUX_ERROR:
+      setLedRGB(HIGH, HIGH, HIGH); // Bianco
+      break;
+    case AlarmType::NO_SEND_DATA:
+      setLedRGB(LOW, HIGH, HIGH); // Azzurro
+      break;
+>>>>>>> Stashed changes
     default:
       ledOff();
       return;  // Non aggiungiamo NONE allo storico dei "notificati"
@@ -55,11 +67,25 @@ void AlarmHandler::removeAlarm(AlarmType type) {
 
 void AlarmHandler::nextAlarmColor() {
 
-  if (_activeAlarms.empty() || !_enabled) {
-    ledOff();
+  if (_activeAlarms.empty())
+  {
+    if (_enabled)
+    {
+      manageLEDerrors(AlarmType::ALL_OK); 
+    }
+    else
+    {
+      ledOff();
+    }
     return;
   }
 
+  if (!_enabled)
+  {
+    ledOff();
+    return;
+  }
+  
   // Se l'iteratore è alla fine o non valido, ricomincia da capo
   if (_currentIt == _activeAlarms.end()) {
     _currentIt = _activeAlarms.begin();
@@ -83,4 +109,8 @@ void AlarmHandler::flipEnabled(){
 
 bool AlarmHandler::getAlarmStatus(){
   return _enabled;
+}
+
+std::vector<AlarmType> AlarmHandler::getActiveAlarms() {
+  return std::vector<AlarmType>(_activeAlarms.begin(), _activeAlarms.end());
 }
