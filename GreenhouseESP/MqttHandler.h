@@ -23,7 +23,7 @@
 //#define TOPIC_BACKUP "lab_iot/mafogani/backup"
 
 struct Thresholds {
-  char platName[32] = "";
+  char plantName[32] = "";
   float tempMin = 0;
   float tempMax = 0;
   float humMin = 0;

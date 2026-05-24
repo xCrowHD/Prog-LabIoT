@@ -30,8 +30,7 @@ void AlarmHandler::manageLEDerrors(AlarmType alarm) {
     case AlarmType::SENSOR_ERROR:
       setLedRGB(HIGH, LOW, LOW);  // Rosso
       break;
-<<<<<<< Updated upstream
-=======
+
     case AlarmType::CONNECTION_ERROR:
       setLedRGB(LOW, LOW, HIGH); // Blu
       break;
@@ -41,7 +40,7 @@ void AlarmHandler::manageLEDerrors(AlarmType alarm) {
     case AlarmType::NO_SEND_DATA:
       setLedRGB(LOW, HIGH, HIGH); // Azzurro
       break;
->>>>>>> Stashed changes
+
     default:
       ledOff();
       return;  // Non aggiungiamo NONE allo storico dei "notificati"
