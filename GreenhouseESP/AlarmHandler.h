@@ -3,6 +3,9 @@
 
 #ifdef ARDUINO
 #include <Arduino.h> // Vero ambiente Arduino sulla scheda
+#define LED_RED D0
+#define LED_GREEN D4
+#define LED_BLUE D3
 #else
 #include "MockLibraries/Arduino.h" // Il finto Arduino.h che abbiamo appena creato sul PC
 #endif

@@ -22,7 +22,7 @@ bool lastButtonState = HIGH;
 // WiFi config
 WiFiClient client;
 // InfluxDB cfg
-InfluxDBClient client_idb(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
+InfluxHandler client_idb(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
 
 // MQTT Broker settings
 MqttHandler mqtt;
@@ -35,16 +35,17 @@ LCDHandler lcd;
 
 // Alarm LEDRGB
 AlarmHandler alarm;
-
-Ticker tickerBlink;
 Ticker writeToInflux;
+Ticker tickerBlink;
 Ticker writeLCD;
 Ticker tickerAlarm;
 Ticker idTick;
+Ticker checkAlarmStatus;
+
 float lastTimerValue = 20.0;
 char id[13];
 
-volatile bool flagWriteInflux = false;
+volatile bool flagCheckSensor;
 
 void setup() {
   Serial.begin(115200);
@@ -56,10 +57,7 @@ void setup() {
   lcd.begin();
   sensor.begin();
   alarm.begin();
-
-  writeToInflux.attach((float)lastTimerValue, []() {
-    flagWriteInflux = true;
-  });
+  client_idb.begin(lastTimerValue);
 
   writeLCD.attach(2.0, []() {
     lcd.popAndDisplay();
@@ -72,6 +70,11 @@ void setup() {
   idTick.attach(5.0, []{
     lcd.addMessage("ID:", id);
   });
+
+  checkAlarmStatus.attach(5.0, [](){
+    flagCheckSensor = true;
+  });
+
 }
 
 void loop() {

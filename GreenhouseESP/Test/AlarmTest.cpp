@@ -5,9 +5,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "AlarmHandler.h"
-#include "InfluxHandler.h"
-#include "MqttHandler.h"
+#include "../AlarmHandler.h"
+#include "../InfluxHandler.h"
+#include "../MqttHandler.h"
 
 #include <iostream>
 #include <string>

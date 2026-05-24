@@ -2,6 +2,7 @@
 #define INFLUX_HANDLER_H
 
 #include "SensorManager.h"
+#include "MqttHandler.h"
 
 #ifdef ARDUINO
 #include <InfluxDbClient.h>
