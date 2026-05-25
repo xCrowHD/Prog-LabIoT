@@ -1,10 +1,5 @@
 #include "InfluxHandler.h"
 
-#include <Ticker.h>
-#include <InfluxDbClient.h>
-#include "MqttHandler.h"
-#include "SensorManager.h"
-
 InfluxHandler::InfluxHandler(const char* url, const char* org, const char* bucket, const char* token)
 : _clientIdb(url, org, bucket, token), _flagWrite(false){
 }
@@ -70,7 +65,7 @@ InfluxStatus InfluxHandler::sendDataToInflux(PlantData& data, long rssi, const c
   return InfluxStatus::SUCCESS;
 }
 
-InfluxDBClient& InfluxHandler::getInfluxClient(){
-  return _clientIdb;
+const char* InfluxHandler::getLastErrorMessage()
+{
+  return _clientIdb.getLastErrorMessage().c_str();
 }
-

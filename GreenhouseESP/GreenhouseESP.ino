@@ -7,6 +7,7 @@
 #include "LCDHandler.h"
 #include "AlarmHandler.h"
 #include "WiFiHandler.h"
+#include "HandleExceptions.h"
 
 // D0, LED on the development board (between the ESP module and the USB port)
 //https://github.com/nodemcu/nodemcu-devkit-v1.0/blob/master/NODEMCU_DEVKIT_V1.0.PDF
@@ -41,6 +42,8 @@ Ticker writeLCD;
 Ticker tickerAlarm;
 Ticker idTick;
 Ticker checkAlarmStatus;
+
+HandleExceptions checkStatus(alarm, lcd, client_idb);
 
 float lastTimerValue = 20.0;
 char id[13];
@@ -110,7 +113,7 @@ void loop() {
 
   if (client_idb.isReadyToWrite() && connectionOK && dataOK){
       InfluxStatus status = client_idb.sendDataToInflux(data, rssi, "Serra", "NodeMCU", currentThr);
-      handleInfluxException(status);
+      checkStatus.handleInfluxException(status);
   }  
 
   if (flagCheckSensor) {
@@ -118,20 +121,21 @@ void loop() {
 
     // Eseguiamo TUTTI i controlli in modo indipendente.
     // Ognuno di loro aggiungerà o rimuoverà il proprio allarme specifico.
-    bool connStatus   = handleConnectionException();
-    bool dataStatus   = handleDataException(data);
-    bool mqttStatus   = handleMqttExceptions(currentThr);
+    long rssi = WiFiHandler::getRSSI();
+    bool connStatus   = checkStatus.handleConnectionException(rssi, RSSI_THRESHOLD);
+    bool dataStatus   = checkStatus.handleDataException(data);
+    bool mqttStatus   = checkStatus.handleMqttExceptions(currentThr);
     bool thrStatus    = true; // Di base assumiamo siano OK, cambieranno solo se controllati
     bool influxStatus = true; 
 
     // Controlliamo le soglie solo se i dati del sensore sono effettivamente validi
     if (dataStatus) {
-      thrStatus = handleThresholds(data, currentThr);
+      thrStatus = checkStatus.handleThresholds(data, currentThr);
       
       // Controlliamo Influx solo se siamo online
       if (connStatus) {
         InfluxStatus status = client_idb.influxStatus(data, currentThr);
-        influxStatus = handleInfluxException(status);
+        influxStatus = checkStatus.handleInfluxException(status);
       } else {
         // Se non c'è connessione, non possiamo testare Influx adesso. 
         // Rimuoviamo il vecchio errore Influx per non bloccare la logica futura.
@@ -148,7 +152,7 @@ void loop() {
 
     // SE tutti i report dei singoli handler dicono che è tutto a posto
     if (connStatus && dataStatus && mqttStatus && thrStatus && influxStatus) {
-        handleSuccess();
+        checkStatus.handleSuccess();
     }
   }
 
@@ -174,85 +178,4 @@ void loop() {
   }
 
   lastButtonState = reading;
-}
-
-bool handleMqttExceptions(Thresholds & currentThr){
-  if (currentThr.plantName == nullptr || currentThr.plantName[0] == '\0'){
-    alarm.clearAlarms();
-    alarm.addAlarm(AlarmType::NO_SEND_DATA);
-    lcd.addMessage("Error", "Missing plant!");
-    return false;
-  }
-  return true;
-}
-
-bool handleThresholds(PlantData& data, Thresholds& currentThr) {
-  bool tempInRange = data.temperature >= currentThr.tempMin && data.temperature <= currentThr.tempMax;
-  bool humInRange = data.humidity >= currentThr.humMin && data.humidity <= currentThr.humMax;
-  bool luxInRange = data.light >= currentThr.luxMin && data.light <= currentThr.luxMax;
-
-  if (!tempInRange && !humInRange && !luxInRange) {
-    alarm.addAlarm(AlarmType::ALL_THRESHOLDS_OUT);
-    lcd.addMessage("Thresholds", "ALL O.O.R");
-    Serial.println(F("All thresholds out of range"));
-    return false;
-  } 
-  else if (!tempInRange || !humInRange || !luxInRange) {
-    alarm.addAlarm(AlarmType::SOME_THRESHOLDS_OUT);      
-    lcd.addMessage("Thresholds", "SOME O.O.R");
-    Serial.println(F("Some thresholds out of range!"));
-    return false;
-  }
-
-    alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
-    alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
-  return true;
-}
-
-bool handleInfluxException(InfluxStatus status){
-  if (status == InfluxStatus::ERR_INFLUX_CONNECTION) {
-    alarm.addAlarm(AlarmType::INFLUX_ERROR);
-    Serial.print(F("Connection Error: "));
-    Serial.println(client_idb.getInfluxClient().getLastErrorMessage());
-    return false;
-  }
-
-  alarm.removeAlarm(AlarmType::INFLUX_ERROR);
-  return true;
-}
-
-bool handleDataException(PlantData& data){
-
-    if (!data.valid){
-      alarm.clearAlarms();
-      alarm.addAlarm(AlarmType::SENSOR_ERROR);
-      lcd.addMessage("Error", "Sensor Error");
-      Serial.println(F("Sensor Error!"));
-      return false;
-
-    }
-    alarm.removeAlarm(AlarmType::SENSOR_ERROR);
-    return true;
-
-}
-
-bool handleConnectionException(){
-    long rssi = WiFiHandler::getRSSI();
-    if (rssi < RSSI_THRESHOLD){
-      alarm.addAlarm(AlarmType::CONNECTION_ERROR);
-      lcd.addMessage("Error", "Connection Error");
-      Serial.print(F("RSSI too low: "));
-      Serial.println(rssi);
-      return false;
-    }
-    alarm.removeAlarm(AlarmType::CONNECTION_ERROR);
-    return true;
-}
-
-
-void handleSuccess(){
-  alarm.clearAlarms();
-  alarm.addAlarm(AlarmType::ALL_OK);
-  lcd.addMessage("All OK!");
-  Serial.println(F("All OK!"));
 }

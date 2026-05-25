@@ -1,25 +1,18 @@
 #ifndef INFLUX_HANDLER_H
 #define INFLUX_HANDLER_H
 
+#include "interfaces/IInfluxHandler.h"
+
 #include "SensorManager.h"
 #include "MqttHandler.h"
 
-#ifdef ARDUINO
 #include <InfluxDbClient.h>
 #include <Ticker.h>
-#else 
-#include "MockLibraries/InfluxDbClient.h"
-#include "MockLibraries/Ticker.h"
-#endif
 
 
-enum class InfluxStatus {
-    SUCCESS,
-    ERR_INFLUX_CONNECTION
-};
 
 
-class InfluxHandler {
+class InfluxHandler : public IInfluxHandler {
   private:
     InfluxDBClient _clientIdb;
     long _rssiThreshold;
@@ -34,7 +27,7 @@ class InfluxHandler {
     InfluxStatus influxStatus(PlantData& data, const Thresholds& currentThr);
     InfluxStatus sendDataToInflux(PlantData& data, long rssi, const char* point_name, const char* device_name, const Thresholds& currentThr);
 
-    InfluxDBClient& getInfluxClient();
+    const char* getLastErrorMessage() override;
 };
 
 

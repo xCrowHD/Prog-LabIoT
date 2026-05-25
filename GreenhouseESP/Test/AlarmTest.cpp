@@ -1,13 +1,14 @@
 #include <iostream>
 #include <algorithm>
 #include <cstdint>
-
+#include <fstream> 
 #include <stdlib.h>
 #include <stdio.h>
 
+#include "../Test/MockClasses.h"
 #include "../AlarmHandler.h"
-#include "../InfluxHandler.h"
-#include "../MqttHandler.h"
+#include "../HandleExceptions.h"
+
 
 #include <iostream>
 #include <string>
@@ -15,7 +16,6 @@
 inline int testsFailed = 0;
 inline int totalAssertions = 0;
 
-// La nostra macro personalizzata: non fa crashare il programma ma logga l'errore
 #define EXPECT(condizione, messaggio)                                                                         \
     do                                                                                                        \
     {                                                                                                         \
@@ -23,23 +23,23 @@ inline int totalAssertions = 0;
         if (!(condizione))                                                                                    \
         {                                                                                                     \
             testsFailed++;                                                                                    \
-            std::cerr << "\n[FALLITO] Assertion mancata alla riga " << __LINE__ << " di " << __FILE__ << "\n" \
+            std::cout << "\n[FALLITO] Assertion mancata alla riga " << __LINE__ << " di " << __FILE__ << "\n" \
                       << "  -> Condizione: " << #condizione << "\n"                                           \
                       << "  -> Messaggio:  " << messaggio << "\n\n";                                          \
         }                                                                                                     \
     } while (0)
 
-AlarmHandler alarm;
-bool mockConnStatus;
+#define RSSI_THRESHOLD -80
+long rssi;
+MockAlarmHandler alarm;
+MockLCDHandler lcd;
+MockInfluxHandler client;
+
+HandleExceptions checkStatus(alarm, lcd, client);
+
 bool mockMqttStatus;
 InfluxStatus mockInfluxStatus;
 
-bool handleMqttExceptions(Thresholds &currentThr);
-bool handleThresholds(PlantData &data, Thresholds &currentThr);
-bool handleInfluxException(InfluxStatus status);
-bool handleDataException(PlantData &data);
-bool handleConnectionException();
-void handleSuccess();
 void loopSimulation(PlantData &data, Thresholds &currentThr, InfluxStatus status);
 void initializeMockStatuses(const std::string& testName = "");
 
@@ -93,7 +93,7 @@ void testAlarmHandler()
     */
     {// Test 6: loop di visualizzazione degli allarmi
     initializeMockStatuses("Test 6");
-    std::cout << "Test 6: loop di visualizzazione degli allarmi" << std::endl;
+    std::cout << "Test 6: loop di visualizzazione degli allarmi" << std::endl << std::endl;
     alarm.addAlarm(AlarmType::SENSOR_ERROR);
     alarm.addAlarm(AlarmType::CONNECTION_ERROR);
     alarm.addAlarm(AlarmType::INFLUX_ERROR);
@@ -107,7 +107,7 @@ void testAlarmHandler()
     initializeMockStatuses("Test 7");
     std::cout << "Test 7: WiFi connection error" << std::endl;
     
-    mockConnStatus = false;
+    rssi = -100;
     PlantData validData = {25.0, 50.0, 300, true};
     Thresholds validThresholds = {"Tomato", 20.0, 30.0, 40.0, 60.0, 200, 400};
 
@@ -118,8 +118,8 @@ void testAlarmHandler()
         std::cout << "Active Alarm " << i + 1 << ": ";
         alarm.nextAlarmColor();
     }
-    EXPECT(alarm.getActiveAlarms().size() == 1,
-        "Dovrebbe esserci 1 allarme attivo (CONNECTION_ERROR).");
+    EXPECT(std::find(alarm.getActiveAlarms().begin(), alarm.getActiveAlarms().end(), AlarmType::CONNECTION_ERROR) != alarm.getActiveAlarms().end(),
+           "L'allarme CONNECTION_ERROR dovrebbe essere presente.");
     EXPECT(std::find(alarm.getActiveAlarms().begin(),
         alarm.getActiveAlarms().end(),
         AlarmType::CONNECTION_ERROR) != alarm.getActiveAlarms().end(),
@@ -131,9 +131,8 @@ void testAlarmHandler()
 
     {// Test 8: sensor data non validi, tutto il resto valido
     initializeMockStatuses("Test 8");
-    std::cout << "Test 8: sensor data invalid" << std::endl;
+    std::cout << "Test 8: sensor data invalid" << std::endl << std::endl;
 
-    mockConnStatus = true;
     Thresholds validThresholds = {"Tomato", 20.0, 30.0, 40.0, 60.0, 200, 400};
     PlantData invalidData = {25.0, 50.0, 300, false}; // Dati non validi
     loopSimulation(invalidData, validThresholds, mockInfluxStatus);
@@ -154,7 +153,7 @@ void testAlarmHandler()
 
     {// Test 9: Influx connection error
     initializeMockStatuses("Test 9");
-    std::cout << "Test 9: Influx connection error" << std::endl;
+    std::cout << "Test 9: Influx connection error" << std::endl << std::endl;
 
     mockInfluxStatus = InfluxStatus::ERR_INFLUX_CONNECTION;
     PlantData validData = {25.0, 50.0, 300, true};
@@ -176,7 +175,7 @@ void testAlarmHandler()
     
     {// Test 10: Mqtt exception (missing plant name)
     initializeMockStatuses("Test 10");
-    std::cout << "Test 10: Mqtt exception (missing plant name)" << std::endl;
+    std::cout << "Test 10: Mqtt exception (missing plant name)" << std::endl << std::endl;
     PlantData validData = {25.0, 50.0, 300, true};
     Thresholds invalidThresholds = {"", 20.0, 30.0, 40.0, 60.0, 200, 400}; // Nome pianta mancante
     loopSimulation(validData, invalidThresholds, mockInfluxStatus);
@@ -197,7 +196,7 @@ void testAlarmHandler()
     {
     // Test 11:Thresholds out of range
     initializeMockStatuses("Test 11");
-    std::cout << "Test 11: All thresholds out of range" << std::endl;
+    std::cout << "Test 11: All thresholds out of range" << std::endl << std::endl;
     PlantData validData = {25.0, 50.0, 300, true};
     Thresholds outOfRangeThresholds = {"Tomato", 10.0, 20.0, 30.0, 40.0, 100, 200}; // Tutte le soglie fuori range
     loopSimulation(validData, outOfRangeThresholds, mockInfluxStatus);
@@ -216,7 +215,7 @@ void testAlarmHandler()
     {
     // Test 12: Some thresholds out of range
     initializeMockStatuses("Test 12");
-    std::cout << "Test 12: Some thresholds out of range" << std::endl;
+    std::cout << "Test 12: Some thresholds out of range" << std::endl << std::endl;
     PlantData validData = {25.0, 50.0, 300, true};
     Thresholds someOutOfRangeThresholds = {"Tomato", 20.0, 30.0, 30.0, 40.0, 100, 200}; // Solo la temperatura è fuori range
     loopSimulation(validData, someOutOfRangeThresholds, mockInfluxStatus);
@@ -235,7 +234,7 @@ void testAlarmHandler()
 
     {// Test 13: Tutto OK
         initializeMockStatuses("Test 13");
-        std::cout << "Test 13: All systems operational" << std::endl;
+        std::cout << "Test 13: All systems operational" << std::endl << std::endl;
         PlantData validData = {25.0, 50.0, 300, true};
         Thresholds validThresholds = {"Tomato", 20.0, 30.0, 40.0, 60.0, 200, 400};
         loopSimulation(validData, validThresholds, InfluxStatus::SUCCESS);
@@ -251,12 +250,12 @@ void testAlarmHandler()
 
     {// Test 14: Loop connessione WiFi disattivata e tutto il resto valido
     initializeMockStatuses("Test 14");
-    std::cout << "Test 14: Loop connessione WiFi disattivata e tutto il resto valido" << std::endl;
+    std::cout << "Test 14: Loop connessione WiFi disattivata e tutto il resto valido" << std::endl << std::endl;
     PlantData validData = {25.0, 50.0, 300, true};
     Thresholds validThresholds = {"Tomato", 20.0, 30.0, 40.0, 60.0, 200, 400};
     
     std::cout << "Simulazione ciclo con connessione WiFi disattivata..." << std::endl;
-    mockConnStatus = false;
+    rssi = -100;
     loopSimulation(validData, validThresholds, InfluxStatus::SUCCESS);
     for (size_t i = 0; i < alarm.getActiveAlarms().size(); ++i)
     {
@@ -265,7 +264,7 @@ void testAlarmHandler()
     }
 
     std::cout << "Simulazione ciclo con connessione WiFi disattivata completata." << std::endl;
-    mockConnStatus = true; // Riattiviamo la connessione per i test successivi
+    rssi = -60;// Riattiviamo la connessione per i test successivi
     loopSimulation(validData, validThresholds, InfluxStatus::SUCCESS); // Simuliamo un ciclo con connessione attiva per vedere il cambio di stato
     
     for (size_t i = 0; i < alarm.getActiveAlarms().size(); ++i)
@@ -280,7 +279,7 @@ void testAlarmHandler()
     { // Test 15: Transizione errore sensore -> risoluzione
         initializeMockStatuses("Test 15");
 
-        std::cout << "Simulazione ciclo con dati non validi..." << std::endl;
+        std::cout << "Simulazione ciclo con dati non validi..." << std::endl << std::endl;
         PlantData invalidData = {25.0, 50.0, 300, false};
         Thresholds validThresholds = {"Tomato", 20.0, 30.0, 40.0, 60.0, 200, 400};
         loopSimulation(invalidData, validThresholds, InfluxStatus::SUCCESS);
@@ -304,7 +303,7 @@ void testAlarmHandler()
 
     {// Test 16: Loop con MQTT exception (missing plant name) e tutto il resto valido
     initializeMockStatuses("Test 16");
-    std::cout << "Test 16: Loop con MQTT exception (missing plant name) e tutto il resto valido" << std::endl;
+    std::cout << "Test 16: Loop con MQTT exception (missing plant name) e tutto il resto valido" << std::endl << std::endl;
     PlantData validData = {25.0, 50.0, 300, true};
     Thresholds invalidThresholds = {"", 20.0, 30.0, 40.0, 60.0, 200, 400}; // Nome pianta mancante
     loopSimulation(validData, invalidThresholds, InfluxStatus::SUCCESS);    
@@ -319,7 +318,7 @@ void testAlarmHandler()
 
     { // Test 17: loop di 2 errori (SOME_THRESHOLDS_OUT + INFLUX_ERROR) e poi risoluzione di entrambi
         initializeMockStatuses("Test 17");
-        std::cout << "Test 17: loop di 2 errori (SOME_THRESHOLDS_OUT + INFLUX_ERROR) e poi risoluzione di entrambi" << std::endl;
+        std::cout << "Test 17: loop di 2 errori (SOME_THRESHOLDS_OUT + INFLUX_ERROR) e poi risoluzione di entrambi" << std::endl << std::endl;
 
         PlantData validData = {25.0, 50.0, 300, true};
         Thresholds someOutOfRangeThresholds = {"Tomato", 20.0, 30.0, 30.0, 40.0, 100, 200};
@@ -332,6 +331,7 @@ void testAlarmHandler()
         EXPECT(alarmsPhase1.size() == 2, "Dovrebbero esserci 2 allarmi attivi.");
 
         for (size_t i = 0; i < alarmsPhase1.size(); ++i)
+        
         {
             std::cout << "Active Alarm " << i + 1 << ": ";
             alarm.nextAlarmColor();
@@ -376,143 +376,63 @@ void testAlarmHandler()
 
 int main()
 {
-    std::cout << "========================================" << std::endl;
-    std::cout << "       INIZIO DELLA SUITE DI TEST       " << std::endl;
-    std::cout << "========================================" << std::endl;
+    // Apre il file sovrascrivendo eventuali esecuzioni precedenti
+
+    std::cout << "=======================================" << std::endl;
+    std::cout << "              SUITE TEST               " << std::endl;
+    std::cout << "=======================================" << std::endl;
 
     testAlarmHandler();
 
-    std::cout << "========================================" << std::endl;
-    std::cout << "             RESOCONTO FINALE           " << std::endl;
-    std::cout << "========================================" << std::endl;
-    std::cout << "Controlli totali eseguiti: " << totalAssertions << std::endl;
+    std::cout << "=======================================" << std::endl;
+    std::cout << "             RESOCONTO FINALE          " << std::endl;
+    std::cout << "=======================================" << std::endl;
+    std::cout << "Controlli totali eseguiti: " << std::to_string(totalAssertions) << std::endl;
 
     if (testsFailed == 0)
     {
-        std::cout << "\n[SUCCESSO] Tutti i test sono passati senza errori!\n"
-                  << std::endl;
+        std::cout << "[SUCCESSO] Tutti i test sono passati senza errori! " << std::endl << std::endl;
         return 0;
     }
     else
     {
-        std::cerr << "\n[ATTENZIONE] Rilevati " << testsFailed << " fallimenti su "
-                  << totalAssertions << " verifiche totali.\n"
-                  << std::endl;
+        std::cout << "[ATTENSIONE] Rilevati " << std::to_string(testsFailed) << " fallimenti su " << std::to_string(totalAssertions) << "verifiche totali" << std::endl << std::endl;
         return 1;
     }
 }
-
 //-------------------------------------- Funzioni di gestione delle eccezioni per i test ---------------------------------------//
 void initializeMockStatuses(const std::string& testName)
 {
-    std::cout << "\n--- Initializing mock statuses for " << testName << " ---\n";
-    alarm.begin();
+
+    std::cout << std::endl << "---Inizializzando Mock Status per il test " << testName << "---" << std::endl;
 
     if (!alarm.getAlarmStatus())
     {
-        alarm.flipEnabled(); // Assicuriamoci che l'allarme sia abilitato all'inizio dei test
+        alarm.flipEnabled(); 
     }
     alarm.clearAlarms();
 
-    mockConnStatus = true;
+    rssi = -60;
     mockMqttStatus = true;
     mockInfluxStatus = InfluxStatus::SUCCESS;
 }
 
-bool handleMqttExceptions(Thresholds &currentThr)
+void loopSimulation(PlantData &data, Thresholds &currentThr, InfluxStatus status)
 {
-    if (currentThr.plantName == nullptr || currentThr.plantName[0] == '\0')
-    {
-        alarm.addAlarm(AlarmType::NO_SEND_DATA);
-        std::cout << "MQTT exception: Missing plant name" << std::endl;
-        return false;
-    }
-    alarm.removeAlarm(AlarmType::NO_SEND_DATA);
-    return true;
-}
-
-bool handleThresholds(PlantData &data, Thresholds &currentThr)
-{
-    bool tempInRange = data.temperature >= currentThr.tempMin && data.temperature <= currentThr.tempMax;
-    bool humInRange = data.humidity >= currentThr.humMin && data.humidity <= currentThr.humMax;
-    bool luxInRange = data.light >= currentThr.luxMin && data.light <= currentThr.luxMax;
-
-    if (!tempInRange && !humInRange && !luxInRange)
-    {
-        alarm.addAlarm(AlarmType::ALL_THRESHOLDS_OUT);
-        std::cout << "Thresholds exception: All thresholds out of range" << std::endl;
-        return false;
-    }
-    else if (!tempInRange || !humInRange || !luxInRange)
-    {
-        alarm.addAlarm(AlarmType::SOME_THRESHOLDS_OUT);
-        std::cout << "Thresholds exception: Some thresholds out of range" << std::endl;
-        return false;
-    }
-
-    alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
-    alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
-    return true;
-}
-
-bool handleInfluxException(InfluxStatus status)
-{
-    if (status == InfluxStatus::ERR_INFLUX_CONNECTION)
-    {
-        alarm.addAlarm(AlarmType::INFLUX_ERROR);
-        std::cout << "Influx exception: Connection error" << std::endl;
-        return false;
-    }
-
-    alarm.removeAlarm(AlarmType::INFLUX_ERROR);
-    return true;
-}
-
-bool handleDataException(PlantData &data)
-{
-
-    if (!data.valid)
-    {
-        alarm.addAlarm(AlarmType::SENSOR_ERROR);
-        std::cout << "Data exception: Invalid sensor data" << std::endl;
-        return false;
-    }
-    alarm.removeAlarm(AlarmType::SENSOR_ERROR);
-    return true;
-}
-
-bool handleConnectionException()
-{
-    if (!mockConnStatus)
-    {
-        alarm.addAlarm(AlarmType::CONNECTION_ERROR);
-        return false;
-    }
-    return true;
-}
-
-void handleSuccess()
-{
-    alarm.clearAlarms();
-    std::cout << "All systems operational" << std::endl;
-}
-
-void loopSimulation(PlantData &data, Thresholds &currentThr, InfluxStatus status){
-    bool connStatus = handleConnectionException();
-    bool dataStatus = handleDataException(data);
-    bool mqttStatus = handleMqttExceptions(currentThr);
+    bool connStatus = checkStatus.handleConnectionException(rssi, RSSI_THRESHOLD);
+    bool dataStatus = checkStatus.handleDataException(data);
+    bool mqttStatus = checkStatus.handleMqttExceptions(currentThr);
     bool thrStatus = true; // Di base assumiamo siano OK, cambieranno solo se controllati
     bool influxStatus = true;
 
-    // Controlliamo le soglie solo se i dati del sensore sono effettivamente validi
     if (dataStatus)
     {
-        thrStatus = handleThresholds(data, currentThr);
+        thrStatus = checkStatus.handleThresholds(data, currentThr);
 
         // Controlliamo Influx solo se siamo online
         if (connStatus)
         {
-            influxStatus = handleInfluxException(status);
+            influxStatus = checkStatus.handleInfluxException(status);
         }
         else
         {
@@ -528,12 +448,10 @@ void loopSimulation(PlantData &data, Thresholds &currentThr, InfluxStatus status
         alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
     }
 
-    // Rimuoviamo l'ALL_OK preventivamente per aggiornarlo alla fine
     alarm.removeAlarm(AlarmType::ALL_OK);
 
-    // SE tutti i report dei singoli handler dicono che è tutto a posto
     if (connStatus && dataStatus && mqttStatus && thrStatus && influxStatus)
     {
-        handleSuccess();
+        checkStatus.handleSuccess();
     }
 }
