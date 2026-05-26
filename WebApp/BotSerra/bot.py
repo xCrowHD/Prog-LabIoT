@@ -3,6 +3,8 @@ from telegram.ext import Application, CommandHandler, CallbackQueryHandler, Cont
 from config import TOKEN_BOT
 from mqtt import mqtt_hub
 from db.plants_db import plant_db_manager
+from services.influx_service import get_plant_data, get_latest_plant_data
+from utils.plant_data_graph import genera_immagine_grafico
 
 # python3 -m BotSerra.bot
 
@@ -34,6 +36,14 @@ async def comando_sync_plant(update: Update, context: ContextTypes.DEFAULT_TYPE)
         parse_mode="Markdown"
     )
 
+async def comando_plant_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    markup = genera_tastiera_piante(comando_origine="plantfield")
+    
+    await update.message.reply_text(
+        "▶️ Di quale pianta vuoi i dati?\n", 
+        reply_markup=markup,
+        parse_mode="Markdown"
+    )
 
 # --- 2. GESTORE DEI CLIC SUI BOTTONI (Callback Query) ---
 
@@ -75,12 +85,57 @@ async def gestisci_sync_plant(update: Update, context: ContextTypes.DEFAULT_TYPE
     query = update.callback_query
     await query.answer()
     _, esp_id, plant_id = query.data.split(":")
-    # query.data sarà ad esempio "stop:840D8EB0612D"
     plant = plant_db_manager.get_plant_by_id(plant_id)
     print(f"[Bot Telegram] {plant.name} sync su {esp_id}")
     mqtt_hub.send_thresholds(esp_id, plant_id)
-    await query.edit_message_text(text=f"✅ {plant.name} sincronizzata correttamente su {esp_id}!", parse_mode="Markdown")
+    await query.edit_message_text(text=f"✅ {plant.name} sincronizzata correttamente su `{esp_id}`!", parse_mode="Markdown")
 
+async def gestisci_plant_field(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    print(query.data)
+    _, plant_id = query.data.split(":")
+    markup = genera_tastiera_field(f"planttime:{plant_id}")
+    print(f"[Bot Telegram] Mostra Field da scegliere per {plant_id}")
+    await query.edit_message_text(text="▶️ Quale Field ti interessa?\n", 
+                                  reply_markup=markup,
+                                  parse_mode="Markdown")
+
+async def gestisci_plant_time(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    print(query.data)
+    _, plant_id, field = query.data.split(":")
+    markup = genera_tastiera_periodo(f"plantgraph:{plant_id}:{field}")
+    print(f"[Bot Telegram] Mostra Periodo da scegliere per {plant_id}")
+    await query.edit_message_text(text="▶️ Quale Periodo ti interessa?\n", 
+                                  reply_markup=markup,
+                                  parse_mode="Markdown")
+
+async def gestisci_plant_graph(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    print(query.data)
+    _, plant_id, field, time = query.data.split(":")
+    data = get_plant_data(plant_id, time)
+    plant_name = plant_db_manager.get_plant_by_id(plant_id).name
+    
+    field_data = [record[field] for record in data if field in record and record[field] is not None]
+    time_data = [record["timestamp"] for record in data if field in record and record[field] is not None]
+
+    image = genera_immagine_grafico(field_data, time_data, field)
+    print(f"[Bot Telegram] Invio Foto dati {plant_id}")
+
+    chat_id = update.effective_chat.id
+    await context.bot.send_photo(
+        chat_id=chat_id,
+        photo=image,
+        caption=f"📊 Grafico di *{field.upper()}* per la pianta `{plant_name}`",
+        parse_mode="Markdown"
+    )
+    await query.delete_message()
+
+    
 # --- Helpers ---
 def genera_tastiera_esp(comando_origine: str) -> InlineKeyboardMarkup:
     tastiera = []
@@ -113,7 +168,7 @@ def genera_tastiera_piante(comando_origine: str) -> InlineKeyboardMarkup:
     tastiera = []
     for pianta in plant_db_manager.get_all_plants():
         testo_bottone = f"{pianta.name}"
-        print(f"{comando_origine}:{pianta.id}")
+        # print(f"{comando_origine}:{pianta.id}")
         bottone = InlineKeyboardButton(
             text=testo_bottone, 
             callback_data=f"{comando_origine}:{pianta.id}"
@@ -123,6 +178,43 @@ def genera_tastiera_piante(comando_origine: str) -> InlineKeyboardMarkup:
     # Se il dizionario è vuoto mettiamo un bottone di avviso
     if not tastiera:
         tastiera.append([InlineKeyboardButton("❌ Nessuna Pianta rilevata", callback_data="error:no_plants")])
+        
+    return InlineKeyboardMarkup(tastiera)
+
+def genera_tastiera_field(comando_origine: str) -> InlineKeyboardMarkup:
+    tastiera = []
+    
+    opzioni_sensori = [
+        ("🌡️ Temperatura", "temp"),
+        ("💧 Umidità", "hum"),
+        ("☀️ Luce", "lux")
+    ]
+    
+    for nome, valore in opzioni_sensori:
+        bottone = InlineKeyboardButton(
+            text=nome,
+            callback_data=f"{comando_origine}:{valore}"
+        )
+        tastiera.append([bottone]) 
+        
+    return InlineKeyboardMarkup(tastiera)
+
+
+def genera_tastiera_periodo(comando_origine: str) -> InlineKeyboardMarkup:
+    tastiera = []
+    
+    opzioni_periodo = [
+        ("⏱️ Ultime 24 Ore", "24h"),
+        ("📅 Ultimi 7 Giorni", "7d"),
+        ("📆 Ultimi 30 Giorni", "30d")
+    ]
+    
+    for nome, valore in opzioni_periodo:
+        bottone = InlineKeyboardButton(
+            text=nome,
+            callback_data=f"{comando_origine}:{valore}"
+        )
+        tastiera.append([bottone])
         
     return InlineKeyboardMarkup(tastiera)
 
@@ -139,8 +231,12 @@ def main():
     app.add_handler(CommandHandler("syncplant", comando_sync_plant))
     app.add_handler(CallbackQueryHandler(gestisci_select_plant, pattern=r"^selplant:.*"))
     app.add_handler(CallbackQueryHandler(gestisci_sync_plant, pattern=r"^syncplant:.*:.*"))
+    app.add_handler(CommandHandler("plantdata", comando_plant_data))
+    app.add_handler(CallbackQueryHandler(gestisci_plant_field, pattern=r"^plantfield:.*"))
+    app.add_handler(CallbackQueryHandler(gestisci_plant_time, pattern=r"^planttime:.*:.*"))
+    app.add_handler(CallbackQueryHandler(gestisci_plant_graph, pattern=r"^plantgraph:.*:.*:.*"))
     # Facciamo partire il bot in ascolto continuo (Polling)
-    print("[Bot Telegram] In esecuzione (Separato). Premi CTRL+C per fermarlo.")
+    print("[Bot Telegram] In esecuzione (Separato). Premi CTRL+Z per fermarlo.")
     app.run_polling()
 
 if __name__ == "__main__":

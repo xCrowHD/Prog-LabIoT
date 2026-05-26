@@ -26,13 +26,13 @@ def _record_to_dict(record) -> dict:
     }
 
 
-def get_plant_data(plant_name: str, last_time: str) -> list[dict]:
-    """Return time-series records for *plant_name* over the *last_time* window."""
+def get_plant_data(plant_id: str, last_time: str) -> list[dict]:
+    """Return time-series records for *plant_id* over the *last_time* window."""
     query = f"""
     from(bucket: "{INFLUXDB_BUCKET}")
     |> range(start: -{last_time})
     |> filter(fn: (r) => r["_measurement"] == "Serra")
-    |> filter(fn: (r) => r["pianta"] == "{plant_name}")
+    |> filter(fn: (r) => r["pianta"] == "{plant_id}")
     |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
     |> group()
     |> sort(columns: ["_time"], desc: false)
