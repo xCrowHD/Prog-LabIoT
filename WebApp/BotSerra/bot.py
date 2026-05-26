@@ -26,7 +26,7 @@ async def comando_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     )
 
 async def comando_sync_plant(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    markup = genera_tastiera_esp(comando_origine="syncplant")
+    markup = genera_tastiera_esp(comando_origine="selplant")
     
     await update.message.reply_text(
         "▶️ Su quale nodo vuoi sincronizzare la nuova pianta?\n*(Puoi selezionare anche i nodi offline, riceveranno il comando al risveglio)*", 
@@ -61,24 +61,25 @@ async def gestisci_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await query.edit_message_text(text=f"✅ MCU `{id_esp}` fermato correttamente!", parse_mode="Markdown")
 
-async def gestisci_sync_plant(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def gestisci_select_plant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
     _, id_esp = query.data.split(":")
-    markup = genera_tastiera_piante(f"plants:{id_esp}")
+    markup = genera_tastiera_piante(f"syncplant:{id_esp}")
     print(f"[Bot Telegram] Mostra piante da sincronizzare a {id_esp}")
     await query.edit_message_text(text="▶️ Quale pianta vuoi sincronizzare?\n", 
                                   reply_markup=markup,
                                   parse_mode="Markdown")
 
-async def gestisci_plant(update: Update, context: ContextTypes.DEFAULT_TYPE):
+async def gestisci_sync_plant(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
-    
+    _, esp_id, plant_id = query.data.split(":")
     # query.data sarà ad esempio "stop:840D8EB0612D"
-    print(query.data)
-    
-    await query.edit_message_text(text=f"✅ !", parse_mode="Markdown")
+    plant = plant_db_manager.get_plant_by_id(plant_id)
+    print(f"[Bot Telegram] {plant.name} sync su {esp_id}")
+    mqtt_hub.send_thresholds(esp_id, plant_id)
+    await query.edit_message_text(text=f"✅ {plant.name} sincronizzata correttamente su {esp_id}!", parse_mode="Markdown")
 
 # --- Helpers ---
 def genera_tastiera_esp(comando_origine: str) -> InlineKeyboardMarkup:
@@ -112,6 +113,7 @@ def genera_tastiera_piante(comando_origine: str) -> InlineKeyboardMarkup:
     tastiera = []
     for pianta in plant_db_manager.get_all_plants():
         testo_bottone = f"{pianta.name}"
+        print(f"{comando_origine}:{pianta.id}")
         bottone = InlineKeyboardButton(
             text=testo_bottone, 
             callback_data=f"{comando_origine}:{pianta.id}"
@@ -135,8 +137,8 @@ def main():
     app.add_handler(CommandHandler("stop", comando_stop))
     app.add_handler(CallbackQueryHandler(gestisci_stop, pattern=r"^stop:.*"))
     app.add_handler(CommandHandler("syncplant", comando_sync_plant))
-    app.add_handler(CallbackQueryHandler(gestisci_sync_plant, pattern=r"^syncplant:.*"))
-    app.add_handler(CallbackQueryHandler(gestisci_plant, pattern=r"^plant:.*:.*"))
+    app.add_handler(CallbackQueryHandler(gestisci_select_plant, pattern=r"^selplant:.*"))
+    app.add_handler(CallbackQueryHandler(gestisci_sync_plant, pattern=r"^syncplant:.*:.*"))
     # Facciamo partire il bot in ascolto continuo (Polling)
     print("[Bot Telegram] In esecuzione (Separato). Premi CTRL+C per fermarlo.")
     app.run_polling()
