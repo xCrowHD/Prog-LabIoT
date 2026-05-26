@@ -16,7 +16,7 @@ private:
 public:
     HandleExceptions(IAlarmHandler& alarm, ILCDHandler &lcd, IInfluxHandler &client_idb);
     bool handleMqttExceptions(Thresholds &currentThr);
-    bool handleThresholds(PlantData &data, Thresholds &currentThr);
+    bool handleThresholds(PlantData &data, Thresholds &currentThr, bool isDataValid);
     bool handleInfluxException(InfluxStatus status);
     bool handleDataException(PlantData &data);
     bool handleConnectionException(long rssi, const long RSSI_THRESHOLD);

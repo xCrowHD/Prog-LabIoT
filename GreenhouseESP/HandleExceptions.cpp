@@ -21,8 +21,14 @@ bool HandleExceptions::handleMqttExceptions(Thresholds &currentThr)
     return true;
 }
 
-bool HandleExceptions::handleThresholds(PlantData &data, Thresholds &currentThr)
+bool HandleExceptions::handleThresholds(PlantData &data, Thresholds &currentThr, bool isDataValid)
 {
+    if (!isDataValid){
+        _alarm.addAlarm(AlarmType::SENSOR_ERROR);
+        _alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
+        _alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
+        return false;
+    }
     bool tempInRange = data.temperature >= currentThr.tempMin && data.temperature <= currentThr.tempMax;
     bool humInRange = data.humidity >= currentThr.humMin && data.humidity <= currentThr.humMax;
     bool luxInRange = data.light >= currentThr.luxMin && data.light <= currentThr.luxMax;
@@ -30,6 +36,7 @@ bool HandleExceptions::handleThresholds(PlantData &data, Thresholds &currentThr)
     if (!tempInRange && !humInRange && !luxInRange)
     {
         _alarm.addAlarm(AlarmType::ALL_THRESHOLDS_OUT);
+        _alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
         _lcd.addMessage("Thresholds", "ALL O.O.R");
         Serial.println(F("All thresholds out of range"));
         return false;
@@ -37,6 +44,7 @@ bool HandleExceptions::handleThresholds(PlantData &data, Thresholds &currentThr)
     else if (!tempInRange || !humInRange || !luxInRange)
     {
         _alarm.addAlarm(AlarmType::SOME_THRESHOLDS_OUT);
+        _alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
         _lcd.addMessage("Thresholds", "SOME O.O.R");
         Serial.println(F("Some thresholds out of range!"));
         return false;

@@ -91,6 +91,7 @@ void loop() {
     lcd.addMessage("Status", "Need Settings");
     return;
   }
+
   if (!mqtt.isRunning()) {
     lcd.addMessage("Status", "OFFLINE");
     return;
@@ -103,59 +104,38 @@ void loop() {
     client_idb.updateInterval(mqttTimer);
     lastTimerValue = mqttTimer;
   }
-  
-  long rssi = WiFiHandler::getRSSI();
-  PlantData data = sensor.getAllData();
-  Thresholds currentThr = mqtt.getThresholds();
+    if (flagCheckSensor) {
+        flagCheckSensor = false; 
 
-  bool connectionOK = (rssi >= RSSI_THRESHOLD); 
-  bool dataOK = data.valid;
+        long rssi = WiFiHandler::getRSSI();
+        PlantData data = sensor.getAllData();
+        Thresholds currentThr = mqtt.getThresholds();
 
-  if (client_idb.isReadyToWrite() && connectionOK && dataOK){
-      InfluxStatus status = client_idb.sendDataToInflux(data, rssi, "Serra", "NodeMCU", currentThr);
-      checkStatus.handleInfluxException(status);
-  }  
+        // I singoli metodi qui sotto aggiungono o rimuovono gli allarmi in autonomia
+        bool connStatus = checkStatus.handleConnectionException(rssi, RSSI_THRESHOLD);
+        bool dataStatus = checkStatus.handleDataException(data);
+        bool mqttStatus = checkStatus.handleMqttExceptions(currentThr);
+        bool thrStatus  = checkStatus.handleThresholds(data, currentThr, dataStatus);
+        
+        // Gestione InfluxDB
+        InfluxStatus status = InfluxStatus::SUCCESS;
 
-  if (flagCheckSensor) {
-    flagCheckSensor = false; 
+        if (client_idb.isReadyToWrite() && connStatus && dataStatus) {
+            status = client_idb.sendDataToInflux(data, rssi, "Serra", "NodeMCU", currentThr);
+        }
+        
+        bool influxStatus = checkStatus.handleInfluxException(status);
 
-    // Eseguiamo TUTTI i controlli in modo indipendente.
-    // Ognuno di loro aggiungerà o rimuoverà il proprio allarme specifico.
-    long rssi = WiFiHandler::getRSSI();
-    bool connStatus   = checkStatus.handleConnectionException(rssi, RSSI_THRESHOLD);
-    bool dataStatus   = checkStatus.handleDataException(data);
-    bool mqttStatus   = checkStatus.handleMqttExceptions(currentThr);
-    bool thrStatus    = true; // Di base assumiamo siano OK, cambieranno solo se controllati
-    bool influxStatus = true; 
 
-    // Controlliamo le soglie solo se i dati del sensore sono effettivamente validi
-    if (dataStatus) {
-      thrStatus = checkStatus.handleThresholds(data, currentThr);
-      
-      // Controlliamo Influx solo se siamo online
-      if (connStatus) {
-        InfluxStatus status = client_idb.influxStatus(data, currentThr);
-        influxStatus = checkStatus.handleInfluxException(status);
-      } else {
-        // Se non c'è connessione, non possiamo testare Influx adesso. 
-        // Rimuoviamo il vecchio errore Influx per non bloccare la logica futura.
-        alarm.removeAlarm(AlarmType::INFLUX_ERROR);
-      }
-    } else {
-      // Se i dati del sensore non sono validi, non possiamo testare le soglie.
-      alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
-      alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
-    }
-
-    // Rimuoviamo l'ALL_OK preventivamente per aggiornarlo alla fine
-    alarm.removeAlarm(AlarmType::ALL_OK);
-
-    // SE tutti i report dei singoli handler dicono che è tutto a posto
-    if (connStatus && dataStatus && mqttStatus && thrStatus && influxStatus) {
-        checkStatus.handleSuccess();
-    }
+        // Valutazione dello stato globale per aggiornare scritte LCD di successo
+        if (connStatus && dataStatus && mqttStatus && thrStatus && influxStatus) {
+            checkStatus.handleSuccess(); 
+        }
+        else{
+          alarm.nextAlarmColor();
+        }
   }
-
+  
   int reading = digitalRead(RESET_ALARMS);
   if (reading != lastButtonState) {
     // Reset del timer
