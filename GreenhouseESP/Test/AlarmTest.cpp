@@ -5,10 +5,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "../Test/MockClasses.h"
 #include "../AlarmHandler.h"
+#include "../InfluxHandler.h"
+#include "../LCDHandler.h"
+#include "../MqttHandler.h"
+#include "../SensorManager.h"
 #include "../HandleExceptions.h"
-
 
 #include <iostream>
 #include <string>
@@ -31,10 +33,14 @@ inline int totalAssertions = 0;
 
 #define RSSI_THRESHOLD -80
 long rssi;
-MockAlarmHandler alarm;
-MockLCDHandler lcd;
-MockInfluxHandler client;
+const char* url = "influx url";
+const char* org = "organization";
+const char* bkt = "Personal bucket";
+const char* tkn = "Your token";
 
+AlarmHandler alarm;
+LCDHandler lcd;
+InfluxHandler client(url, org, bkt, tkn);
 HandleExceptions checkStatus(alarm, lcd, client);
 
 bool mockMqttStatus;

@@ -115,7 +115,7 @@ void loop() {
         bool connStatus = checkStatus.handleConnectionException(rssi, RSSI_THRESHOLD);
         bool dataStatus = checkStatus.handleDataException(data);
         bool mqttStatus = checkStatus.handleMqttExceptions(currentThr);
-        bool thrStatus  = checkStatus.handleThresholds(data, currentThr, dataStatus);
+        bool thrStatus  = checkStatus.handleThresholds(data, currentThr);
         
         // Gestione InfluxDB
         InfluxStatus status = InfluxStatus::SUCCESS;

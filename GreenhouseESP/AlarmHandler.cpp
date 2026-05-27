@@ -1,13 +1,102 @@
 #include "AlarmHandler.h"
-#include <Arduino.h>
-
-#define LED_RED D0
-#define LED_GREEN D4
-#define LED_BLUE D3
 
 AlarmHandler::AlarmHandler() {
   _currentIt = _activeAlarms.begin();
   _enabled = true;
+}
+
+void AlarmHandler::manageLEDerrors(AlarmType alarm)
+{
+  switch (alarm)
+  {
+  case AlarmType::ALL_OK:
+    setLedRGB(LOW, HIGH, LOW);
+    break; // Verde (LOW/HIGH o 0/1)
+  case AlarmType::SOME_THRESHOLDS_OUT:
+    setLedRGB(HIGH, LOW, HIGH);
+    break; // Purple
+  case AlarmType::ALL_THRESHOLDS_OUT:
+    setLedRGB(HIGH, HIGH, LOW);
+    break; // Giallo
+  case AlarmType::SENSOR_ERROR:
+    setLedRGB(HIGH, LOW, LOW);
+    break; // Rosso
+  case AlarmType::CONNECTION_ERROR:
+    setLedRGB(LOW, LOW, HIGH);
+    break; // Blu
+  case AlarmType::INFLUX_ERROR:
+    setLedRGB(HIGH, HIGH, HIGH);
+    break; // Bianco
+  case AlarmType::NO_SEND_DATA:
+    setLedRGB(LOW, HIGH, HIGH);
+    break; // Azzurro
+  default:
+    ledOff();
+    break;
+  }
+}
+
+void AlarmHandler::nextAlarmColor()
+{
+  if (_activeAlarms.empty())
+  {
+    if (_enabled)
+    {
+      manageLEDerrors(AlarmType::ALL_OK);
+    }
+    else
+    {
+      ledOff();
+    }
+    return;
+  }
+
+  if (!_enabled)
+  {
+    ledOff();
+    return;
+  }
+
+  if (_currentIt == _activeAlarms.end())
+  {
+    _currentIt = _activeAlarms.begin();
+  }
+
+  AlarmType current = *_currentIt;
+  manageLEDerrors(current);
+  _currentIt++;
+}
+
+void AlarmHandler::flipEnabled()
+{
+  clearAlarms();
+  _enabled = !_enabled;
+}
+
+bool AlarmHandler::getAlarmStatus() { return _enabled; }
+
+void AlarmHandler::addAlarm(AlarmType type)
+{
+  if (type == AlarmType::NONE)
+    return;
+  _activeAlarms.insert(type);         // Se esiste già, non fa nulla.
+  _currentIt = _activeAlarms.begin(); // Reset iteratore per sicurezza
+}
+void AlarmHandler::removeAlarm(AlarmType type)
+{
+  _activeAlarms.erase(type);          // Rimuove l'errore se presente
+  _currentIt = _activeAlarms.begin(); // Reset iteratore
+}
+void AlarmHandler::clearAlarms()
+{
+  _activeAlarms.clear();
+  _currentIt = _activeAlarms.begin();
+  ledOff();
+}
+
+std::vector<AlarmType> AlarmHandler::getActiveAlarms()
+{
+  return std::vector<AlarmType>(_activeAlarms.begin(), _activeAlarms.end());
 }
 
 void AlarmHandler::begin() {

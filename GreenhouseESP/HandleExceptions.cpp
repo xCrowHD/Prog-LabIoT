@@ -2,10 +2,10 @@
 #if ARDUINO
 #include <Arduino.h>
 #else
-#include "MockLibraries/Arduino.h" // <--- Inserisci il percorso corretto per raggiungere il tuo mock
+#include "MockLibraries/Serial.h" // <--- Inserisci il percorso corretto per raggiungere il tuo mock
 #endif
 
-HandleExceptions::HandleExceptions(IAlarmHandler &alarm, ILCDHandler& lcd, IInfluxHandler& client_idb)
+HandleExceptions::HandleExceptions(AlarmHandler alarm, LCDHandler lcd, InfluxHandler client_idb)
     : _alarm(alarm), _lcd(lcd), _client_idb(client_idb) {}
 
 bool HandleExceptions::handleMqttExceptions(Thresholds &currentThr)
@@ -21,9 +21,9 @@ bool HandleExceptions::handleMqttExceptions(Thresholds &currentThr)
     return true;
 }
 
-bool HandleExceptions::handleThresholds(PlantData &data, Thresholds &currentThr, bool isDataValid)
+bool HandleExceptions::handleThresholds(PlantData &data, Thresholds &currentThr)
 {
-    if (!isDataValid){
+    if (!data.valid){
         _alarm.addAlarm(AlarmType::SENSOR_ERROR);
         _alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
         _alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
