@@ -287,7 +287,7 @@ class MQTTManager:
     def set_security_callback(self, callback_func):
         """Permette a app.py di registrare la propria funzione WebSocket"""
         self.callback_sicurezza = callback_func
-        # 🌟 CATTURA IL LOOP QUI: Essendo chiamata da app.py (Lifespan/Main), 
+        # CATTURA IL LOOP QUI: Essendo chiamata da app.py (Lifespan/Main), 
         # siamo al 100% nel thread e nel loop di Uvicorn!
         self.loop_principale = asyncio.get_running_loop()
         print("[MQTT] Callback e Loop principale registrati con successo!")
