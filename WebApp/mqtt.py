@@ -8,7 +8,7 @@ import json
 from paho.mqtt import client as mqtt_client
 from db.plants_db import plant_db_manager
 from db.node_settings_db import settings_db_manager
-
+import asyncio
 
 from config import (
     MQTT_IP, MQTT_PORT,
@@ -23,6 +23,7 @@ class MQTTManager:
         self.esp_list:dict[str, dict] = {}
         self.current_esp_index: int = 0
         self.callback_sicurezza = None
+        self.loop_principale = None
 
         self.client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2)
         self.client.connect(MQTT_IP, MQTT_PORT, keepalive=60)
@@ -82,17 +83,13 @@ class MQTTManager:
             payload = json.loads(msg.payload.decode())
             print(f"[MQTT] Ricevuto messaggio sicurezza: {payload}")
             
-            # Se app.py ci ha passato la funzione di notifica, la eseguiamo
-            if self.callback_sicurezza is not None:
-                import asyncio
-                try:
-                    # Recuperiamo il loop asincrono di Uvicorn che è già in esecuzione
-                    loop = asyncio.get_running_loop()
-                    # Spediamo la coroutine al volo nel thread principale di FastAPI
-                    asyncio.run_coroutine_threadsafe(self.callback_sicurezza(payload), loop)
-                except RuntimeError:
-                    # Se il loop non è ancora partito (fase di avvio), usiamo asyncio classico
-                    pass
+            # Se la callback è attiva e abbiamo il riferimento al loop di Uvicorn
+            if self.callback_sicurezza and self.loop_principale:
+                # Spediamo la coroutine direttamente al loop di Uvicorn in totale sicurezza
+                asyncio.run_coroutine_threadsafe(
+                    self.callback_sicurezza(payload), 
+                    self.loop_principale
+                )
         except Exception as e:
             print(f"[MQTT] Errore nel parsing del messaggio di sicurezza: {e}")
 
@@ -290,6 +287,9 @@ class MQTTManager:
     def set_security_callback(self, callback_func):
         """Permette a app.py di registrare la propria funzione WebSocket"""
         self.callback_sicurezza = callback_func
-        print("[MQTT] Callback WebSocket per la sicurezza registrata correttamente!")
+        # 🌟 CATTURA IL LOOP QUI: Essendo chiamata da app.py (Lifespan/Main), 
+        # siamo al 100% nel thread e nel loop di Uvicorn!
+        self.loop_principale = asyncio.get_running_loop()
+        print("[MQTT] Callback e Loop principale registrati con successo!")
 
 mqtt_hub = MQTTManager()

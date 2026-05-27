@@ -11,7 +11,10 @@ let socket = null;
  * @param {Function} onMessageCallback - La funzione UI da eseguire quando arriva un allarme
  */
 export function initWebSocket(onMessageCallback) {
-  socket = new WebSocket("ws://127.0.0.1:8000/ws/sicurezza");
+  const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
+  const host = window.location.host; // Es: "127.0.0.1:8000" o "192.168.1.50:8000"
+
+  socket = new WebSocket(`${protocol}//${host}/ws/sicurezza`);
 
   socket.onopen = function (e) {
     console.log("[WS] Connessione stabilita con il backend!");
