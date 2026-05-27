@@ -7,6 +7,7 @@ from services.influx_service import get_plant_data, get_latest_plant_data
 from utils.plant_data_graph import genera_immagine_grafico
 
 # python3 -m BotSerra.bot
+# da ./WebApp
 
 # --- COMANDI PRINCIPALI ---
 async def comando_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -41,6 +42,15 @@ async def comando_plant_data(update: Update, context: ContextTypes.DEFAULT_TYPE)
     
     await update.message.reply_text(
         "▶️ Di quale pianta vuoi i dati?\n", 
+        reply_markup=markup,
+        parse_mode="Markdown"
+    )
+
+async def comando_last_plant_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    markup = genera_tastiera_piante(comando_origine="planttype")
+    
+    await update.message.reply_text(
+        "▶️ Di quale pianta vuoi i gli ultimi dati?\n", 
         reply_markup=markup,
         parse_mode="Markdown"
     )
@@ -135,7 +145,46 @@ async def gestisci_plant_graph(update: Update, context: ContextTypes.DEFAULT_TYP
     )
     await query.delete_message()
 
-    
+async def gestisci_last_plant_data(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    _, plant_id = query.data.split(":")
+    data = get_latest_plant_data(plant_id)
+    plant_name = plant_db_manager.get_plant_by_id(plant_id).name
+
+    if not data:
+        await query.edit_message_text(
+            text=f"⚠️ *Nessun dato trovato* per il nodo `{plant_name}`.\nAssicurati che il NodeMCU sia acceso e stia trasmettendo.",
+            parse_mode="Markdown"
+        )
+        return
+    temp = data.get("temp", "N/D")
+    hum  = data.get("hum", "N/D")
+    lux  = data.get("klux", "N/D")
+    time = data.get("timestamp", "N/D")
+
+    temp_str = f"{temp}°C" if isinstance(temp, (int, float)) else temp
+    hum_str  = f"{hum}%" if isinstance(hum, (int, float)) else hum
+    lux_str  = f"{lux} KLux" if isinstance(lux, (int, float)) else lux
+
+
+    print(f"[Bot Telegram] Mostra Ultimi dati per {plant_name}")
+    report_testo = (
+        f"🌿 *REPORT SERRA – STATO ATTUALE*\n"
+        f"📋 Nodo Pianta: `{plant_name}`\n"
+        f"----------------------------------------\n\n"
+        f"🌡️ *Temperatura:* {temp_str}\n"
+        f"💧 *Umidità Terreno:* {hum_str}\n"
+        f"☀️ *Luminosità Ambientale:* {lux_str}\n\n"
+        f"----------------------------------------\n"
+        f"🕒 _Ultimo aggiornamento: {time}_"
+    )
+
+    await query.edit_message_text(
+        text=report_testo,
+        parse_mode="Markdown"
+    )
+
 # --- Helpers ---
 def genera_tastiera_esp(comando_origine: str) -> InlineKeyboardMarkup:
     tastiera = []
@@ -235,6 +284,8 @@ def main():
     app.add_handler(CallbackQueryHandler(gestisci_plant_field, pattern=r"^plantfield:.*"))
     app.add_handler(CallbackQueryHandler(gestisci_plant_time, pattern=r"^planttime:.*:.*"))
     app.add_handler(CallbackQueryHandler(gestisci_plant_graph, pattern=r"^plantgraph:.*:.*:.*"))
+    app.add_handler(CommandHandler("plantlast", comando_last_plant_data))
+    app.add_handler(CallbackQueryHandler(gestisci_last_plant_data, pattern=r"^planttype:.*"))
     # Facciamo partire il bot in ascolto continuo (Polling)
     print("[Bot Telegram] In esecuzione (Separato). Premi CTRL+Z per fermarlo.")
     app.run_polling()

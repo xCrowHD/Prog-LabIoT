@@ -45,13 +45,13 @@ def get_plant_data(plant_id: str, last_time: str) -> list[dict]:
         client.close()
 
 
-def get_latest_plant_data(plant_name: str) -> dict | None:
-    """Return the single most-recent record for *plant_name*, or None."""
+def get_latest_plant_data(plant_id: str) -> dict | None:
+    """Return the single most-recent record for *plant_id*, or None."""
     query = f"""
     from(bucket: "{INFLUXDB_BUCKET}")
     |> range(start: 0)
     |> filter(fn: (r) => r["_measurement"] == "Serra")
-    |> filter(fn: (r) => r["pianta"] == "{plant_name}")
+    |> filter(fn: (r) => r["pianta"] == "{plant_id}")
     |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
     |> group()
     |> sort(columns: ["_time"], desc: true)
