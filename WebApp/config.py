@@ -27,5 +27,8 @@ TOPIC_SET_THRESHOLD   = "lab_iot/mafogani/threshold"
 TOPIC_SET_START_STOP  = "lab_iot/mafogani/start-stop"
 TOPIC_BACKUP          = "lab_iot/mafogani/backup"
 
+# ── Telegram Bot ──────────────────────────────────────────────────────────────
+TOKEN_BOT    = os.getenv("TOKEN_BOT")
+
 # ── Static files ──────────────────────────────────────────────────────────────
 UPLOAD_DIR = "./static/uploads"

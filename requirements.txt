@@ -6,3 +6,5 @@ urllib3
 python-dotenv
 SQLAlchemy
 python-multipart
+python-telegram-bot
+matplotlib
