@@ -26,6 +26,7 @@ TOPIC_CONNECTION      = "lab_iot/mafogani/connection/+"
 TOPIC_SET_THRESHOLD   = "lab_iot/mafogani/threshold"
 TOPIC_SET_START_STOP  = "lab_iot/mafogani/start-stop"
 TOPIC_BACKUP          = "lab_iot/mafogani/backup"
+TOPIC_SECURITY        = "lab_iot/mafogani/security"
 
 # ── Telegram Bot ──────────────────────────────────────────────────────────────
 TOKEN_BOT    = os.getenv("TOKEN_BOT")
