@@ -25,10 +25,11 @@ import {
   clearFormInputs,
   loadLatestSensorData,
   loadMcuInfo,
+  updateSecurityDashboard,
 } from "./ui.js";
 
 import { renderPlantChart } from "./chart.js";
-
+import { initWebSocket } from "./websocket.js";
 // ── Application state ─────────────────────────────────────────────────────────
 let activePlantIndex = 0;
 let activeMcuFormStep = 0; // 0 = info panel, 1 = set-mcu form
@@ -184,6 +185,7 @@ async function boot() {
   loadMcuInfo();
   const nodeData = await fetchCurrentNode();
   renderNodeStatus(nodeData);
+  initWebSocket(updateSecurityDashboard);
 }
 
 document.addEventListener("DOMContentLoaded", () => {

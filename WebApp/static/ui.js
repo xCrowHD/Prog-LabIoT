@@ -104,6 +104,16 @@ export function renderNodeStatus(data) {
   document.getElementById("esp-status").innerText = `System ${data.status}`;
 }
 
+// ── Security ─────────────────────────────────────────────────────────────
+/**
+ * Aggiorna l'interfaccia grafica in tempo reale con i dati di sicurezza
+ * ricevuti dal WebSocket (Sensore Fiamma, Collisione/Porta, Temperatura).
+ * * @param {{ flame: number, collision: number, temperature: number }} data
+ */
+export async function updateSecurityDashboard(data) {
+  console.log("[ui] Got Security Data");
+}
+
 // ── Tab helpers ───────────────────────────────────────────────────────────────
 
 /**

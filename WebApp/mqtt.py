@@ -13,7 +13,8 @@ from db.node_settings_db import settings_db_manager
 from config import (
     MQTT_IP, MQTT_PORT,
     TOPIC_TEST, TOPIC_SET_MCU, TOPIC_CONNECTION,
-    TOPIC_SET_THRESHOLD, TOPIC_SET_START_STOP, TOPIC_BACKUP, TOPIC_TOPICS
+    TOPIC_SET_THRESHOLD, TOPIC_SET_START_STOP,
+    TOPIC_BACKUP, TOPIC_TOPICS, TOPIC_SECURITY
 )
 
 
@@ -21,11 +22,14 @@ class MQTTManager:
     def __init__(self):
         self.esp_list:dict[str, dict] = {}
         self.current_esp_index: int = 0
+        self.callback_sicurezza = None
 
         self.client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2)
         self.client.connect(MQTT_IP, MQTT_PORT, keepalive=60)
         self.client.subscribe(TOPIC_CONNECTION)
+        self.client.subscribe(TOPIC_SECURITY)
         self.client.message_callback_add(TOPIC_CONNECTION, self._on_node_status)
+        self.client.message_callback_add(TOPIC_SECURITY, self._on_security_message)
         self.client.publish(TOPIC_TEST, "MQTT Client ON")
         self.client.loop_start()
 
@@ -72,6 +76,27 @@ class MQTTManager:
         
         print(self.esp_list)
 
+    def _on_security_message(self, client, userdata, msg):
+        """Scatta quando il nuovo sensore invia dati su incendio o collisione"""
+        try:
+            payload = json.loads(msg.payload.decode())
+            print(f"[MQTT] Ricevuto messaggio sicurezza: {payload}")
+            
+            # Se app.py ci ha passato la funzione di notifica, la eseguiamo
+            if self.callback_sicurezza is not None:
+                import asyncio
+                try:
+                    # Recuperiamo il loop asincrono di Uvicorn che è già in esecuzione
+                    loop = asyncio.get_running_loop()
+                    # Spediamo la coroutine al volo nel thread principale di FastAPI
+                    asyncio.run_coroutine_threadsafe(self.callback_sicurezza(payload), loop)
+                except RuntimeError:
+                    # Se il loop non è ancora partito (fase di avvio), usiamo asyncio classico
+                    pass
+        except Exception as e:
+            print(f"[MQTT] Errore nel parsing del messaggio di sicurezza: {e}")
+
+    # ── Internal helper functions ────────────────────────────────────────────────────
     def _send_dynamic_topics_list(self, esp_id: str):
         
         topics_list = {
@@ -261,5 +286,10 @@ class MQTTManager:
         }
         self.client.publish(TOPIC_SET_MCU, json.dumps(payload), qos=1)
 
+    # ── Callback set for websocket ──────────────────────────────────
+    def set_security_callback(self, callback_func):
+        """Permette a app.py di registrare la propria funzione WebSocket"""
+        self.callback_sicurezza = callback_func
+        print("[MQTT] Callback WebSocket per la sicurezza registrata correttamente!")
 
 mqtt_hub = MQTTManager()
