@@ -175,7 +175,6 @@ function startPollers() {
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
 async function boot() {
-  initWebSocket(updateSecurityDashboard);
   activePlantIndex = 0;
   const plant = await getCurrentPlant();
   if (plant) {
@@ -183,7 +182,7 @@ async function boot() {
   } else {
     showAddPlantForm();
   }
-  loadMcuInfo();
+
   try {
     const nodeData = await fetchCurrentNode();
     renderNodeStatus(nodeData);
@@ -192,15 +191,15 @@ async function boot() {
       "Nessun nodo MQTT disponibile al boot, gestione della UI vuota:",
       error,
     );
-
-    // Creiamo al volo un oggetto finto di "safe fallback" da passare alla UI
-    // così la funzione renderNodeStatus non va in crash cercando proprietà inesistenti
     const fallbackNode = { id: "Nessun Nodo Disponibile", status: "OFFLINE" };
     renderNodeStatus(fallbackNode);
   }
+  loadMcuInfo();
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  initWebSocket(updateSecurityDashboard);
+
   boot();
   startPollers();
   document.getElementById("plant-loop").addEventListener("click", onLoopPlants);

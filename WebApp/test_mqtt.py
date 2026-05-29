@@ -28,7 +28,7 @@ time.sleep(1)
 try:
     # ── STEP 1: SIMULIAMO L'AVVIO DELL'ESP (Connection/Settings payload) ──
     # Inviamo il payload esatto che dice al backend che questo dispositivo esiste
-    payload_allarme = {
+    payload_boot = {
         "id": FALSO_MAC_ESP,
         "status": "ONLINE",
         "type": "SECURITY_SENSOR",
@@ -36,7 +36,7 @@ try:
     }
     
     print(f"\n📡 [STEP 1] Fingo l'avvio dell'ESP sul topic: {TOPIC_CONNESSIONE}")
-    client.publish(TOPIC_CONNESSIONE, json.dumps(payload_allarme), qos=1).wait_for_publish()
+    client.publish(TOPIC_CONNESSIONE, json.dumps(payload_boot), qos=1).wait_for_publish()
     print("✅ ESP registrato nel sistema del backend!")
 
     # Attendiamo 3 secondi (simuliamo il tempo in cui l'ESP gira normalmente)
@@ -44,15 +44,14 @@ try:
     time.sleep(3)
 
     # ── STEP 2: SIMULIAMO IL CAMBIO DI STATO (Allarme Fiamma/Collisione) ──
-    payload_allarme = {
+    payload_allarme_door = {
         "id": FALSO_MAC_ESP,
-        "status": "ONLINE",
-        "type": "SECURITY_SENSOR",
-        "actions": ["SECURITY", "SETTINGS"]
+        "timestamp": "22/06/2026",
+        "alarmType": "DOOR",
     }
     
     print(f"🚀 [STEP 2] Spedisco l'allarme sul topic: {TOPIC_SICUREZZA}")
-    client.publish(TOPIC_SICUREZZA, json.dumps(payload_allarme), qos=1).wait_for_publish()
+    client.publish(TOPIC_SICUREZZA, json.dumps(payload_allarme_door), qos=1).wait_for_publish()
     print("✅ Allarme inviato!")
 
 except Exception as e:
