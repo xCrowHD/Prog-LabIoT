@@ -175,6 +175,7 @@ function startPollers() {
 // ── Boot ──────────────────────────────────────────────────────────────────────
 
 async function boot() {
+  initWebSocket(updateSecurityDashboard);
   activePlantIndex = 0;
   const plant = await getCurrentPlant();
   if (plant) {
@@ -185,7 +186,6 @@ async function boot() {
   loadMcuInfo();
   const nodeData = await fetchCurrentNode();
   renderNodeStatus(nodeData);
-  initWebSocket(updateSecurityDashboard);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
