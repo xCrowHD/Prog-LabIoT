@@ -184,8 +184,20 @@ async function boot() {
     showAddPlantForm();
   }
   loadMcuInfo();
-  const nodeData = await fetchCurrentNode();
-  renderNodeStatus(nodeData);
+  try {
+    const nodeData = await fetchCurrentNode();
+    renderNodeStatus(nodeData);
+  } catch (error) {
+    console.warn(
+      "Nessun nodo MQTT disponibile al boot, gestione della UI vuota:",
+      error,
+    );
+
+    // Creiamo al volo un oggetto finto di "safe fallback" da passare alla UI
+    // così la funzione renderNodeStatus non va in crash cercando proprietà inesistenti
+    const fallbackNode = { id: "Nessun Nodo Disponibile", status: "OFFLINE" };
+    renderNodeStatus(fallbackNode);
+  }
 }
 
 document.addEventListener("DOMContentLoaded", () => {
