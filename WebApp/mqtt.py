@@ -24,8 +24,10 @@ class MQTTManager:
         self.current_esp_index: int = 0
         self.callback_sicurezza = None
         self.loop_principale = None
-
         self.client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2)
+
+    def start(self):
+        """Fa partire il client MQTT solo quando il server è pronto"""
         self.client.connect(MQTT_IP, MQTT_PORT, keepalive=60)
         self.client.subscribe(TOPIC_CONNECTION)
         self.client.subscribe(TOPIC_SECURITY)
@@ -33,6 +35,7 @@ class MQTTManager:
         self.client.message_callback_add(TOPIC_SECURITY, self._on_security_message)
         self.client.publish(TOPIC_TEST, "MQTT Client ON")
         self.client.loop_start()
+        print("[MQTT] Client connesso e loop avviato correttamente!")
 
     # ── Internal callbacks ────────────────────────────────────────────────────
 
