@@ -38,7 +38,7 @@ const char* org = "organization";
 const char* bkt = "Personal bucket";
 const char* tkn = "Your token";
 
-AlarmHandler alarm(/*testMode =*/ true);
+AlarmHandler alarm({.testMode = true, .disableTime = 0});
 LCDHandler lcd;
 InfluxHandler client(url, org, bkt, tkn);
 HandleExceptions checkStatus(alarm, lcd, client);
@@ -407,7 +407,7 @@ void testAlarmHandler()
         // Controlliamo che il vettore si sia riempito lo stesso (Vecchio tolto + 3 nuovi = 3)
         auto alarmPhase1 = alarm.getActiveAlarms();
         std::cout << "Dimensione vettore mentre disabilitato: " << alarmPhase1.size() << std::endl;
-        EXPECT(alarmPhase1.size() == 3, "Il vettore dovrebbe contenere 4 allarmi anche se disattivato.");
+        EXPECT(alarmPhase1.size() == 3, "Il vettore dovrebbe contenere 3 allarmi anche se disattivato.");
 
         // Riattiviamo il sistema
         std::cout << "\nRiattiviamo il sistema" << std::endl;
@@ -423,6 +423,53 @@ void testAlarmHandler()
         {
                 alarm.nextAlarmColor();
         }
+    }
+    { // Test 19: Disabilitazione temporizzata
+        initializeMockStatuses("Test 19");
+        std::cout << "Test 19: Disabilitazione temporizzata" << std::endl;
+        std::cout << "\ndisableTime impostato a 2 millisecondi" << std::endl;
+        alarm.getConfig().disableTime = 2;
+
+        std::cout << "Disabilitazione allarme" << std::endl;
+        alarm.flipEnabled(); // Viene registrato il timestamp attuale (es. 0)
+
+        // Fase 1: Il tempo è a 0, l'allarme viene bloccato
+        std::cout << "Aggiungiamo SENSOR ERROR" << std::endl;
+        alarm.addAlarm(AlarmType::SENSOR_ERROR);
+        std::cout << "nextAlarmColor()...";
+        alarm.nextAlarmColor();
+        EXPECT(alarm.getActiveAlarms().empty() == true, "Alarm non deve registrare questo evento");
+
+        // Avanziamo il tempo globale di 1 ms usando la funzione finta
+        std::cout << "\nAvanziamo il tempo di 1ms" << std::endl;
+        delay(1);
+
+        // Siamo a 1ms (minore di 2ms): ancora bloccato
+        std::cout << "Aggiungiamo CONNECTION ERROR. L'evento non deve essere registrato" << std::endl;
+        alarm.addAlarm(AlarmType::CONNECTION_ERROR);
+        std::cout << "nextAlarmColor()...";
+        alarm.nextAlarmColor();
+        std::cout << "Numero allarmi attivi: " << alarm.getActiveAlarms().size() << std::endl;
+        EXPECT(alarm.getActiveAlarms().empty(), "Alarm non deve registrare questo evento");
+
+        // Avanziamo di un altro millisecondo (Totale tempo = 2ms)
+        std::cout << "\nAvanziamo di un ulteriore ms" << std::endl;
+        delay(1);
+
+        // Fase 2: Il tempo di blocco è scaduto, l'allarme viene accettato in background
+        std::cout << "Aggiungiamo ancora CONNECTION_ERROR" << std::endl;
+        alarm.addAlarm(AlarmType::CONNECTION_ERROR);
+        std::cout << "nextAlarmColor()...";
+        alarm.nextAlarmColor();
+        std::cout << "Verifichiamo che il sistema ha accettato l'allarme" << std::endl;
+        std::cout << "Numero allarmi attivi: " << alarm.getActiveAlarms().size() << std::endl;
+        EXPECT(alarm.getActiveAlarms().size() == 1, "Alarm deve registare questo evento anche se disabilitato");
+
+        std::cout << "Riattiviamo l'allarme" << std::endl;
+        alarm.flipEnabled();
+        std::cout << "nextAlarmcolor()...";
+        alarm.nextAlarmColor();
+        EXPECT(alarm.getActiveAlarms().size() == 1, "Allarme cancellato erroneamente");
     }
 }
 
@@ -458,6 +505,8 @@ void initializeMockStatuses(const std::string& testName)
 
     std::cout << std::endl << "---Inizializzando Mock Status per il test " << testName << "---" << std::endl;
 
+    alarm.getConfig().disableTime = 0;
+    alarm.getConfig().testMode = true;
     if (!alarm.getAlarmStatus())
     {
         alarm.flipEnabled(); 

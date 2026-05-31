@@ -1,8 +1,10 @@
 #include "AlarmHandler.h"
 
-AlarmHandler::AlarmHandler(bool testMode) : _testMode(testMode) {
+AlarmHandler::AlarmHandler(AlarmConfig config) : _config(config), _enabled(true) {
   _currentIt = _activeAlarms.begin();
-  _enabled = true;
+  _internalTime = 0;
+  _deactivationTimestamp = 0;
+  _inBlindPeriod = false;
 }
 
 void AlarmHandler::manageLEDerrors(AlarmType alarm)
@@ -38,22 +40,15 @@ void AlarmHandler::manageLEDerrors(AlarmType alarm)
 
 void AlarmHandler::nextAlarmColor()
 {
-  if (_activeAlarms.empty())
-  {
-    if (_enabled)
-    {
-      manageLEDerrors(AlarmType::ALL_OK);
-    }
-    else
-    {
-      ledOff();
-    }
-    return;
-  }
-
   if (!_enabled)
   {
     ledOff();
+    return;
+  }
+
+  if (_activeAlarms.empty())
+  {
+    manageLEDerrors(AlarmType::ALL_OK);
     return;
   }
 
@@ -69,12 +64,17 @@ void AlarmHandler::nextAlarmColor()
 
 void AlarmHandler::flipEnabled()
 {
+    _internalTime = millis();
+
   if (_enabled){
-    clearAlarms();
     _enabled = false;
+    _deactivationTimestamp = _internalTime; // Registra il momento dello spegnimento
+    _inBlindPeriod = true;                  // Attiva la finestra di cecità totale
+    clearAlarms();
   }
   else{
     _enabled = true;
+    _inBlindPeriod = false;
   }
 }
 
@@ -82,12 +82,27 @@ bool AlarmHandler::getAlarmStatus() { return _enabled; }
 
 void AlarmHandler::addAlarm(AlarmType type)
 {
+  if (type == AlarmType::NONE) return;
+
+  _internalTime = millis();
+
+  // FASE 1: Se siamo nel periodo di cecità totale, controlliamo se è scaduto
+  if (_inBlindPeriod) {
+    if (_internalTime - _deactivationTimestamp < _config.disableTime) {
+      // Il delayTime NON è ancora passato: ignora totalmente l'allarme (non salvare nulla)
+      return; 
+    } else {
+      // Il delayTime è SCADUTO! Finiamo il periodo di cecità
+      _inBlindPeriod = false; 
+    }
+  }
+
+  // FASE 2: Se il sistema è disabilitato (ma la cecità è scaduta), 
+  // il codice prosegue qui sotto. L'allarme viene salvato nel set, 
+  // ma NON verrà mostrato perché i LED saranno gestiti di conseguenza.
   
-  if (type == AlarmType::NONE)
-    return;
-  //std::cout << "Alarm added: " << static_cast<int>(type) << std::endl;
-  _activeAlarms.insert(type);         // Se esiste già, non fa nulla.
-  _currentIt = _activeAlarms.begin(); // Reset iteratore per sicurezza
+  _activeAlarms.insert(type);
+  _currentIt = _activeAlarms.begin();
 }
 
 void AlarmHandler::removeAlarm(AlarmType type)
@@ -125,7 +140,7 @@ void AlarmHandler::setLedRGB(uint8_t r, uint8_t g, uint8_t b) {
 
   #ifndef ARDUINO // Evito che il codice venga compilato e inserito sull'ESP per risparmiare memoria!
     const char* mk = "[MOCK PIN] --> ";
-    if (_testMode) {
+    if (_config.testMode) {
         if (r == 0 && g == 0 && b == 0)
           std::cout << mk << "OFF" << std::endl;
         else if (r == 0 && g == 0 && b == 1)
@@ -134,7 +149,7 @@ void AlarmHandler::setLedRGB(uint8_t r, uint8_t g, uint8_t b) {
           std::cout << mk << "GREEN" << std::endl;
         else if (r == 1 && g == 0 && b == 0)
           std::cout << mk << "RED" << std::endl;
-        else if (r == 0 && g == 1 & b == 1)
+        else if (r == 0 && g == 1 && b == 1)
           std::cout << mk << "CYAN" << std::endl;
         else if (r == 1 && g == 0 && b == 1)
           std::cout << mk << "PURPLE" << std::endl;
@@ -145,3 +160,4 @@ void AlarmHandler::setLedRGB(uint8_t r, uint8_t g, uint8_t b) {
     }
   #endif
 }
+AlarmConfig& AlarmHandler::getConfig() { return _config; }

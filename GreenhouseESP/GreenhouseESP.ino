@@ -13,15 +13,16 @@
 //https://github.com/nodemcu/nodemcu-devkit-v1.0/blob/master/NODEMCU_DEVKIT_V1.0.PDF
 
 //BUTTON
+#define RSSI_THRESHOLD -80
 #define RESET_ALARMS D5
 #define BUTTON_DEBOUNCE_DELAY 20
 unsigned long lastDebounceTime = 0;  // L'ultima volta che il pin è stato campionato
 bool lastButtonState = HIGH;
-
-#define RSSI_THRESHOLD -80
+float sampleAfterAlarmDisabling = 5.0f; // Intervallo di tempo dopo il quale Alarm torna sensibile alla raccolta degi errori
 
 // WiFi config
 WiFiClient client;
+
 // InfluxDB cfg
 InfluxHandler client_idb(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
 
@@ -35,7 +36,7 @@ SensorManager sensor;
 LCDHandler lcd;
 
 // Alarm LEDRGB
-AlarmHandler alarm;
+AlarmHandler alarm({.disableTime = sampleAfterAlarmDisabling});
 Ticker writeToInflux;
 Ticker tickerBlink;
 Ticker writeLCD;
@@ -49,6 +50,7 @@ float lastTimerValue = 20.0;
 char id[13];
 
 volatile bool flagCheckSensor;
+
 
 void setup() {
   Serial.begin(115200);

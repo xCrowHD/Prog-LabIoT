@@ -31,16 +31,25 @@ enum class AlarmType : uint8_t
   NUM_ALARM_TYPES
 };
 
+struct AlarmConfig {
+  bool testMode = false;
+  float disableTime = 20.0f; // Tempo a seguito del quale l'allarme torna a campionare i suoi errori
+};
+
 class AlarmHandler{
   private:
     bool _enabled;
+    uint32_t _internalTime;       // Tempo corrente (reale su Arduino, simulato su PC)
+    uint32_t _deactivationTimestamp; // Il momento in cui l'operatore ha disattivato l'allarme
+    bool _inBlindPeriod;          // Flag: siamo nella finestra di blocco totale?
+
     std::set<AlarmType> _activeAlarms;
     std::set<AlarmType>::iterator _currentIt;
     
-    bool _testMode;
+    AlarmConfig _config;
 
   public:
-    AlarmHandler(bool testMode = false);
+    AlarmHandler(AlarmConfig config);
     void begin();
     void manageLEDerrors(AlarmType alarm);
     void nextAlarmColor();
@@ -50,6 +59,7 @@ class AlarmHandler{
     void removeAlarm(AlarmType type);
     void clearAlarms();
     std::vector<AlarmType> getActiveAlarms();
+    AlarmConfig& getConfig ();
 
   private: 
     void ledOff();
