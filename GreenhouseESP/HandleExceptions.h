@@ -9,12 +9,12 @@
 
 class HandleExceptions {
 private:
-    AlarmHandler _alarm;
-    LCDHandler _lcd;
-    InfluxHandler _client_idb;
+    AlarmHandler& _alarm;
+    LCDHandler& _lcd;
+    InfluxHandler& _client_idb;
 
 public:
-    HandleExceptions(AlarmHandler alarm, LCDHandler lcd, InfluxHandler client_idb);
+    HandleExceptions(AlarmHandler& alarm, LCDHandler& lcd, InfluxHandler& client_idb);
     bool handleMqttExceptions(Thresholds &currentThr);
     bool handleThresholds(PlantData &data, Thresholds &currentThr);
     bool handleInfluxException(InfluxStatus status);

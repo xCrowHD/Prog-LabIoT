@@ -5,7 +5,7 @@
 #include "MockLibraries/Serial.h" // <--- Inserisci il percorso corretto per raggiungere il tuo mock
 #endif
 
-HandleExceptions::HandleExceptions(AlarmHandler alarm, LCDHandler lcd, InfluxHandler client_idb)
+HandleExceptions::HandleExceptions(AlarmHandler& alarm, LCDHandler& lcd, InfluxHandler& client_idb)
     : _alarm(alarm), _lcd(lcd), _client_idb(client_idb) {}
 
 bool HandleExceptions::handleMqttExceptions(Thresholds &currentThr)

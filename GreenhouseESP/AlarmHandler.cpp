@@ -77,15 +77,19 @@ bool AlarmHandler::getAlarmStatus() { return _enabled; }
 
 void AlarmHandler::addAlarm(AlarmType type)
 {
+  
   if (type == AlarmType::NONE)
     return;
+  //std::cout << "Alarm added: " << static_cast<int>(type) << std::endl;
   _activeAlarms.insert(type);         // Se esiste già, non fa nulla.
-  _currentIt = _activeAlarms.begin(); // Reset iteratore per sicurezza
+  //_currentIt = _activeAlarms.begin(); // Reset iteratore per sicurezza
 }
+
 void AlarmHandler::removeAlarm(AlarmType type)
 {
+  //std::cout << "Alarm removed: " << static_cast<int>(type) << std::endl;
   _activeAlarms.erase(type);          // Rimuove l'errore se presente
-  _currentIt = _activeAlarms.begin(); // Reset iteratore
+  //_currentIt = _activeAlarms.begin(); // Reset iteratore
 }
 void AlarmHandler::clearAlarms()
 {

@@ -5,12 +5,12 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#include "../AlarmHandler.h"
-#include "../InfluxHandler.h"
-#include "../LCDHandler.h"
-#include "../MqttHandler.h"
-#include "../SensorManager.h"
-#include "../HandleExceptions.h"
+#include "../GreenhouseESP/AlarmHandler.h"
+#include "../GreenhouseESP/InfluxHandler.h"
+#include "../GreenhouseESP/LCDHandler.h"
+#include "../GreenhouseESP/MqttHandler.h"
+#include "../GreenhouseESP/SensorManager.h"
+#include "../GreenhouseESP/HandleExceptions.h"
 
 #include <iostream>
 #include <string>
@@ -51,19 +51,19 @@ void initializeMockStatuses(const std::string& testName = "");
 
 void testAlarmHandler()
 {
-    /*initializeMockStatuses();
+    initializeMockStatuses();
 
     // Test 1: Aggiunta di un allarme
     std::cout << "Test 1: Aggiunta di un allarme" << std::endl;
     alarm.addAlarm(AlarmType::SENSOR_ERROR);
-    assert(alarm.getAlarmStatus() == true &&
+    EXPECT(alarm.getAlarmStatus() == true,
         "L'allarme dovrebbe essere attivo dopo l'aggiunta di un allarme.");
 
     initializeMockStatuses();
     // Test 2: Rimozione di un allarme
     std::cout << "Test 2: Rimozione di un allarme" << std::endl;
     alarm.removeAlarm(AlarmType::SENSOR_ERROR);
-    assert(alarm.getActiveAlarms().empty() == true && 
+    EXPECT(alarm.getActiveAlarms().empty() == true,
         "L'elenco degli allarmi attivi dovrebbe essere vuoto dopo la rimozione di un allarme.");
 
     initializeMockStatuses();
@@ -71,32 +71,31 @@ void testAlarmHandler()
     std::cout << "Test 3: Aggiunta di più allarmi" << std::endl;
     alarm.addAlarm(AlarmType::SOME_THRESHOLDS_OUT);
     alarm.addAlarm(AlarmType::ALL_THRESHOLDS_OUT);
-    assert(alarm.getActiveAlarms().size() == 2 && 
+    EXPECT(alarm.getActiveAlarms().size() == 2,
         "Dovrebbero esserci 2 allarmi attivi.");
-    assert(std::find(alarm.getActiveAlarms().begin(), 
+    EXPECT(std::find(alarm.getActiveAlarms().begin(), 
         alarm.getActiveAlarms().end(), 
-        AlarmType::SOME_THRESHOLDS_OUT) != alarm.getActiveAlarms().end() &&
+        AlarmType::SOME_THRESHOLDS_OUT) != alarm.getActiveAlarms().end(),
          "L'allarme SOME_THRESHOLDS_OUT dovrebbe essere presente.");
 
-    assert(std::find(alarm.getActiveAlarms().begin(), 
+    EXPECT(std::find(alarm.getActiveAlarms().begin(), 
         alarm.getActiveAlarms().end(), 
-        AlarmType::ALL_THRESHOLDS_OUT) != alarm.getActiveAlarms().end() &&
+        AlarmType::ALL_THRESHOLDS_OUT) != alarm.getActiveAlarms().end(),
          "L'allarme ALL_THRESHOLDS_OUT dovrebbe essere presente.");
 
     // Test 4: Verifica dello stato dell'allarme
     initializeMockStatuses();
     std::cout << "Test 4: Verifica dello stato dell'allarme" << std::endl;
-    assert(alarm.getAlarmStatus() == true &&
+    EXPECT(alarm.getAlarmStatus() == true,
         "L'allarme dovrebbe essere attivo quando ci sono allarmi attivi.");
 
     // Test 5: Disabilitazione dell'allarme
     initializeMockStatuses();
     std::cout << "Test 5: Disabilitazione dell'allarme" << std::endl;
     alarm.flipEnabled();
-    assert(alarm.getAlarmStatus() == false &&
+    EXPECT(alarm.getAlarmStatus() == false,
         "L'allarme dovrebbe essere disabilitato dopo la chiamata a flipEnabled.");
 
-    */
     {// Test 6: loop di visualizzazione degli allarmi
     initializeMockStatuses("Test 6");
     std::cout << "Test 6: loop di visualizzazione degli allarmi" << std::endl << std::endl;
@@ -119,16 +118,17 @@ void testAlarmHandler()
 
     loopSimulation(validData, validThresholds, mockInfluxStatus);
 
-    for (size_t i = 0; i < alarm.getActiveAlarms().size(); ++i)
+    auto alarmPhase = alarm.getActiveAlarms();
+
+    for (size_t i = 0; i < alarmPhase.size(); ++i)
     {
         std::cout << "Active Alarm " << i + 1 << ": ";
         alarm.nextAlarmColor();
     }
-    EXPECT(std::find(alarm.getActiveAlarms().begin(), alarm.getActiveAlarms().end(), AlarmType::CONNECTION_ERROR) != alarm.getActiveAlarms().end(),
+    EXPECT(std::find(alarmPhase.begin(), alarmPhase.end(), AlarmType::CONNECTION_ERROR) != alarmPhase.end(),
            "L'allarme CONNECTION_ERROR dovrebbe essere presente.");
-    EXPECT(std::find(alarm.getActiveAlarms().begin(),
-        alarm.getActiveAlarms().end(),
-        AlarmType::CONNECTION_ERROR) != alarm.getActiveAlarms().end(),
+    EXPECT(std::find(alarmPhase.begin(), alarmPhase.end(),
+        AlarmType::CONNECTION_ERROR) != alarmPhase.end(),
         "L'allarme CONNECTION_ERROR dovrebbe essere presente.");
 
     }
@@ -428,36 +428,22 @@ void loopSimulation(PlantData &data, Thresholds &currentThr, InfluxStatus status
     bool connStatus = checkStatus.handleConnectionException(rssi, RSSI_THRESHOLD);
     bool dataStatus = checkStatus.handleDataException(data);
     bool mqttStatus = checkStatus.handleMqttExceptions(currentThr);
-    bool thrStatus = true; // Di base assumiamo siano OK, cambieranno solo se controllati
-    bool influxStatus = true;
+    bool thrStatus = checkStatus.handleThresholds(data, currentThr);
 
-    if (dataStatus)
+    if (client.isReadyToWrite() && connStatus && dataStatus)
     {
-        thrStatus = checkStatus.handleThresholds(data, currentThr);
-
-        // Controlliamo Influx solo se siamo online
-        if (connStatus)
-        {
-            influxStatus = checkStatus.handleInfluxException(status);
-        }
-        else
-        {
-            // Se non c'è connessione, non possiamo testare Influx adesso.
-            // Rimuoviamo il vecchio errore Influx per non bloccare la logica futura.
-            alarm.removeAlarm(AlarmType::INFLUX_ERROR);
-        }
-    }
-    else
-    {
-        // Se i dati del sensore non sono validi, non possiamo testare le soglie.
-        alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
-        alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
+        status = client.sendDataToInflux(data, rssi, "Serra", "NodeMCU", currentThr);
     }
 
-    alarm.removeAlarm(AlarmType::ALL_OK);
+    bool influxStatus = checkStatus.handleInfluxException(status);
 
+    // Valutazione dello stato globale per aggiornare scritte LCD di successo
     if (connStatus && dataStatus && mqttStatus && thrStatus && influxStatus)
     {
         checkStatus.handleSuccess();
+    }
+    else
+    {
+        alarm.nextAlarmColor();
     }
 }
