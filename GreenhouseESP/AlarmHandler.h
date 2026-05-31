@@ -8,6 +8,7 @@
 #else
   #include "MockLibraries/Serial.h"
   #include <cstdint>
+  #include <iostream>
   #define LED_RED 11
   #define LED_BLUE 12
   #define LED_GREEN 13
@@ -35,9 +36,11 @@ class AlarmHandler{
     bool _enabled;
     std::set<AlarmType> _activeAlarms;
     std::set<AlarmType>::iterator _currentIt;
+    
+    bool _testMode;
 
   public:
-    AlarmHandler();
+    AlarmHandler(bool testMode = false);
     void begin();
     void manageLEDerrors(AlarmType alarm);
     void nextAlarmColor();

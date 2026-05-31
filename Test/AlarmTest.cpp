@@ -38,7 +38,7 @@ const char* org = "organization";
 const char* bkt = "Personal bucket";
 const char* tkn = "Your token";
 
-AlarmHandler alarm;
+AlarmHandler alarm(/*testMode =*/ true);
 LCDHandler lcd;
 InfluxHandler client(url, org, bkt, tkn);
 HandleExceptions checkStatus(alarm, lcd, client);
@@ -373,10 +373,56 @@ void testAlarmHandler()
         }
 
         EXPECT(alarmsPhase3.size() == 0, "Dovrebbe esserci 0 allarmi attivi (ALL_OK) dopo la risoluzione di tutti gli errori.");
-        }
+    }
 
-    {
-        // Test
+    { // Test 18: aggiunta nuovi allarmi mentre disabilitato.
+        initializeMockStatuses("Test 18");
+        std::cout << "Test 18: Alarm disable. Mi aspetto che il sistema raccolga nuovi dati allarmi mentre disabilitato \n"
+                    "ma che non siano visualizzati mentre disattivo"
+                    << std::endl << std::endl;
+
+        std::cout << "Simuliamo SENSOR ERROR" << std::endl << std::endl;
+        alarm.addAlarm(AlarmType::SENSOR_ERROR);
+        alarm.nextAlarmColor();
+
+        // Verifichiamo che lo stato iniziale sia attivo e l'allarme sia dentro
+        EXPECT(alarm.getAlarmStatus() == true, "L'allarme dovrebbe essere abilitato all'inizio.");
+        EXPECT(alarm.getActiveAlarms().size() == 1, "Dovrebbe esserci 1 allarme nel vettore.");
+
+        // Disattiviamo il sistema
+        std::cout << "\nDisattiviamo il sistema" << std::endl;
+        alarm.flipEnabled();
+        EXPECT(alarm.getAlarmStatus() == false, "L'allarme dovrebbe essere disattivato dopo il flip.");
+
+        std::cout << "\nSimuliamo 3 errori mentre disabilitato" << std::endl
+                      << std::endl;
+        alarm.addAlarm(AlarmType::SOME_THRESHOLDS_OUT);
+        alarm.addAlarm(AlarmType::CONNECTION_ERROR);
+        alarm.addAlarm(AlarmType::INFLUX_ERROR);
+
+        // Proviamo a ciclare i LED: non dovrebbe mostrare nulla/andare in ledOff() internamente
+        std::cout << "Colori visualizzati mentre disattivo:" << std::endl;
+        alarm.nextAlarmColor();
+
+        // Controlliamo che il vettore si sia riempito lo stesso (Vecchio tolto + 3 nuovi = 3)
+        auto alarmPhase1 = alarm.getActiveAlarms();
+        std::cout << "Dimensione vettore mentre disabilitato: " << alarmPhase1.size() << std::endl;
+        EXPECT(alarmPhase1.size() == 3, "Il vettore dovrebbe contenere 4 allarmi anche se disattivato.");
+
+        // Riattiviamo il sistema
+        std::cout << "\nRiattiviamo il sistema" << std::endl;
+        alarm.flipEnabled();
+        EXPECT(alarm.getAlarmStatus() == true, "L'allarme dovrebbe essere nuovamente attivo dopo il secondo flip.");
+
+        // Verifichiamo che la sequenza non sia andata persa dopo la riattivazione
+        auto alarmPhase2 = alarm.getActiveAlarms();
+        EXPECT(alarmPhase2.size() == 3, "Il vettore deve mantenere i 3 allarmi dopo essere stato riattivato.");
+
+        std::cout << "\nVisualizziamo la sequenza di allarmi generati:" << std::endl;
+        for (size_t i = 0; i < alarmPhase2.size(); i++)
+        {
+                alarm.nextAlarmColor();
+        }
     }
 }
 

@@ -1,6 +1,6 @@
 #include "AlarmHandler.h"
 
-AlarmHandler::AlarmHandler() {
+AlarmHandler::AlarmHandler(bool testMode) : _testMode(testMode) {
   _currentIt = _activeAlarms.begin();
   _enabled = true;
 }
@@ -69,8 +69,13 @@ void AlarmHandler::nextAlarmColor()
 
 void AlarmHandler::flipEnabled()
 {
-  clearAlarms();
-  _enabled = !_enabled;
+  if (_enabled){
+    clearAlarms();
+    _enabled = false;
+  }
+  else{
+    _enabled = true;
+  }
 }
 
 bool AlarmHandler::getAlarmStatus() { return _enabled; }
@@ -117,4 +122,26 @@ void AlarmHandler::setLedRGB(uint8_t r, uint8_t g, uint8_t b) {
   digitalWrite(LED_RED, r);
   digitalWrite(LED_GREEN, g);
   digitalWrite(LED_BLUE, b);
+
+  #ifndef ARDUINO // Evito che il codice venga compilato e inserito sull'ESP per risparmiare memoria!
+    const char* mk = "[MOCK PIN] --> ";
+    if (_testMode) {
+        if (r == 0 && g == 0 && b == 0)
+          std::cout << mk << "OFF" << std::endl;
+        else if (r == 0 && g == 0 && b == 1)
+          std::cout << mk << "BLUE" << std::endl;
+        else if (r == 0 && g == 1 && b == 0)
+          std::cout << mk << "GREEN" << std::endl;
+        else if (r == 1 && g == 0 && b == 0)
+          std::cout << mk << "RED" << std::endl;
+        else if (r == 0 && g == 1 & b == 1)
+          std::cout << mk << "CYAN" << std::endl;
+        else if (r == 1 && g == 0 && b == 1)
+          std::cout << mk << "PURPLE" << std::endl;
+        else if (r == 1 && g == 1 && b == 0)
+          std::cout << mk << "YELLOW" << std::endl;
+        else if (r == 1 && g == 1 && b == 1)
+          std::cout << mk << "WHITE" << std::endl;
+    }
+  #endif
 }
