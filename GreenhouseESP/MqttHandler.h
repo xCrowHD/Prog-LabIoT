@@ -1,7 +1,7 @@
 #ifndef MQTT_HANDLER_H
 #define MQTT_HANDLER_H
 
-#if ARDUINO
+#ifdef ARDUINO
 #include <Arduino.h>
 #include <ESP8266WiFi.h>
 #include <MQTT.h>

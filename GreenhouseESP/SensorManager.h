@@ -1,18 +1,18 @@
 #ifndef SENSOR_MANAGER_H
 #define SENSOR_MANAGER_H
 
-#if ARDUINO
-#include <Arduino.h>
-#include <DHT.h>
-#define DHTPIN D7
-#define DHTTYPE DHT11
-#define PHOTORESISTOR A0
+#ifdef ARDUINO
+  #include <Arduino.h>
+  #include <DHT.h>
+  #define DHTPIN D7
+  #define DHTTYPE DHT11
+  #define PHOTORESISTOR A0
 #else
-#include "MockLibraries/DHT.h"
-#include "MockLibraries/Serial.h"
-#define DHTPIN 5
-#define DHTTYPE 111
-#define PHOTORESISTOR 6 
+  #include "MockLibraries/DHT.h"
+  #include "MockLibraries/Serial.h"
+  #define DHTPIN 5
+  #define DHTTYPE 111
+  #define PHOTORESISTOR 6 
 #endif
 
 

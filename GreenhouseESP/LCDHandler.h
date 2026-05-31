@@ -2,7 +2,7 @@
 #define LCD_HANDLER_H
 #include <deque>
 
-#if ARDUINO
+#ifdef ARDUINO
 #include <Arduino.h>
 #include <LiquidCrystal_I2C.h>
 #include <Wire.h>

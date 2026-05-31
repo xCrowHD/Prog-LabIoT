@@ -1,7 +1,7 @@
 #ifndef WIFI_HANDLER_H
 #define WIFI_HANDLER_H
 
-#if ARDUINO
+#ifdef ARDUINO
 #include <WiFiManager.h>
 #include <ESP8266WiFi.h>
 #else 

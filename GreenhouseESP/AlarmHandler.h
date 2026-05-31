@@ -1,23 +1,23 @@
 #ifndef ALARMHANDLER_H
 #define ALARMHANDLER_H
-#if ARDUINO
-#include <Arduino.h>
-#define LED_RED D0
-#define LED_GREEN D4
-#define LED_BLUE D3
+#ifdef ARDUINO
+  #include <Arduino.h>
+  #define LED_RED D0
+  #define LED_GREEN D4
+  #define LED_BLUE D3
 #else
-#include "MockLibraries/Serial.h"
-#define LED_RED 11
-#define LED_BLUE 12
-#define LED_GREEN 13
+  #include "MockLibraries/Serial.h"
+  #include <cstdint>
+  #define LED_RED 11
+  #define LED_BLUE 12
+  #define LED_GREEN 13
 #endif
-
 
 #include <set>
 #include <vector>
-#include <cstdint>
 
-enum class AlarmType
+
+enum class AlarmType : uint8_t
 {
   NONE,
   ALL_OK,

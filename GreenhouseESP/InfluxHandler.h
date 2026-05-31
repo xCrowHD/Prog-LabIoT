@@ -1,18 +1,20 @@
 #ifndef INFLUX_HANDLER_H
 #define INFLUX_HANDLER_H
 
-#if ARDUINO
+#ifdef ARDUINO
 #include <InfluxDbClient.h>
 #include <Ticker.h>
 #else
 #include "MockLibraries/InfluxDbClient.h"
 #include "MockLibraries/Ticker.h"
+#include <cstdint>
 #endif
+
 
 #include "SensorManager.h"
 #include "MqttHandler.h"
 
-enum class InfluxStatus
+enum class InfluxStatus: uint8_t
 {
   SUCCESS,
   ERR_INFLUX_CONNECTION
