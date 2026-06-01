@@ -17,9 +17,8 @@ class LiquidCrystal_I2C {
         void clear() {
             std::cout << "LCD clear()" << std::endl;
         }
-        void home() {
-            std::cout << "LCD home()" << std::endl;
-        }
+        void home() {}
+
         void print(const char* line) {
             std::cout << "LCD output: " << line << std::endl;
         }

@@ -22,16 +22,26 @@ struct LCDMsg{
   char secondLine[DISPLAY_CHARS + 1];
 };
 
+struct LCDConfig
+{
+  bool testMode = false;
+  bool enable = true;
+};
+
 class LCDHandler{
 private:
   LiquidCrystal_I2C _lcd;
   std::deque<LCDMsg> _queue;
+
+  LCDConfig _config;
+
 public:
-  LCDHandler();
+  LCDHandler(LCDConfig config = LCDConfig());
   void begin(); 
   void popAndDisplay();
   void addMessage(const char* msgOne, const char* msgSec = "");
   void addMessagePlantData(float temp, float hum, float lux);
+  LCDConfig& getConfig();
 private:
   void displayMessage(const char* line1, const char* line2 = "");
 };

@@ -9,9 +9,9 @@
   #include "MockLibraries/Serial.h"
   #include <cstdint>
   #include <iostream>
-  #define LED_RED 11
-  #define LED_BLUE 12
-  #define LED_GREEN 13
+  #define LED_RED 0
+  #define LED_BLUE 4
+  #define LED_GREEN 3
 #endif
 
 #include <set>
@@ -33,15 +33,11 @@ enum class AlarmType : uint8_t
 
 struct AlarmConfig {
   bool testMode = false;
-  float disableTime = 20.0f; // Tempo a seguito del quale l'allarme torna a campionare i suoi errori
+  bool enable = true;
 };
 
 class AlarmHandler{
   private:
-    bool _enabled;
-    uint32_t _internalTime;       // Tempo corrente (reale su Arduino, simulato su PC)
-    uint32_t _deactivationTimestamp; // Il momento in cui l'operatore ha disattivato l'allarme
-    bool _inBlindPeriod;          // Flag: siamo nella finestra di blocco totale?
 
     std::set<AlarmType> _activeAlarms;
     std::set<AlarmType>::iterator _currentIt;
@@ -49,12 +45,10 @@ class AlarmHandler{
     AlarmConfig _config;
 
   public:
-    AlarmHandler(AlarmConfig config);
+    AlarmHandler(AlarmConfig config = AlarmConfig());
     void begin();
     void manageLEDerrors(AlarmType alarm);
     void nextAlarmColor();
-    void flipEnabled();
-    bool getAlarmStatus();
     void addAlarm(AlarmType type);
     void removeAlarm(AlarmType type);
     void clearAlarms();

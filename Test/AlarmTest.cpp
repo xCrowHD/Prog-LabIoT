@@ -38,10 +38,11 @@ const char* org = "organization";
 const char* bkt = "Personal bucket";
 const char* tkn = "Your token";
 
-AlarmHandler alarm({.testMode = true, .disableTime = 0});
-LCDHandler lcd;
+AlarmHandler alarm({.testMode = true});
+LCDHandler lcd({.testMode = true});
 InfluxHandler client(url, org, bkt, tkn);
 HandleExceptions checkStatus(alarm, lcd, client);
+
 
 bool mockMqttStatus;
 InfluxStatus mockInfluxStatus;
@@ -56,7 +57,7 @@ void testAlarmHandler()
     // Test 1: Aggiunta di un allarme
     std::cout << "Test 1: Aggiunta di un allarme" << std::endl;
     alarm.addAlarm(AlarmType::SENSOR_ERROR);
-    EXPECT(alarm.getAlarmStatus() == true,
+    EXPECT(checkStatus.isExecutionAllowed() == true,
         "L'allarme dovrebbe essere attivo dopo l'aggiunta di un allarme.");
 
     initializeMockStatuses();
@@ -86,14 +87,14 @@ void testAlarmHandler()
     // Test 4: Verifica dello stato dell'allarme
     initializeMockStatuses();
     std::cout << "Test 4: Verifica dello stato dell'allarme" << std::endl;
-    EXPECT(alarm.getAlarmStatus() == true,
+    EXPECT(checkStatus.isExecutionAllowed() == true,
         "L'allarme dovrebbe essere attivo quando ci sono allarmi attivi.");
 
     // Test 5: Disabilitazione dell'allarme
     initializeMockStatuses();
     std::cout << "Test 5: Disabilitazione dell'allarme" << std::endl;
-    alarm.flipEnabled();
-    EXPECT(alarm.getAlarmStatus() == false,
+    checkStatus.flipEnabled();
+    EXPECT(checkStatus.isExecutionAllowed() == false,
         "L'allarme dovrebbe essere disabilitato dopo la chiamata a flipEnabled.");
 
     {// Test 6: loop di visualizzazione degli allarmi
@@ -147,6 +148,7 @@ void testAlarmHandler()
     {
         std::cout << "Active Alarm " << i + 1 << ": ";
         alarm.nextAlarmColor();
+        lcd.popAndDisplay();
     }
 
     EXPECT(alarm.getActiveAlarms().size() == 1,
@@ -169,6 +171,7 @@ void testAlarmHandler()
     {
         std::cout << "Active Alarm " << i + 1 << ": ";
         alarm.nextAlarmColor();
+        lcd.popAndDisplay();
     }
     EXPECT(alarm.getActiveAlarms().size() == 1,
         "Dovrebbe esserci 1 allarme attivo (INFLUX_ERROR).");
@@ -386,13 +389,13 @@ void testAlarmHandler()
         alarm.nextAlarmColor();
 
         // Verifichiamo che lo stato iniziale sia attivo e l'allarme sia dentro
-        EXPECT(alarm.getAlarmStatus() == true, "L'allarme dovrebbe essere abilitato all'inizio.");
+        EXPECT(checkStatus.isExecutionAllowed() == true, "L'allarme dovrebbe essere abilitato all'inizio.");
         EXPECT(alarm.getActiveAlarms().size() == 1, "Dovrebbe esserci 1 allarme nel vettore.");
 
         // Disattiviamo il sistema
         std::cout << "\nDisattiviamo il sistema" << std::endl;
-        alarm.flipEnabled();
-        EXPECT(alarm.getAlarmStatus() == false, "L'allarme dovrebbe essere disattivato dopo il flip.");
+        checkStatus.flipEnabled();
+        EXPECT(checkStatus.isExecutionAllowed() == false, "L'allarme dovrebbe essere disattivato dopo il flip.");
 
         std::cout << "\nSimuliamo 3 errori mentre disabilitato" << std::endl
                       << std::endl;
@@ -411,8 +414,8 @@ void testAlarmHandler()
 
         // Riattiviamo il sistema
         std::cout << "\nRiattiviamo il sistema" << std::endl;
-        alarm.flipEnabled();
-        EXPECT(alarm.getAlarmStatus() == true, "L'allarme dovrebbe essere nuovamente attivo dopo il secondo flip.");
+        checkStatus.flipEnabled();
+        EXPECT(checkStatus.isExecutionAllowed() == true, "L'allarme dovrebbe essere nuovamente attivo dopo il secondo flip.");
 
         // Verifichiamo che la sequenza non sia andata persa dopo la riattivazione
         auto alarmPhase2 = alarm.getActiveAlarms();
@@ -428,27 +431,34 @@ void testAlarmHandler()
         initializeMockStatuses("Test 19");
         std::cout << "Test 19: Disabilitazione temporizzata" << std::endl;
         std::cout << "\ndisableTime impostato a 2 millisecondi" << std::endl;
-        alarm.getConfig().disableTime = 2;
+        checkStatus.getConfig().disableTime = 2;
 
         std::cout << "Disabilitazione allarme" << std::endl;
-        alarm.flipEnabled(); // Viene registrato il timestamp attuale (es. 0)
+        checkStatus.flipEnabled(); // Viene registrato il timestamp attuale (es. 0)
 
         // Fase 1: Il tempo è a 0, l'allarme viene bloccato
+
         std::cout << "Aggiungiamo SENSOR ERROR" << std::endl;
-        alarm.addAlarm(AlarmType::SENSOR_ERROR);
+        PlantData invalidData = {25.0, 50.0, 300, false}; // Dati non validi
+        Thresholds validThresholds = {"Tomato", 20.0, 30.0, 40.0, 60.0, 200, 400};
+        checkStatus.handleDataException(invalidData); // Simuliamo un ciclo con dati non validi per attivare l'allarme SENSOR_ERROR
+        
+        //alarm.addAlarm(AlarmType::SENSOR_ERROR);
         std::cout << "nextAlarmColor()...";
         alarm.nextAlarmColor();
+        lcd.popAndDisplay();
+        std::cout << "Numero allarmi attivi: " << alarm.getActiveAlarms().size() << std::endl;
         EXPECT(alarm.getActiveAlarms().empty() == true, "Alarm non deve registrare questo evento");
 
-        // Avanziamo il tempo globale di 1 ms usando la funzione finta
         std::cout << "\nAvanziamo il tempo di 1ms" << std::endl;
         delay(1);
 
         // Siamo a 1ms (minore di 2ms): ancora bloccato
         std::cout << "Aggiungiamo CONNECTION ERROR. L'evento non deve essere registrato" << std::endl;
-        alarm.addAlarm(AlarmType::CONNECTION_ERROR);
+        checkStatus.handleConnectionException(RSSI_THRESHOLD - 20, RSSI_THRESHOLD); 
         std::cout << "nextAlarmColor()...";
         alarm.nextAlarmColor();
+        lcd.popAndDisplay();
         std::cout << "Numero allarmi attivi: " << alarm.getActiveAlarms().size() << std::endl;
         EXPECT(alarm.getActiveAlarms().empty(), "Alarm non deve registrare questo evento");
 
@@ -458,17 +468,19 @@ void testAlarmHandler()
 
         // Fase 2: Il tempo di blocco è scaduto, l'allarme viene accettato in background
         std::cout << "Aggiungiamo ancora CONNECTION_ERROR" << std::endl;
-        alarm.addAlarm(AlarmType::CONNECTION_ERROR);
+        checkStatus.handleConnectionException(RSSI_THRESHOLD - 20, RSSI_THRESHOLD);
         std::cout << "nextAlarmColor()...";
         alarm.nextAlarmColor();
+        lcd.popAndDisplay();
         std::cout << "Verifichiamo che il sistema ha accettato l'allarme" << std::endl;
         std::cout << "Numero allarmi attivi: " << alarm.getActiveAlarms().size() << std::endl;
         EXPECT(alarm.getActiveAlarms().size() == 1, "Alarm deve registare questo evento anche se disabilitato");
 
         std::cout << "Riattiviamo l'allarme" << std::endl;
-        alarm.flipEnabled();
+        checkStatus.flipEnabled();
         std::cout << "nextAlarmcolor()...";
         alarm.nextAlarmColor();
+        lcd.popAndDisplay();
         EXPECT(alarm.getActiveAlarms().size() == 1, "Allarme cancellato erroneamente");
     }
 }
@@ -495,21 +507,24 @@ int main()
     }
     else
     {
-        std::cout << "[ATTENSIONE] Rilevati " << std::to_string(testsFailed) << " fallimenti su " << std::to_string(totalAssertions) << "verifiche totali" << std::endl << std::endl;
+        std::cout << "[ATTENSIONE] Rilevati " << std::to_string(testsFailed) << " fallimenti su " << std::to_string(totalAssertions) << " verifiche totali" << std::endl << std::endl;
         return 1;
     }
 }
 //-------------------------------------- Funzioni di gestione delle eccezioni per i test ---------------------------------------//
 void initializeMockStatuses(const std::string& testName)
 {
-
+    
     std::cout << std::endl << "---Inizializzando Mock Status per il test " << testName << "---" << std::endl;
 
-    alarm.getConfig().disableTime = 0;
+    checkStatus.getConfig().disableTime = 0; // Imposto un tempo di disabilitazione breve per i test
+    checkStatus.getConfig().testMode = true;  // Abilito i messaggi di debug per i LED su console
     alarm.getConfig().testMode = true;
-    if (!alarm.getAlarmStatus())
+    lcd.begin();
+    
+    if (!checkStatus.isExecutionAllowed())
     {
-        alarm.flipEnabled(); 
+        checkStatus.flipEnabled(); 
     }
     alarm.clearAlarms();
 

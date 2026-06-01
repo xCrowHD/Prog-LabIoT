@@ -1,5 +1,13 @@
-#include <Ticker.h>
-#include <ESP8266WiFi.h>
+#ifdef ARDUINO
+  #include <Ticker.h>
+  #include <ESP8266WiFi.h>
+  #define RESET_ALARMS D5
+#else
+  #include "MockLibraries/Ticker.h"
+  #include "MockLibraries/ESP8266WiFi.h"
+  #define RESET_ALARMS 5
+#endif
+
 #include "InfluxHandler.h"
 #include "secrets.h"
 #include "MqttHandler.h"
@@ -14,11 +22,10 @@
 
 //BUTTON
 #define RSSI_THRESHOLD -80
-#define RESET_ALARMS D5
 #define BUTTON_DEBOUNCE_DELAY 20
 unsigned long lastDebounceTime = 0;  // L'ultima volta che il pin è stato campionato
 bool lastButtonState = HIGH;
-float sampleAfterAlarmDisabling = 5.0f; // Intervallo di tempo dopo il quale Alarm torna sensibile alla raccolta degi errori
+float sampleAfterAlarmDisabling = 25.0f; // Intervallo di tempo dopo il quale Alarm torna sensibile alla raccolta degi errori
 
 // WiFi config
 WiFiClient client;
@@ -36,7 +43,7 @@ SensorManager sensor;
 LCDHandler lcd;
 
 // Alarm LEDRGB
-AlarmHandler alarm({.disableTime = sampleAfterAlarmDisabling});
+AlarmHandler alarm;
 Ticker writeToInflux;
 Ticker tickerBlink;
 Ticker writeLCD;
@@ -44,7 +51,7 @@ Ticker tickerAlarm;
 Ticker idTick;
 Ticker checkAlarmStatus;
 
-HandleExceptions checkStatus(alarm, lcd, client_idb);
+HandleExceptions checkStatus(alarm, lcd, client_idb, {.disableTime=sampleAfterAlarmDisabling});
 
 float lastTimerValue = 20.0;
 char id[13];
@@ -148,9 +155,9 @@ void loop() {
     static bool wasAlreadyPressed = false;
     // Se è passato abbastanza tempo, la lettura è stabile
     if (reading == LOW && !wasAlreadyPressed) {
-      alarm.flipEnabled();
-      const char* aStatus = alarm.getAlarmStatus() ? "ON" : "OFF";
-      lcd.addMessage("Alarm Status:", aStatus);
+      checkStatus.flipEnabled();
+      const char* aStatus = checkStatus.isExecutionAllowed() ? "ON" : "OFF";
+      //lcd.addMessage("Alarm Status:", aStatus); con le nuove modifiche, quando checkStatus è disable, LCD non displaya nuovi messaggi (ma li accetta e li mette in coda)!
       wasAlreadyPressed = true;
     }
     if (reading == HIGH) {

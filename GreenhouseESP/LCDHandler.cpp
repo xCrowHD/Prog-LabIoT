@@ -1,11 +1,15 @@
 #include "LCDHandler.h"
 
-LCDHandler::LCDHandler()
-  : _lcd(DISPLAY_ADDR, DISPLAY_CHARS, DISPLAY_LINES) {}
+LCDHandler::LCDHandler(LCDConfig config)
+  : _lcd(DISPLAY_ADDR, DISPLAY_CHARS, DISPLAY_LINES), _config(config) {}
 
 void LCDHandler::begin() {
   Wire.begin();
   Wire.beginTransmission(DISPLAY_ADDR);
+  if (_config.testMode) {
+    _queue.clear(); // da togliere se si vuole mantenere la coda dei messaggi anche dopo un reset, ma per ora preferisco svuotarla per evitare confusione nei test
+  }
+  
   byte error = Wire.endTransmission();
 
   if (error == 0) {
@@ -53,6 +57,7 @@ void LCDHandler::addMessage(const char* msgOne, const char* msgSec) {
 
 void LCDHandler::popAndDisplay() {
   if (_queue.empty()) return;
+  if (!_config.enable) return; // Se LCD disabilitato, non mostro nulla
 
   // Prendo il primo elemento
   LCDMsg msgToShow = _queue.front();
@@ -73,4 +78,8 @@ void LCDHandler::addMessagePlantData(float temp, float hum, float lux) {
 
   // Aggiungiamo i char* alla coda del display
   addMessage(row1, row2);
+}
+
+LCDConfig& LCDHandler::getConfig() {
+  return _config;
 }

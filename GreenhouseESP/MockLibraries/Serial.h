@@ -11,6 +11,7 @@
 #ifndef ARDUINO
 #define OUTPUT 1
 #define INPUT 0
+#define INPUT_PULLUP 2
 #define HIGH 1
 #define LOW 0
 
@@ -39,6 +40,13 @@ inline void digitalWrite(uint8_t pin, uint8_t val)
     (void)pin;
     (void)val;
 }
+
+inline int digitalRead(uint8_t pin)
+{
+    (void)pin;
+    return HIGH; // Simula un pulsante non premuto
+}
+
 inline int analogRead(uint8_t pin)
 {
     (void)pin;

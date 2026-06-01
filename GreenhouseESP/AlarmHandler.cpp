@@ -1,10 +1,8 @@
 #include "AlarmHandler.h"
 
-AlarmHandler::AlarmHandler(AlarmConfig config) : _config(config), _enabled(true) {
+AlarmHandler::AlarmHandler(AlarmConfig config) : _config(config)
+{
   _currentIt = _activeAlarms.begin();
-  _internalTime = 0;
-  _deactivationTimestamp = 0;
-  _inBlindPeriod = false;
 }
 
 void AlarmHandler::manageLEDerrors(AlarmType alarm)
@@ -32,7 +30,7 @@ void AlarmHandler::manageLEDerrors(AlarmType alarm)
   case AlarmType::NO_SEND_DATA:
     setLedRGB(LOW, HIGH, HIGH);
     break; // Azzurro
-  default:
+  case AlarmType::NONE:
     ledOff();
     break;
   }
@@ -40,9 +38,9 @@ void AlarmHandler::manageLEDerrors(AlarmType alarm)
 
 void AlarmHandler::nextAlarmColor()
 {
-  if (!_enabled)
-  {
-    ledOff();
+  // Se non ci sono allarmi, mostra tutto OK, altrimenti cicla
+  if (_config.enable == false) {
+    manageLEDerrors(AlarmType::NONE);
     return;
   }
 
@@ -62,55 +60,21 @@ void AlarmHandler::nextAlarmColor()
   _currentIt++;
 }
 
-void AlarmHandler::flipEnabled()
-{
-    _internalTime = millis();
-
-  if (_enabled){
-    _enabled = false;
-    _deactivationTimestamp = _internalTime; // Registra il momento dello spegnimento
-    _inBlindPeriod = true;                  // Attiva la finestra di cecità totale
-    clearAlarms();
-  }
-  else{
-    _enabled = true;
-    _inBlindPeriod = false;
-  }
-}
-
-bool AlarmHandler::getAlarmStatus() { return _enabled; }
-
 void AlarmHandler::addAlarm(AlarmType type)
 {
-  if (type == AlarmType::NONE) return;
+  if (type == AlarmType::NONE)
+    return;
 
-  _internalTime = millis();
-
-  // FASE 1: Se siamo nel periodo di cecità totale, controlliamo se è scaduto
-  if (_inBlindPeriod) {
-    if (_internalTime - _deactivationTimestamp < _config.disableTime) {
-      // Il delayTime NON è ancora passato: ignora totalmente l'allarme (non salvare nulla)
-      return; 
-    } else {
-      // Il delayTime è SCADUTO! Finiamo il periodo di cecità
-      _inBlindPeriod = false; 
-    }
-  }
-
-  // FASE 2: Se il sistema è disabilitato (ma la cecità è scaduta), 
-  // il codice prosegue qui sotto. L'allarme viene salvato nel set, 
-  // ma NON verrà mostrato perché i LED saranno gestiti di conseguenza.
-  
   _activeAlarms.insert(type);
   _currentIt = _activeAlarms.begin();
 }
 
 void AlarmHandler::removeAlarm(AlarmType type)
 {
-  //std::cout << "Alarm removed: " << static_cast<int>(type) << std::endl;
-  _activeAlarms.erase(type);          // Rimuove l'errore se presente
-  _currentIt = _activeAlarms.begin(); // Reset iteratore
+  _activeAlarms.erase(type);
+  _currentIt = _activeAlarms.begin();
 }
+
 void AlarmHandler::clearAlarms()
 {
   _activeAlarms.clear();
