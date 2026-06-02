@@ -44,14 +44,16 @@ try:
     time.sleep(3)
 
     # ── STEP 2: SIMULIAMO IL CAMBIO DI STATO (Allarme Fiamma/Collisione) ──
-    payload_allarme_door = {
-        "id": FALSO_MAC_ESP,
-        "timestamp": "22/06/2026",
-        "alarmType": "DOOR",
+    payload_allarme_incendio = {
+        "id": "ESP32_LAB_01",       # Sostituisci con il tuo ID effettivo
+        "isOnFlame": False,          # Il booleano (True per incendio, False per ripristino)
+        "temp": 35.5,               # La temperatura attuale in gradi Celsius
+        "timestamp": 1780425000,    # Il numero Unix Time (int)
+        "type": "FLAME_ALARM"       # Il tipo di messaggio
     }
     
     print(f"🚀 [STEP 2] Spedisco l'allarme sul topic: {TOPIC_SICUREZZA}")
-    client.publish(TOPIC_SICUREZZA, json.dumps(payload_allarme_door), qos=1).wait_for_publish()
+    client.publish(TOPIC_SICUREZZA, json.dumps(payload_allarme_incendio), qos=1).wait_for_publish()
     print("✅ Allarme inviato!")
 
 except Exception as e:

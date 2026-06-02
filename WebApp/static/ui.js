@@ -108,10 +108,63 @@ export function renderNodeStatus(data) {
 /**
  * Aggiorna l'interfaccia grafica in tempo reale con i dati di sicurezza
  * ricevuti dal WebSocket (Sensore Fiamma, Collisione/Porta, Temperatura).
- * * @param {{ flame: number, collision: number, temperature: number }} data
+ * * @param data
  */
 export async function updateSecurityDashboard(data) {
   console.log("[ui] Got Security Data");
+  console.log(data);
+  const dateObj = new Date(data.timestamp * 1000);
+
+  // Formattazione locale (es: "02/06/2026, 19:17:41")
+  const formattedDate = dateObj.toLocaleString("it-IT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  document.getElementById("flame-last-event").innerText = formattedDate;
+  if (data.type == "FLAME_ALARM") {
+    setFlameAlarm(data);
+    addFlameEventToLog(data.temp, formattedDate, data.isOnFlame);
+  }
+}
+
+async function setFlameAlarm(data) {
+  document.getElementById("analog-temp").innerText = data.temp;
+  _swapClass("flame-indicator", data.isOnFlame, "bg-primary", "bg-red");
+  document.getElementById("flame-status").innerText = data.isOnFlame
+    ? "FIRE DETECTED!"
+    : "CLEAR";
+}
+
+async function addFlameEventToLog(temp, time, isOnFlame) {
+  const logContainer = document.getElementById("event-log-list");
+
+  // Definiamo i testi e le classi in base allo stato
+  const isAlert = isOnFlame;
+  const statusLabel = isAlert ? "ALERT" : "RESTORED";
+  const statusColor = isAlert ? "text-red" : "text-primary-500";
+  const bgClass = isAlert ? "bg-red/10" : "bg-primary-500/10";
+  const message = isAlert ? "Flame detected" : "Flame cleared";
+
+  const newEventHTML = `
+    <div class="flex items-center gap-3 px-3 py-2 bg-surface-container-lowest rounded-lg mb-2 border-l-4 ${isAlert ? "border-red" : "border-emerald-500"}">
+      <span class="material-symbols-outlined text-[16px] ${statusColor}">
+        ${isAlert ? "local_fire_department" : "check_circle"}
+      </span>
+      <span class="text-[10px] font-mono text-on-surface-variant/50 shrink-0">${time}</span>
+      <span class="text-xs text-on-surface">${message} — temp ${temp}°C</span>
+      <span class="ml-auto px-2 py-0.5 ${bgClass} ${statusColor} text-[9px] font-bold rounded uppercase">${statusLabel}</span>
+    </div>
+  `;
+
+  logContainer.insertAdjacentHTML("afterbegin", newEventHTML);
+
+  while (logContainer.children.length > 20) {
+    logContainer.removeChild(logContainer.lastElementChild);
+  }
 }
 
 // ── Tab helpers ───────────────────────────────────────────────────────────────
