@@ -51,7 +51,7 @@ public:
   void addMessagePlantData(float temp, float hum, float lux);
   void clearErrors();
   LCDConfig& getConfig();
-  std::deque<LCDMsg>  getQueue();
+  std::deque<LCDMsg> getQueue();
   
 private: 
   void displayMessage(const char *line1, const char *line2 = "");

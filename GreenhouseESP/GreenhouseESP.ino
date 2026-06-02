@@ -17,6 +17,7 @@
 #include "WiFiHandler.h"
 #include "HandleExceptions.h"
 
+
 // D0, LED on the development board (between the ESP module and the USB port)
 //https://github.com/nodemcu/nodemcu-devkit-v1.0/blob/master/NODEMCU_DEVKIT_V1.0.PDF
 
@@ -101,6 +102,7 @@ void loop() {
     return;
   }
 
+
   if (!mqtt.isRunning()) {
     lcd.addMessage("Status", "OFFLINE", MessageType::INFO);
     return;
@@ -143,8 +145,9 @@ void loop() {
         else{
           alarm.nextAlarmColor();
         }
-  }
+      }
   
+     
   int reading = digitalRead(RESET_ALARMS);
   if (reading != lastButtonState) {
     // Reset del timer
