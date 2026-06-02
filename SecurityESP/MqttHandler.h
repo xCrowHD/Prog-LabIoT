@@ -2,6 +2,7 @@
 #define MQTT_HANDLER_H
 
 #include <Arduino.h>
+#include <time.h>
 #include <ESP8266WiFi.h>
 #include <MQTT.h>
 #include <ArduinoJson.h>
@@ -48,7 +49,8 @@ public:
   bool connected();
   McuSettings getSettings();
   bool isSet();
-  void sendSecurityPayload();
+  void sendDoorPayload(bool doorClose);
+  void sendFlamePayload(bool isOnFlame, float temp);
 
 private:
   const char* statusToString(Status s);
