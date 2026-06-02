@@ -1,41 +1,59 @@
 #ifndef ALARMHANDLER_H
 #define ALARMHANDLER_H
+#ifdef ARDUINO
+  #include <Arduino.h>
+  #define LED_RED D0
+  #define LED_GREEN D4
+  #define LED_BLUE D3
+#else
+  #include "MockLibraries/Serial.h"
+  #include <cstdint>
+  #include <iostream>
+  #define LED_RED 11
+  #define LED_BLUE 12
+  #define LED_GREEN 13
+#endif
 
-#include <Arduino.h>
 #include <set>
+#include <vector>
 
-#define LED_RED D0
-#define LED_GREEN D4
-#define LED_BLUE D3
 
-enum class AlarmType { NONE,
-                 ALL_OK,
-                 SENSOR_ERROR,
-                 ALL_THRESHOLDS_OUT,
-                 SOME_THRESHOLDS_OUT,
-                 NO_SEND_DATA,
-                 NUM_ALARM_TYPES };  //NUM_ALARM_TYPE = #elementi di enum
+enum class AlarmType : uint8_t
+{
+  NONE,
+  ALL_OK,
+  SENSOR_ERROR,
+  ALL_THRESHOLDS_OUT,
+  SOME_THRESHOLDS_OUT,
+  CONNECTION_ERROR,
+  INFLUX_ERROR,
+  NO_SEND_DATA,
+  NUM_ALARM_TYPES
+};
 
-class AlarmHandler {
-private:
-  bool _enabled;
-  std::set<AlarmType> _activeAlarms; // Il set gestisce i duplicati da solo
-  std::set<AlarmType>::iterator _currentIt; // Iteratore per scorrere
+class AlarmHandler{
+  private:
+    bool _enabled;
+    std::set<AlarmType> _activeAlarms;
+    std::set<AlarmType>::iterator _currentIt;
+    
+    bool _testMode;
 
-public:
-  AlarmHandler();
-  void begin();
-  void addAlarm(AlarmType type);
-  void removeAlarm(AlarmType type);
-  void nextAlarmColor();
-  void flipEnabled();
-  bool getAlarmStatus();
+  public:
+    AlarmHandler(bool testMode = false);
+    void begin();
+    void manageLEDerrors(AlarmType alarm);
+    void nextAlarmColor();
+    void flipEnabled();
+    bool getAlarmStatus();
+    void addAlarm(AlarmType type);
+    void removeAlarm(AlarmType type);
+    void clearAlarms();
+    std::vector<AlarmType> getActiveAlarms();
 
-private:
-  void ledOff();
-  void setLedRGB(uint8_t r, uint8_t g, uint8_t b);
-  void manageLEDerrors(AlarmType alarmType);
-  void clearAlarms();
+  private: 
+    void ledOff();
+    void setLedRGB(uint8_t r, uint8_t g, uint8_t b);
 };
 
 #endif
