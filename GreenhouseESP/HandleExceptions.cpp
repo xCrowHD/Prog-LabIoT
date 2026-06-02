@@ -7,20 +7,13 @@
 
 #define ARE_ALARM_OFF() \
     if (checkBlindPeriod()) { \
-        _alarm.addAlarm(AlarmType::NONE); \
         return true; \
-    } else { \
-        _alarm.removeAlarm(AlarmType::NONE); \
-    }
+    } 
     
 #define ARE_ALARM_OFF_VOID() \
     if (checkBlindPeriod()) { \
-        _alarm.addAlarm(AlarmType::NONE); \
         return; \
-    } else { \
-        _alarm.removeAlarm(AlarmType::NONE); \
-    }
-
+    } 
 
 HandleExceptions::HandleExceptions(AlarmHandler& alarm, LCDHandler& lcd, InfluxHandler& client_idb, HandleExceptionsConfig config)
     : _alarm(alarm), _lcd(lcd), _client_idb(client_idb), _config{config} {}
@@ -37,6 +30,7 @@ void HandleExceptions::flipEnabled()
         _alarm.getConfig().enable = false;     // Attiva la finestra di cecità totale
         _lcd.getConfig().enable = false;          // Disabilita la visualizzazione degli allarmi anche su LCD
         _alarm.clearAlarms();                  // Spegne anche i LED tramite AlarmHandler
+        _lcd.clearErrors();                    // Pulisce eventuali messaggi di errore su LCD
     }
     else
     {
@@ -54,7 +48,7 @@ bool HandleExceptions::handleMqttExceptions(Thresholds &currentThr)
     if (currentThr.plantName == nullptr || currentThr.plantName[0] == '\0')
     {
         _alarm.addAlarm(AlarmType::NO_SEND_DATA);
-        _lcd.addMessage("Error", "Missing plant!");
+        _lcd.addMessage("Error", "Missing plant!", MessageType::ERROR);
         Serial.println("MQTT exception: Missing plant name");
         return !_config.enable;
     }
@@ -70,7 +64,7 @@ bool HandleExceptions::handleThresholds(PlantData &data, Thresholds &currentThr)
         _alarm.addAlarm(AlarmType::SENSOR_ERROR);
         _alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
         _alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
-        _lcd.addMessage("Error", "Sensor Error");
+        _lcd.addMessage("Error", "Sensor Error", MessageType::ERROR);
         return !_config.enable;
     }
     bool tempInRange = data.temperature >= currentThr.tempMin && data.temperature <= currentThr.tempMax;
@@ -81,7 +75,7 @@ bool HandleExceptions::handleThresholds(PlantData &data, Thresholds &currentThr)
     {
         _alarm.addAlarm(AlarmType::ALL_THRESHOLDS_OUT);
         _alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
-        _lcd.addMessage("Thresholds", "ALL O.O.R");
+        _lcd.addMessage("Thresholds", "ALL O.O.R", MessageType::ERROR);
         Serial.println(F("All thresholds out of range"));
         return !_config.enable;
     }
@@ -89,7 +83,7 @@ bool HandleExceptions::handleThresholds(PlantData &data, Thresholds &currentThr)
     {
         _alarm.addAlarm(AlarmType::SOME_THRESHOLDS_OUT);
         _alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
-        _lcd.addMessage("Thresholds", "SOME O.O.R");
+        _lcd.addMessage("Thresholds", "SOME O.O.R", MessageType::ERROR);
         Serial.println(F("Some thresholds out of range!"));
         return !_config.enable;
     }
@@ -122,7 +116,7 @@ bool HandleExceptions::handleDataException(PlantData &data)
     if (!data.valid)
     {
         _alarm.addAlarm(AlarmType::SENSOR_ERROR);
-        _lcd.addMessage("Error", "Sensor Error");
+        _lcd.addMessage("Error", "Sensor Error", MessageType::ERROR);
         Serial.println(F("Sensor Error!"));
         return !_config.enable;
     }
@@ -137,7 +131,7 @@ bool HandleExceptions::handleConnectionException(long rssi, const long RSSI_THRE
     if (rssi < RSSI_THRESHOLD)
     {
         _alarm.addAlarm(AlarmType::CONNECTION_ERROR);
-        _lcd.addMessage("Error", "Connection Error");
+        _lcd.addMessage("Error", "Connection Error", MessageType::ERROR);
         Serial.print(F("RSSI too low: "));
         Serial.println(rssi);
         return !_config.enable;
@@ -150,7 +144,7 @@ void HandleExceptions::handleSuccess()
     ARE_ALARM_OFF_VOID();
 
     _alarm.clearAlarms();
-    _lcd.addMessage("All OK!");
+    _lcd.addMessage("All OK!", "", MessageType::ERROR);
     Serial.println(F("All OK!"));
 }
 

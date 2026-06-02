@@ -52,7 +52,7 @@ void initializeMockStatuses(const std::string& testName = "");
 
 void testAlarmHandler()
 {
-    initializeMockStatuses();
+    initializeMockStatuses("Test 1");
 
     // Test 1: Aggiunta di un allarme
     std::cout << "Test 1: Aggiunta di un allarme" << std::endl;
@@ -60,14 +60,14 @@ void testAlarmHandler()
     EXPECT(checkStatus.isExecutionAllowed() == true,
         "L'allarme dovrebbe essere attivo dopo l'aggiunta di un allarme.");
 
-    initializeMockStatuses();
+    initializeMockStatuses("Test 2");
     // Test 2: Rimozione di un allarme
     std::cout << "Test 2: Rimozione di un allarme" << std::endl;
     alarm.removeAlarm(AlarmType::SENSOR_ERROR);
     EXPECT(alarm.getActiveAlarms().empty() == true,
         "L'elenco degli allarmi attivi dovrebbe essere vuoto dopo la rimozione di un allarme.");
 
-    initializeMockStatuses();
+    initializeMockStatuses("Test 3");
     // Test 3: Aggiunta di più allarmi
     std::cout << "Test 3: Aggiunta di più allarmi" << std::endl;
     alarm.addAlarm(AlarmType::SOME_THRESHOLDS_OUT);
@@ -85,13 +85,13 @@ void testAlarmHandler()
          "L'allarme ALL_THRESHOLDS_OUT dovrebbe essere presente.");
 
     // Test 4: Verifica dello stato dell'allarme
-    initializeMockStatuses();
+    initializeMockStatuses("Test 4");
     std::cout << "Test 4: Verifica dello stato dell'allarme" << std::endl;
     EXPECT(checkStatus.isExecutionAllowed() == true,
         "L'allarme dovrebbe essere attivo quando ci sono allarmi attivi.");
 
     // Test 5: Disabilitazione dell'allarme
-    initializeMockStatuses();
+    initializeMockStatuses("Test 5");
     std::cout << "Test 5: Disabilitazione dell'allarme" << std::endl;
     checkStatus.flipEnabled();
     EXPECT(checkStatus.isExecutionAllowed() == false,
@@ -433,7 +433,7 @@ void testAlarmHandler()
         std::cout << "\ndisableTime impostato a 2 millisecondi" << std::endl;
         checkStatus.getConfig().disableTime = 2;
 
-        std::cout << "Disabilitazione allarme" << std::endl;
+        std::cout << "Disabilitazione allarme (tempo 0)" << std::endl;
         checkStatus.flipEnabled(); // Viene registrato il timestamp attuale (es. 0)
 
         // Fase 1: Il tempo è a 0, l'allarme viene bloccato
@@ -446,7 +446,13 @@ void testAlarmHandler()
         //alarm.addAlarm(AlarmType::SENSOR_ERROR);
         std::cout << "nextAlarmColor()...";
         alarm.nextAlarmColor();
+        std::cout << "lcd.popAndDisplay()...\n";
         lcd.popAndDisplay();
+        std::cout << std::endl;
+
+        auto lcdQueue = lcd.getQueue();
+        EXPECT(lcdQueue.empty(), "LCD dovrebbe essere vuoto perché l'allarme è bloccato");
+        
         std::cout << "Numero allarmi attivi: " << alarm.getActiveAlarms().size() << std::endl;
         EXPECT(alarm.getActiveAlarms().empty() == true, "Alarm non deve registrare questo evento");
 
@@ -458,29 +464,43 @@ void testAlarmHandler()
         checkStatus.handleConnectionException(RSSI_THRESHOLD - 20, RSSI_THRESHOLD); 
         std::cout << "nextAlarmColor()...";
         alarm.nextAlarmColor();
+        std::cout << "lcd.popAndDisplay()...\n";
         lcd.popAndDisplay();
+        std::cout << std::endl;
+
+        auto lcdQueue2 = lcd.getQueue();
+        EXPECT(lcdQueue2.empty(), "LCD dovrebbe essere vuoto perché l'allarme è ancora bloccato");
+        
         std::cout << "Numero allarmi attivi: " << alarm.getActiveAlarms().size() << std::endl;
         EXPECT(alarm.getActiveAlarms().empty(), "Alarm non deve registrare questo evento");
 
         // Avanziamo di un altro millisecondo (Totale tempo = 2ms)
-        std::cout << "\nAvanziamo di un ulteriore ms" << std::endl;
+        std::cout << "\nAvanziamo di un ulteriore ms (tempo = 2ms)" << std::endl;
         delay(1);
 
         // Fase 2: Il tempo di blocco è scaduto, l'allarme viene accettato in background
         std::cout << "Aggiungiamo ancora CONNECTION_ERROR" << std::endl;
         checkStatus.handleConnectionException(RSSI_THRESHOLD - 20, RSSI_THRESHOLD);
+        std::cout << "Verifichiamo che il sistema ha accettato l'allarme" << std::endl;
         std::cout << "nextAlarmColor()...";
         alarm.nextAlarmColor();
+        std::cout << "lcd.popAndDisplay()...\n";
         lcd.popAndDisplay();
-        std::cout << "Verifichiamo che il sistema ha accettato l'allarme" << std::endl;
+        std::cout << std::endl;
+
+        auto lcdQueue3 = lcd.getQueue();
+        EXPECT(lcdQueue3.size() == 1, "LCD dovrebbe avere un messaggio in coda perché l'allarme è stato accettato dopo la scadenza del blocco");
+        
         std::cout << "Numero allarmi attivi: " << alarm.getActiveAlarms().size() << std::endl;
         EXPECT(alarm.getActiveAlarms().size() == 1, "Alarm deve registare questo evento anche se disabilitato");
 
-        std::cout << "Riattiviamo l'allarme" << std::endl;
+        std::cout << "\nRiattiviamo l'allarme" << std::endl;
         checkStatus.flipEnabled();
         std::cout << "nextAlarmcolor()...";
         alarm.nextAlarmColor();
+        std::cout << "lcd.popAndDisplay()...\n";
         lcd.popAndDisplay();
+        std::cout << std::endl;
         EXPECT(alarm.getActiveAlarms().size() == 1, "Allarme cancellato erroneamente");
     }
 }

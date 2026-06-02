@@ -80,7 +80,7 @@ void setup() {
   });
 
   idTick.attach(5.0, []{
-    lcd.addMessage("ID:", id);
+    lcd.addMessage("ID:", id, MessageType::INFO);
   });
 
   checkAlarmStatus.attach(5.0, [](){
@@ -92,20 +92,20 @@ void setup() {
 void loop() {
   mqtt.handle();
   if (mqtt.isStandBy()){
-    lcd.addMessage("Status", "StandByMode");
+    lcd.addMessage("Status", "StandByMode", MessageType::INFO);
     return;
   }
 
   if (!mqtt.isSet()) {
-    lcd.addMessage("Status", "Need Settings");
+    lcd.addMessage("Status", "Need Settings", MessageType::INFO);
     return;
   }
 
   if (!mqtt.isRunning()) {
-    lcd.addMessage("Status", "OFFLINE");
+    lcd.addMessage("Status", "OFFLINE", MessageType::INFO);
     return;
   } else {
-    lcd.addMessage("Status", "ONLINE");
+    lcd.addMessage("Status", "ONLINE", MessageType::INFO);
   }
 
   float mqttTimer = mqtt.getSettings().timer;
@@ -157,8 +157,8 @@ void loop() {
     if (reading == LOW && !wasAlreadyPressed) {
       checkStatus.flipEnabled();
       const char* aStatus = checkStatus.isExecutionAllowed() ? "ON" : "OFF";
-      //lcd.addMessage("Alarm Status:", aStatus); con le nuove modifiche, quando checkStatus è disable, LCD non displaya nuovi messaggi (ma li accetta e li mette in coda)!
-      wasAlreadyPressed = true;
+      lcd.addMessage("Alarm Status:", aStatus, MessageType::INFO);       
+      wasAlreadyPressed = true;   
     }
     if (reading == HIGH) {
       // Quando rilasci il bottone, resettiamo la guardia per la prossima volta

@@ -1,6 +1,7 @@
 #ifndef LCD_HANDLER_H
 #define LCD_HANDLER_H
 #include <deque>
+#include <algorithm>
 
 #ifdef ARDUINO
 #include <Arduino.h>
@@ -17,9 +18,16 @@
 #define DISPLAY_LINES 2
 #define DISPLAY_ADDR 0x27
 
+enum class MessageType {
+    DATA,
+    ERROR,
+    INFO
+};
+
 struct LCDMsg{
   char firstLine[DISPLAY_CHARS + 1];
   char secondLine[DISPLAY_CHARS + 1];
+  MessageType type;
 };
 
 struct LCDConfig
@@ -39,11 +47,14 @@ public:
   LCDHandler(LCDConfig config = LCDConfig());
   void begin(); 
   void popAndDisplay();
-  void addMessage(const char* msgOne, const char* msgSec = "");
+  void addMessage(const char* msgOne, const char* msgSec = "", MessageType type = MessageType::INFO);
   void addMessagePlantData(float temp, float hum, float lux);
+  void clearErrors();
   LCDConfig& getConfig();
-private:
-  void displayMessage(const char* line1, const char* line2 = "");
+  std::deque<LCDMsg>  getQueue();
+  
+private: 
+  void displayMessage(const char *line1, const char *line2 = "");
 };
 
 #endif // LCD_HANDLER_H

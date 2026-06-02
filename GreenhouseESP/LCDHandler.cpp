@@ -1,4 +1,4 @@
-#include "LCDHandler.h"
+#include "LCDHandler.h" 
 
 LCDHandler::LCDHandler(LCDConfig config)
   : _lcd(DISPLAY_ADDR, DISPLAY_CHARS, DISPLAY_LINES), _config(config) {}
@@ -19,7 +19,6 @@ void LCDHandler::begin() {
     _lcd.clear();
     _lcd.home();
 
-
   } else {
     Serial.print(F("LCD not found. Error "));
     Serial.println(error);
@@ -39,7 +38,11 @@ void LCDHandler::displayMessage(const char* line1, const char* line2) {
   }
 }
 
-void LCDHandler::addMessage(const char* msgOne, const char* msgSec) {
+void LCDHandler::addMessage(const char* msgOne, const char* msgSec, MessageType type) {
+  /*if (!_config.enable)
+    if (type == MessageType::ERROR) // Se LCD disabilitato, non aggiungo nuovi messaggi di errore (ma mantengo quelli già in coda)
+      return; */
+
   for (const auto& item : _queue) {
     if (strcmp(item.firstLine, msgOne) == 0 && strcmp(item.secondLine, msgSec) == 0) {
       return;  // Già in coda, esco
@@ -51,16 +54,38 @@ void LCDHandler::addMessage(const char* msgOne, const char* msgSec) {
   strncpy(newMsg.secondLine, msgSec, DISPLAY_CHARS);
   newMsg.firstLine[DISPLAY_CHARS] = '\0';
   newMsg.secondLine[DISPLAY_CHARS] = '\0';
+  newMsg.type = type;
 
   _queue.push_back(newMsg);
 }
 
+void LCDHandler::clearErrors() {
+  /*if (!_config.enable)
+    return; // Se LCD disabilitato, non modifico la coda dei messaggi */
+  _queue.erase(std::remove_if(_queue.begin(), _queue.end(),
+    [](const LCDMsg& msg) { return msg.type == MessageType::ERROR; }),
+    _queue.end());
+}
+
 void LCDHandler::popAndDisplay() {
-  if (_queue.empty()) return;
-  if (!_config.enable) return; // Se LCD disabilitato, non mostro nulla
+  if (_queue.empty()){
+    if (_config.testMode) {
+      Serial.print("[Empty]");
+    }
+    return;
+  } 
 
   // Prendo il primo elemento
   LCDMsg msgToShow = _queue.front();
+
+  if (!_config.enable && msgToShow.type == MessageType::ERROR) {
+    if (_config.testMode) {
+      Serial.println("[Error achived but not displayed]:");
+      displayMessage(msgToShow.firstLine, msgToShow.secondLine); // Per test mode mostro comunque il messaggio in uscita, ma non lo rimuovo dalla coda
+    }
+    return;
+  }
+
   _queue.pop_front();
 
   _lcd.clear();
@@ -77,9 +102,13 @@ void LCDHandler::addMessagePlantData(float temp, float hum, float lux) {
   snprintf(row2, sizeof(row2), "Luce: %d lx", (int)lux);
 
   // Aggiungiamo i char* alla coda del display
-  addMessage(row1, row2);
+  addMessage(row1, row2, MessageType::DATA);
 }
 
 LCDConfig& LCDHandler::getConfig() {
   return _config;
+}
+
+std::deque<LCDMsg> LCDHandler::getQueue() {
+  return _queue;
 }

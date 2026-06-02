@@ -38,12 +38,13 @@ void AlarmHandler::manageLEDerrors(AlarmType alarm)
 
 void AlarmHandler::nextAlarmColor()
 {
-  // Se non ci sono allarmi, mostra tutto OK, altrimenti cicla
+  
   if (_config.enable == false) {
     manageLEDerrors(AlarmType::NONE);
     return;
   }
 
+  // Se non ci sono allarmi, mostra tutto OK, altrimenti cicla
   if (_activeAlarms.empty())
   {
     manageLEDerrors(AlarmType::ALL_OK);
