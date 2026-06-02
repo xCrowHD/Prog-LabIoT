@@ -13,6 +13,25 @@ import {
 } from "./api.js";
 import { renderPlantChart } from "./chart.js";
 
+// ── Dashboard display ─────────────────────────────────────────────────────────────
+
+export async function switchDashboardView() {
+  const node = await fetchCurrentNode();
+  const dashplant = document.getElementById("dashboard-plant");
+  const dashsec = document.getElementById("dashboard-security");
+  console.log(node);
+  if (node.type == "PLANT_SENSOR") {
+    dashplant.classList.remove("hidden");
+    dashsec.classList.add("hidden");
+    console.log("[UI] show plant dashboard");
+  }
+  if (node.type == "SECURITY_SENSOR") {
+    dashsec.classList.remove("hidden");
+    dashplant.classList.add("hidden");
+    console.log("[UI] show security dashboard");
+  }
+}
+
 // ── Plant display ─────────────────────────────────────────────────────────────
 
 /**

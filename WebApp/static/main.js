@@ -26,6 +26,7 @@ import {
   loadLatestSensorData,
   loadMcuInfo,
   updateSecurityDashboard,
+  switchDashboardView,
 } from "./ui.js";
 
 import { renderPlantChart } from "./chart.js";
@@ -144,6 +145,7 @@ async function onSavePlant() {
 
 async function onNextNode() {
   const data = await fetchNextNode();
+  switchDashboardView();
   renderNodeStatus(data);
   loadMcuInfo();
 }
@@ -185,6 +187,7 @@ async function boot() {
 
   try {
     const nodeData = await fetchCurrentNode();
+    switchDashboardView();
     renderNodeStatus(nodeData);
   } catch (error) {
     console.warn(

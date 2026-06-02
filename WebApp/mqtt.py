@@ -48,9 +48,11 @@ class MQTTManager:
         if esp_id not in self.esp_list:
             self.esp_list[esp_id] = {}
         self.esp_list[esp_id]["status"] = status
+        self.esp_list[esp_id]["type"] = esp_type
 
         settings_db_manager.ensure_node_exists(esp_id)
         node_db = settings_db_manager.get_node_settings_by_id(esp_id)
+        print(self.esp_list)
 
         if status == "CONNECTING":
             self._send_dynamic_topics_list(esp_id, esp_type)
@@ -85,7 +87,7 @@ class MQTTManager:
                 # Se un Main muore, svegliamo il backup
                 self._set_backup_standby(esp_id, in_standby=False)
         
-        print(self.esp_list)
+        
 
     def _on_security_message(self, client, userdata, msg):
         """Scatta quando il nuovo sensore invia dati su incendio o collisione"""
@@ -224,14 +226,14 @@ class MQTTManager:
         if not self.esp_list:
             return None
         esp_id = sorted(self.esp_list)[self.current_esp_index]
-        return {"id": esp_id, "status": self.esp_list[esp_id]["status"]}
+        return {"id": esp_id, "status": self.esp_list[esp_id]["status"], "type": self.esp_list[esp_id]["type"]}
 
     def get_next_esp(self) -> dict | None:
         if not self.esp_list:
             return None
         self.current_esp_index = (self.current_esp_index + 1) % len(self.esp_list)
         esp_id = sorted(self.esp_list)[self.current_esp_index]
-        return {"id": esp_id, "status": self.esp_list[esp_id]["status"]}
+        return {"id": esp_id, "status": self.esp_list[esp_id]["status"], "type": self.esp_list[esp_id]["type"]}
 
     def send_thresholds(self, node_id: str, plant_id: str):
         """
