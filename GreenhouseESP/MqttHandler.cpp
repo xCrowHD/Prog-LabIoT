@@ -76,7 +76,7 @@ void MqttHandler::handleThresholds(char* payload, unsigned int length) {
 
     if (doc.containsKey("name")) {
       const char* nameFromData = doc["name"];
-      strlcpy(_plantThresholds.platName, nameFromData, sizeof(_plantThresholds.platName));
+      strlcpy(_plantThresholds.plantName, nameFromData, sizeof(_plantThresholds.plantName));
     }
 
     JsonObject thresholds = doc["thresholds"];
@@ -92,7 +92,7 @@ void MqttHandler::handleThresholds(char* payload, unsigned int length) {
     _plantThresholds.luxMax = thresholds["light"]["max"];
     Serial.println(F("--- Dati Aggiornati ---"));
     Serial.print(F("Nuova Pianta: "));
-    Serial.println(_plantThresholds.platName);
+    Serial.println(_plantThresholds.plantName);
   } else {
     Serial.println(F("Could no set thresholds"));
   }

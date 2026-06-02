@@ -1,12 +1,13 @@
 #include <Ticker.h>
 #include <ESP8266WiFi.h>
-#include <InfluxDbClient.h>
+#include "InfluxHandler.h"
 #include "secrets.h"
 #include "MqttHandler.h"
 #include "SensorManager.h"
 #include "LCDHandler.h"
 #include "AlarmHandler.h"
 #include "WiFiHandler.h"
+#include "HandleExceptions.h"
 
 // D0, LED on the development board (between the ESP module and the USB port)
 //https://github.com/nodemcu/nodemcu-devkit-v1.0/blob/master/NODEMCU_DEVKIT_V1.0.PDF
@@ -22,7 +23,7 @@ bool lastButtonState = HIGH;
 // WiFi config
 WiFiClient client;
 // InfluxDB cfg
-InfluxDBClient client_idb(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
+InfluxHandler client_idb(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
 
 // MQTT Broker settings
 MqttHandler mqtt;
@@ -35,16 +36,19 @@ LCDHandler lcd;
 
 // Alarm LEDRGB
 AlarmHandler alarm;
-
-Ticker tickerBlink;
 Ticker writeToInflux;
+Ticker tickerBlink;
 Ticker writeLCD;
 Ticker tickerAlarm;
 Ticker idTick;
+Ticker checkAlarmStatus;
+
+HandleExceptions checkStatus(alarm, lcd, client_idb);
+
 float lastTimerValue = 20.0;
 char id[13];
 
-volatile bool flagWriteInflux = false;
+volatile bool flagCheckSensor;
 
 void setup() {
   Serial.begin(115200);
@@ -56,10 +60,7 @@ void setup() {
   lcd.begin();
   sensor.begin();
   alarm.begin();
-
-  writeToInflux.attach((float)lastTimerValue, []() {
-    flagWriteInflux = true;
-  });
+  client_idb.begin(lastTimerValue);
 
   writeLCD.attach(2.0, []() {
     lcd.popAndDisplay();
@@ -72,6 +73,11 @@ void setup() {
   idTick.attach(5.0, []{
     lcd.addMessage("ID:", id);
   });
+
+  checkAlarmStatus.attach(5.0, [](){
+    flagCheckSensor = true;
+  });
+
 }
 
 void loop() {
@@ -85,6 +91,7 @@ void loop() {
     lcd.addMessage("Status", "Need Settings");
     return;
   }
+
   if (!mqtt.isRunning()) {
     lcd.addMessage("Status", "OFFLINE");
     return;
@@ -92,16 +99,43 @@ void loop() {
     lcd.addMessage("Status", "ONLINE");
   }
 
-  if (mqtt.getSettings().timer != lastTimerValue) {
-    lastTimerValue = mqtt.getSettings().timer;
-    updateInfluxTicker();
+  float mqttTimer = mqtt.getSettings().timer;
+  if (mqttTimer != lastTimerValue) {
+    client_idb.updateInterval(mqttTimer);
+    lastTimerValue = mqttTimer;
   }
+    if (flagCheckSensor) {
+        flagCheckSensor = false; 
 
-  if (flagWriteInflux) {
-    flagWriteInflux = false;
-    sendDataToInflux();
+        long rssi = WiFiHandler::getRSSI();
+        PlantData data = sensor.getAllData();
+        Thresholds currentThr = mqtt.getThresholds();
+
+        // I singoli metodi qui sotto aggiungono o rimuovono gli allarmi in autonomia
+        bool connStatus = checkStatus.handleConnectionException(rssi, RSSI_THRESHOLD);
+        bool dataStatus = checkStatus.handleDataException(data);
+        bool mqttStatus = checkStatus.handleMqttExceptions(currentThr);
+        bool thrStatus  = checkStatus.handleThresholds(data, currentThr);
+        
+        // Gestione InfluxDB
+        InfluxStatus status = InfluxStatus::SUCCESS;
+
+        if (client_idb.isReadyToWrite() && connStatus && dataStatus) {
+            status = client_idb.sendDataToInflux(data, rssi, "Serra", "NodeMCU", currentThr);
+        }
+        
+        bool influxStatus = checkStatus.handleInfluxException(status);
+
+
+        // Valutazione dello stato globale per aggiornare scritte LCD di successo
+        if (connStatus && dataStatus && mqttStatus && thrStatus && influxStatus) {
+            checkStatus.handleSuccess(); 
+        }
+        else{
+          alarm.nextAlarmColor();
+        }
   }
-
+  
   int reading = digitalRead(RESET_ALARMS);
   if (reading != lastButtonState) {
     // Reset del timer
@@ -124,116 +158,4 @@ void loop() {
   }
 
   lastButtonState = reading;
-}
-
-// Influx DB operations
-
-bool check_influxdb() {
-  // check InfluxDB server connection
-  if (client_idb.validateConnection()) {
-    Serial.print(F("Connected to InfluxDB: "));
-    Serial.println(client_idb.getServerUrl());
-    return true;
-  } else {
-    Serial.print(F("InfluxDB connection failed: "));
-    Serial.println(client_idb.getLastErrorMessage());
-    return false;
-  }
-}
-
-void sendDataToInflux() {
-
-  if (!check_influxdb()) {
-    Serial.println(F("Not Connected To InfluxDB"));
-    return;
-  }
-
-  Serial.print(F("Sending to InfluxDB... "));
-
-  Point sensorData("Serra");
-  sensorData.addTag("device", "NodeMCU");
-
-  Thresholds currentThr = mqtt.getThresholds();
-
-  // Controlla se il primo carattere NON è lo zero (stringa non vuota)
-  if (currentThr.platName[0] != '\0') {
-    sensorData.addTag("pianta", currentThr.platName);
-  } else {
-    Serial.println(F("Plant Name not Found"));
-    alarm.addAlarm(AlarmType::SENSOR_ERROR);
-    alarm.removeAlarm(AlarmType::ALL_OK);
-    lcd.addMessage("ERROR", "Plant null");
-    return;
-  }
-
-  alarm.removeAlarm(AlarmType::SENSOR_ERROR);
-
-  PlantData data = sensor.getAllData();
-  if (!data.valid) {
-    Serial.println(F("Datas are not valid"));
-    alarm.addAlarm(AlarmType::SENSOR_ERROR);
-    alarm.removeAlarm(AlarmType::ALL_OK);
-    lcd.addMessage("ERROR", "Sensors Error");
-    return;
-  }
-
-  alarm.removeAlarm(AlarmType::SENSOR_ERROR);
-
-  bool tempInRange = data.temperature >= currentThr.tempMin && data.temperature <= currentThr.tempMax;
-  bool humInRange = data.temperature >= currentThr.humMin && data.temperature <= currentThr.humMax;
-  bool luxInrange = data.light >= currentThr.luxMin && data.light <= currentThr.luxMax;
-
-  if (tempInRange && humInRange && luxInrange) {
-    alarm.addAlarm(AlarmType::ALL_OK);
-    // Se tutto è OK, potresti voler rimuovere gli altri errori
-    alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
-    alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
-    lcd.addMessage("Thresholds", "ALL OK");
-  } else if (!tempInRange && !humInRange && !luxInrange) {
-    alarm.addAlarm(AlarmType::ALL_THRESHOLDS_OUT);
-    alarm.removeAlarm(AlarmType::ALL_OK);
-    alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
-    lcd.addMessage("Thresholds", "ALL O.O.R");
-  } else {
-    alarm.addAlarm(AlarmType::SOME_THRESHOLDS_OUT);
-    alarm.removeAlarm(AlarmType::ALL_OK);
-    alarm.removeAlarm(AlarmType::ALL_THRESHOLDS_OUT);
-    lcd.addMessage("Thresholds", "SOME O.O.R");
-  }
-
-  long rssi = WiFiHandler::getRSSI();
-  if (rssi < RSSI_THRESHOLD) {
-    Serial.println(F("RSSI too low"));
-    Serial.println(rssi);
-    return;
-  }
-
-  sensorData.addField("temp", data.temperature);
-  sensorData.addField("hum", data.humidity);
-  sensorData.addField("lux", data.light);
-  sensorData.addField("rssi", rssi);
-
-  if (client_idb.writePoint(sensorData)) {
-    Serial.print(F("Sent to data to influxDB"));
-    lcd.addMessagePlantData(data.temperature, data.humidity, data.light);
-  } else {
-    Serial.println(client_idb.getLastErrorMessage());
-  }
-}
-
-void updateInfluxTicker() {
-  int newInterval = mqtt.getSettings().timer;
-
-  // Protezione: evita valori assurdi o zero che farebbero crashare l'ESP
-  if (newInterval <= 0) newInterval = 20;
-
-  Serial.print(F("Aggiornamento intervallo InfluxDB: "));
-  Serial.print(newInterval);
-  Serial.println(F(" secondi"));
-
-  // Stacchiamo il ticker e lo riattacchiamo con il nuovo valore
-  writeToInflux.detach();
-  writeToInflux.attach((float)newInterval, []() {
-    flagWriteInflux = true;
-  });
 }
