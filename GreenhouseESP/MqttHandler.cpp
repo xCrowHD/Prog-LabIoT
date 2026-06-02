@@ -183,13 +183,13 @@ void MqttHandler::handleTopics(char* payload, unsigned int length) {
       return;
     }
 
-    const char* thr = doc["thr"];
+    const char* thr = doc["syncplant"];
     strlcpy(_topics.threshold, thr, sizeof(_topics.threshold));
 
-    const char* run = doc["running"];
+    const char* run = doc["startstop"];
     strlcpy(_topics.running, run, sizeof(_topics.running));
 
-    const char* set = doc["set"];
+    const char* set = doc["settings"];
     strlcpy(_topics.set, set, sizeof(_topics.set));
 
     const char* backup = doc["backup"];
@@ -240,10 +240,18 @@ bool MqttHandler::isAddressedToMe(const JsonVariant& doc) {
 }
 
 void MqttHandler::sendStatus(Status status) {
-  StaticJsonDocument<96> doc;
-  char buffer[96];
+  StaticJsonDocument<256> doc;
+  char buffer[256];
+  const char* actions[] = { "SYNCPLANT", "SETTINGS", "STARTSTOP", "BACKUP"};
   doc["id"] = _id;
   doc["status"] = statusToString(status);
+  doc["type"] = "PLANT_SENSOR";
+
+  JsonArray actionsJson = doc["actions"].to<JsonArray>();
+  for (int i = 0; i < actionsCount; i++) {
+    actionsJson.add(actions[i]);
+  }
+
   serializeJson(doc, buffer);
 
   _client.publish(_dynamicTopic, buffer, true, 1);

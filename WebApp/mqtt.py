@@ -43,6 +43,7 @@ class MQTTManager:
         data = json.loads(msg.payload.decode())
         esp_id = data.get("id")
         status = data.get("status")
+        esp_type = data.get("type")
 
         if esp_id not in self.esp_list:
             self.esp_list[esp_id] = {}
@@ -52,10 +53,13 @@ class MQTTManager:
         node_db = settings_db_manager.get_node_settings_by_id(esp_id)
 
         if status == "CONNECTING":
-            self._send_dynamic_topics_list(esp_id)
+            self._send_dynamic_topics_list(esp_id, esp_type)
         
 
         if status == "ONLINE":
+            if esp_type == "SECURITY_SENSOR":
+                return
+            
             self._restore_node_state(esp_id) # Ripristina soglie/timer
 
             if node_db and node_db.name:
@@ -74,6 +78,9 @@ class MQTTManager:
                     print(f"[MQTT] Backup {esp_id} checked partner: standby={should_standby}")
 
         elif status == "OFFLINE":
+            if esp_type == "SECURITY_SENSOR":
+                return
+            
             if node_db and not node_db.is_backup:
                 # Se un Main muore, svegliamo il backup
                 self._set_backup_standby(esp_id, in_standby=False)
@@ -97,15 +104,18 @@ class MQTTManager:
             print(f"[MQTT] Errore nel parsing del messaggio di sicurezza: {e}")
 
     # ── Internal helper functions ────────────────────────────────────────────────────
-    def _send_dynamic_topics_list(self, esp_id: str):
-        
-        topics_list = {
-            "id": esp_id,
-            "set": TOPIC_SET_MCU,
-            "backup": TOPIC_BACKUP,
-            "thr": TOPIC_SET_THRESHOLD,
-            "running": TOPIC_SET_START_STOP
-        }
+    def _send_dynamic_topics_list(self, esp_id: str, esp_type: str):
+
+        topics_list = {"id": esp_id}
+
+        if esp_type == "PLANT_SENSOR":
+            topics_list["backup"] = TOPIC_BACKUP
+            topics_list["settings"] = TOPIC_SET_MCU
+            topics_list["startstop"] = TOPIC_SET_START_STOP
+            topics_list["syncplant"] = TOPIC_SET_THRESHOLD
+        if esp_type == "SECURITY_SENSOR":
+            topics_list["security"] = TOPIC_SECURITY
+            topics_list["settings"] = TOPIC_SET_MCU
 
         self.client.publish(TOPIC_TOPICS, json.dumps(topics_list), qos=1)
 
