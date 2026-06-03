@@ -453,8 +453,8 @@ void testAlarmHandler()
         auto lcdQueue = lcd.getQueue();
         EXPECT(lcdQueue.empty(), "LCD dovrebbe essere vuoto perché l'allarme è bloccato");
         
-        std::cout << "Numero allarmi attivi: " << alarm.getActiveAlarms().size() << std::endl;
-        EXPECT(alarm.getActiveAlarms().empty() == true, "Alarm non deve registrare questo evento");
+        std::cout << "Numero allarmi attivi: " << alarm.getActiveAlarms().size() << "(NONE)" << std::endl;
+        EXPECT(alarm.getActiveAlarms().size()==1, "Alarm non deve registrare questo evento");
 
         std::cout << "\nAvanziamo il tempo di 1ms" << std::endl;
         delay(1);
@@ -471,8 +471,8 @@ void testAlarmHandler()
         auto lcdQueue2 = lcd.getQueue();
         EXPECT(lcdQueue2.empty(), "LCD dovrebbe essere vuoto perché l'allarme è ancora bloccato");
         
-        std::cout << "Numero allarmi attivi: " << alarm.getActiveAlarms().size() << std::endl;
-        EXPECT(alarm.getActiveAlarms().empty(), "Alarm non deve registrare questo evento");
+        std::cout << "Numero allarmi attivi: " << alarm.getActiveAlarms().size() << "(NONE)" << std::endl;
+        EXPECT(alarm.getActiveAlarms().size()==1, "Alarm non deve registrare questo evento");
 
         // Avanziamo di un altro millisecondo (Totale tempo = 2ms)
         std::cout << "\nAvanziamo di un ulteriore ms (tempo = 2ms)" << std::endl;
@@ -484,13 +484,14 @@ void testAlarmHandler()
         std::cout << "Verifichiamo che il sistema ha accettato l'allarme" << std::endl;
         std::cout << "nextAlarmColor()...";
         alarm.nextAlarmColor();
+
+        auto lcdQueue3 = lcd.getQueue();
+        EXPECT(lcdQueue3.size() == 1, "LCD dovrebbe avere un messaggio in coda perche' l'allarme e' stato accettato dopo la scadenza del blocco");
+
         std::cout << "lcd.popAndDisplay()...\n";
         lcd.popAndDisplay();
         std::cout << std::endl;
 
-        auto lcdQueue3 = lcd.getQueue();
-        EXPECT(lcdQueue3.size() == 1, "LCD dovrebbe avere un messaggio in coda perché l'allarme è stato accettato dopo la scadenza del blocco");
-        
         std::cout << "Numero allarmi attivi: " << alarm.getActiveAlarms().size() << std::endl;
         EXPECT(alarm.getActiveAlarms().size() == 1, "Alarm deve registare questo evento anche se disabilitato");
 

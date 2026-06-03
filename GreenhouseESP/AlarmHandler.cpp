@@ -63,8 +63,10 @@ void AlarmHandler::nextAlarmColor()
 
 void AlarmHandler::addAlarm(AlarmType type)
 {
-  if (type == AlarmType::NONE)
-    return;
+  /*if (type == AlarmType::NONE)
+    return;*/
+    if (type != AlarmType::NONE)
+      _activeAlarms.erase(AlarmType::NONE);
 
   _activeAlarms.insert(type);
   _currentIt = _activeAlarms.begin();

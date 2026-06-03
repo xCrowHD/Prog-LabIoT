@@ -83,6 +83,7 @@ void LCDHandler::popAndDisplay() {
       Serial.println("[Error achived but not displayed]:");
       displayMessage(msgToShow.firstLine, msgToShow.secondLine); // Per test mode mostro comunque il messaggio in uscita, ma non lo rimuovo dalla coda
     }
+    _queue.pop_front(); // <--- RIMUOVI il messaggio fallimentare dalla coda!
     return;
   }
 

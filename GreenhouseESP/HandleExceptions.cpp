@@ -30,6 +30,7 @@ void HandleExceptions::flipEnabled()
         _alarm.getConfig().enable = false;     // Attiva la finestra di cecità totale
         _lcd.getConfig().enable = false;          // Disabilita la visualizzazione degli allarmi anche su LCD
         _alarm.clearAlarms();                  // Spegne anche i LED tramite AlarmHandler
+        _alarm.addAlarm(AlarmType::NONE);
         _lcd.clearErrors();                    // Pulisce eventuali messaggi di errore su LCD
     }
     else
@@ -67,6 +68,7 @@ bool HandleExceptions::handleThresholds(PlantData &data, Thresholds &currentThr)
         _lcd.addMessage("Error", "Sensor Error", MessageType::ERROR);
         return !_config.enable;
     }
+
     bool tempInRange = data.temperature >= currentThr.tempMin && data.temperature <= currentThr.tempMax;
     bool humInRange = data.humidity >= currentThr.humMin && data.humidity <= currentThr.humMax;
     bool luxInRange = data.light >= currentThr.luxMin && data.light <= currentThr.luxMax;
@@ -144,7 +146,8 @@ void HandleExceptions::handleSuccess()
     ARE_ALARM_OFF_VOID();
 
     _alarm.clearAlarms();
-    _lcd.addMessage("All OK!", "", MessageType::ERROR);
+    //_lcd.addMessage("All OK!", "", MessageType::ERROR);
+    _lcd.clearErrors();
     Serial.println(F("All OK!"));
 }
 

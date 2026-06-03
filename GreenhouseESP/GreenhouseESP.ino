@@ -128,6 +128,9 @@ void loop() {
         bool mqttStatus = checkStatus.handleMqttExceptions(currentThr);
         bool thrStatus  = checkStatus.handleThresholds(data, currentThr);
         
+        if (dataStatus){
+          lcd.addMessagePlantData(data.temperature, data.humidity, data.light);
+        }
         // Gestione InfluxDB
         InfluxStatus status = InfluxStatus::SUCCESS;
 
