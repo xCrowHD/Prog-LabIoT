@@ -143,14 +143,38 @@ export async function updateSecurityDashboard(data) {
     minute: "2-digit",
     second: "2-digit",
   });
-  document.getElementById("flame-last-event").innerText = formattedDate;
   if (data.type == "FLAME_ALARM") {
-    setFlameAlarm(data);
+    setFlameAlarm(data, formattedDate);
     addFlameEventToLog(data.temp, formattedDate, data.isOnFlame);
+  }
+  if (data.type == "DOOR_ALARM") {
+    if (!data.doorClose) {
+      incrementDoorCounter(data.timestamp);
+    }
+    addDoorEventToLog(data.doorClose, formattedDate);
   }
 }
 
-async function setFlameAlarm(data) {
+async function incrementDoorCounter(timestampRaw) {
+  const countElement = document.getElementById("door-count");
+
+  const eventDate = new Date(timestampRaw * 1000);
+  const today = new Date();
+
+  // Verifica se è oggi
+  const isToday =
+    eventDate.getDate() === today.getDate() &&
+    eventDate.getMonth() === today.getMonth() &&
+    eventDate.getFullYear() === today.getFullYear();
+
+  if (isToday) {
+    let currentCount = parseInt(countElement.innerText) || 0;
+    countElement.innerText = currentCount + 1;
+  }
+}
+
+async function setFlameAlarm(data, formattedDate) {
+  document.getElementById("flame-last-event").innerText = formattedDate;
   document.getElementById("analog-temp").innerText = data.temp;
   _swapClass("flame-indicator", data.isOnFlame, "bg-primary", "bg-red");
   document.getElementById("flame-status").innerText = data.isOnFlame
@@ -181,6 +205,39 @@ async function addFlameEventToLog(temp, time, isOnFlame) {
 
   logContainer.insertAdjacentHTML("afterbegin", newEventHTML);
 
+  while (logContainer.children.length > 20) {
+    logContainer.removeChild(logContainer.lastElementChild);
+  }
+}
+
+async function addDoorEventToLog(doorClose, time) {
+  const logContainer = document.getElementById("event-log-list");
+
+  // La porta è aperta quando doorClose è false
+  const isOpen = !doorClose;
+
+  // Definiamo i testi e le classi in base allo stato
+  // Se è aperta (isOpen) è un avviso, se è chiusa è un ripristino
+  const statusLabel = isOpen ? "OPENED" : "CLOSED";
+  const statusColor = isOpen ? "text-red" : "text-primary"; // text-primary usa il verde del tuo config
+  const bgClass = isOpen ? "bg-red/10" : "bg-primary/10";
+  const message = isOpen ? "Door opened" : "Door closed";
+  const icon = isOpen ? "door_open" : "door_back";
+
+  const newEventHTML = `
+    <div class="flex items-center gap-3 px-3 py-2 bg-surface-container-lowest rounded-lg mb-2 border-l-4 ${isOpen ? "border-red" : "border-primary"}">
+      <span class="material-symbols-outlined text-[16px] ${statusColor}">
+        ${icon}
+      </span>
+      <span class="text-[10px] font-mono text-on-surface-variant/50 shrink-0">${time}</span>
+      <span class="text-xs text-on-surface">${message}</span>
+      <span class="ml-auto px-2 py-0.5 ${bgClass} ${statusColor} text-[9px] font-bold rounded uppercase">${statusLabel}</span>
+    </div>
+  `;
+
+  logContainer.insertAdjacentHTML("afterbegin", newEventHTML);
+
+  // Manteniamo il limite di 20 elementi
   while (logContainer.children.length > 20) {
     logContainer.removeChild(logContainer.lastElementChild);
   }
