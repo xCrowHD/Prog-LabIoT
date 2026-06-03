@@ -1,11 +1,14 @@
 #include "MqttHandler.h"
 
 MqttHandler::MqttHandler()
-  : _client(512), _settings{}, _topics{}, _status(Status::OFFLINE) {}
+  : _client(512), _settings{}, _topics{}, _status(Status::OFFLINE) {
+  _actions[0] = "SECURITY";
+  _actions[1] = "SETTINGS";
+}
 
 void MqttHandler::begin(WiFiClient& wifiClient, const char* broker, int port) {
   WiFiHandler::getMacAddress(_id);
-  snprintf(_lwtPayload, sizeof(_lwtPayload), "{\"id\":\"%s\",\"status\":\"OFFLINE\"}", _id);
+  updateWill();
   _client.begin(broker, port, wifiClient);
 
   snprintf(_dynamicTopic, sizeof(_dynamicTopic), "%s/%s", TOPIC_CONNECTION, _id);
@@ -94,7 +97,7 @@ void MqttHandler::handleTopics(char* payload, unsigned int length) {
       Serial.println();
       return;
     }
-    
+
     const char* sec = doc["security"];
     strlcpy(_topics.security, sec, sizeof(_topics.security));
 
@@ -132,21 +135,34 @@ bool MqttHandler::isAddressedToMe(const JsonVariant& doc) {
 void MqttHandler::sendStatus(Status status) {
   StaticJsonDocument<256> doc;
   char buffer[256];
-  const char* actions[] = { "SECURITY", "SETTINGS"};
-  int actionsCount = sizeof(actions) / sizeof(actions[0]);
 
   doc["id"] = _id;
   doc["status"] = statusToString(status);
   doc["type"] = "SECURITY_SENSOR";
 
   JsonArray actionsJson = doc["actions"].to<JsonArray>();
-  for (int i = 0; i < actionsCount; i++) {
-    actionsJson.add(actions[i]);
+  for (int i = 0; i < NUM_ACTIONS; i++) {
+    actionsJson.add(_actions[i]);
   }
 
   serializeJson(doc, buffer);
 
   _client.publish(_dynamicTopic, buffer, true, 1);
+}
+
+void MqttHandler::updateWill() {
+  StaticJsonDocument<256> doc;
+
+  doc["id"] = _id;
+  doc["status"] = "OFFLINE";  // Il Will deve essere sempre OFFLINE
+  doc["type"] = "SECURITY_SENSOR";
+  // Aggiungiamo anche le actions se vuoi coerenza totale
+  JsonArray actionsJson = doc["actions"].to<JsonArray>();
+  for (int i = 0; i < NUM_ACTIONS; i++) {
+    actionsJson.add(_actions[i]);
+  }
+
+  serializeJson(doc, _lwtPayload);
 }
 
 const char* MqttHandler::statusToString(Status s) {
@@ -158,5 +174,33 @@ const char* MqttHandler::statusToString(Status s) {
   }
 }
 
-void MqttHandler::sendSecurityPayload() {
+void MqttHandler::sendDoorPayload(bool doorClose) {
+  StaticJsonDocument<256> doc;
+  char buffer[256];
+
+  time_t now = time(nullptr);
+
+  doc["id"] = _id;
+  doc["doorClose"] = doorClose;
+  doc["timestamp"] = (unsigned long)now;
+  doc["type"] = "DOOR_ALARM";
+  serializeJson(doc, buffer);
+
+  _client.publish(_topics.security, buffer, false, 1);
+}
+
+void MqttHandler::sendFlamePayload(bool isOnFlame, float temp) {
+  StaticJsonDocument<256> doc;
+  char buffer[256];
+
+  time_t now = time(nullptr);
+
+  doc["id"] = _id;
+  doc["isOnFlame"] = isOnFlame;
+  doc["temp"] = temp;
+  doc["timestamp"] = (unsigned long)now;
+  doc["type"] = "FLAME_ALARM";
+  serializeJson(doc, buffer);
+
+  _client.publish(_topics.security, buffer, false, 1);
 }

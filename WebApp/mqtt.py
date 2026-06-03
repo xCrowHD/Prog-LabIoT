@@ -8,12 +8,13 @@ import json
 from paho.mqtt import client as mqtt_client
 from db.plants_db import plant_db_manager
 from db.node_settings_db import settings_db_manager
-
+import asyncio
 
 from config import (
     MQTT_IP, MQTT_PORT,
     TOPIC_TEST, TOPIC_SET_MCU, TOPIC_CONNECTION,
-    TOPIC_SET_THRESHOLD, TOPIC_SET_START_STOP, TOPIC_BACKUP, TOPIC_TOPICS
+    TOPIC_SET_THRESHOLD, TOPIC_SET_START_STOP,
+    TOPIC_BACKUP, TOPIC_TOPICS, TOPIC_SECURITY
 )
 
 
@@ -21,13 +22,20 @@ class MQTTManager:
     def __init__(self):
         self.esp_list:dict[str, dict] = {}
         self.current_esp_index: int = 0
-
+        self.callback_sicurezza = None
+        self.loop_principale = None
         self.client = mqtt_client.Client(mqtt_client.CallbackAPIVersion.VERSION2)
+
+    def start(self):
+        """Fa partire il client MQTT solo quando il server è pronto"""
         self.client.connect(MQTT_IP, MQTT_PORT, keepalive=60)
         self.client.subscribe(TOPIC_CONNECTION)
+        self.client.subscribe(TOPIC_SECURITY)
         self.client.message_callback_add(TOPIC_CONNECTION, self._on_node_status)
+        self.client.message_callback_add(TOPIC_SECURITY, self._on_security_message)
         self.client.publish(TOPIC_TEST, "MQTT Client ON")
         self.client.loop_start()
+        print("[MQTT] Client connesso e loop avviato correttamente!")
 
     # ── Internal callbacks ────────────────────────────────────────────────────
 
@@ -35,19 +43,25 @@ class MQTTManager:
         data = json.loads(msg.payload.decode())
         esp_id = data.get("id")
         status = data.get("status")
+        esp_type = data.get("type")
 
         if esp_id not in self.esp_list:
             self.esp_list[esp_id] = {}
         self.esp_list[esp_id]["status"] = status
+        self.esp_list[esp_id]["type"] = esp_type
 
         settings_db_manager.ensure_node_exists(esp_id)
         node_db = settings_db_manager.get_node_settings_by_id(esp_id)
+        print(self.esp_list)
 
         if status == "CONNECTING":
-            self._send_dynamic_topics_list(esp_id)
+            self._send_dynamic_topics_list(esp_id, esp_type)
         
 
         if status == "ONLINE":
+            if esp_type == "SECURITY_SENSOR":
+                return
+            
             self._restore_node_state(esp_id) # Ripristina soglie/timer
 
             if node_db and node_db.name:
@@ -66,21 +80,44 @@ class MQTTManager:
                     print(f"[MQTT] Backup {esp_id} checked partner: standby={should_standby}")
 
         elif status == "OFFLINE":
+            if esp_type == "SECURITY_SENSOR":
+                return
+            
             if node_db and not node_db.is_backup:
                 # Se un Main muore, svegliamo il backup
                 self._set_backup_standby(esp_id, in_standby=False)
         
-        print(self.esp_list)
-
-    def _send_dynamic_topics_list(self, esp_id: str):
         
-        topics_list = {
-            "id": esp_id,
-            "set": TOPIC_SET_MCU,
-            "backup": TOPIC_BACKUP,
-            "thr": TOPIC_SET_THRESHOLD,
-            "running": TOPIC_SET_START_STOP
-        }
+
+    def _on_security_message(self, client, userdata, msg):
+        """Scatta quando il nuovo sensore invia dati su incendio o collisione"""
+        try:
+            payload = json.loads(msg.payload.decode())
+            print(f"[MQTT] Ricevuto messaggio sicurezza: {payload}")
+            
+            # Se la callback è attiva e abbiamo il riferimento al loop di Uvicorn
+            if self.callback_sicurezza and self.loop_principale:
+                # Spediamo la coroutine direttamente al loop di Uvicorn in totale sicurezza
+                asyncio.run_coroutine_threadsafe(
+                    self.callback_sicurezza(payload), 
+                    self.loop_principale
+                )
+        except Exception as e:
+            print(f"[MQTT] Errore nel parsing del messaggio di sicurezza: {e}")
+
+    # ── Internal helper functions ────────────────────────────────────────────────────
+    def _send_dynamic_topics_list(self, esp_id: str, esp_type: str):
+
+        topics_list = {"id": esp_id}
+
+        if esp_type == "PLANT_SENSOR":
+            topics_list["backup"] = TOPIC_BACKUP
+            topics_list["settings"] = TOPIC_SET_MCU
+            topics_list["startstop"] = TOPIC_SET_START_STOP
+            topics_list["syncplant"] = TOPIC_SET_THRESHOLD
+        if esp_type == "SECURITY_SENSOR":
+            topics_list["security"] = TOPIC_SECURITY
+            topics_list["settings"] = TOPIC_SET_MCU
 
         self.client.publish(TOPIC_TOPICS, json.dumps(topics_list), qos=1)
 
@@ -189,14 +226,14 @@ class MQTTManager:
         if not self.esp_list:
             return None
         esp_id = sorted(self.esp_list)[self.current_esp_index]
-        return {"id": esp_id, "status": self.esp_list[esp_id]["status"]}
+        return {"id": esp_id, "status": self.esp_list[esp_id]["status"], "type": self.esp_list[esp_id]["type"]}
 
     def get_next_esp(self) -> dict | None:
         if not self.esp_list:
             return None
         self.current_esp_index = (self.current_esp_index + 1) % len(self.esp_list)
         esp_id = sorted(self.esp_list)[self.current_esp_index]
-        return {"id": esp_id, "status": self.esp_list[esp_id]["status"]}
+        return {"id": esp_id, "status": self.esp_list[esp_id]["status"], "type": self.esp_list[esp_id]["type"]}
 
     def send_thresholds(self, node_id: str, plant_id: str):
         """
@@ -261,5 +298,13 @@ class MQTTManager:
         }
         self.client.publish(TOPIC_SET_MCU, json.dumps(payload), qos=1)
 
+    # ── Callback set for websocket ──────────────────────────────────
+    def set_security_callback(self, callback_func):
+        """Permette a app.py di registrare la propria funzione WebSocket"""
+        self.callback_sicurezza = callback_func
+        # CATTURA IL LOOP QUI: Essendo chiamata da app.py (Lifespan/Main), 
+        # siamo al 100% nel thread e nel loop di Uvicorn!
+        self.loop_principale = asyncio.get_running_loop()
+        print("[MQTT] Callback e Loop principale registrati con successo!")
 
 mqtt_hub = MQTTManager()

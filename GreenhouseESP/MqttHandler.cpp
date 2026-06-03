@@ -1,11 +1,17 @@
 #include "MqttHandler.h"
 
 MqttHandler::MqttHandler()
-  : _client(512), _plantThresholds{}, _settings{}, _topics{}, _status(Status::OFFLINE) {}
+  : _client(512), _plantThresholds{}, _settings{}, _topics{}, _status(Status::OFFLINE) {
+  _actions[0] = "SYNCPLANT";
+  _actions[1] = "SETTINGS";
+  _actions[2] = "STARTSTOP";
+  _actions[3] = "BACKUP";
+}
 
 void MqttHandler::begin(WiFiClient& wifiClient, const char* broker, int port) {
   WiFiHandler::getMacAddress(_id);
-  snprintf(_lwtPayload, sizeof(_lwtPayload), "{\"id\":\"%s\",\"status\":\"OFFLINE\"}", _id);
+  updateWill();
+
   _client.begin(broker, port, wifiClient);
 
   snprintf(_dynamicTopic, sizeof(_dynamicTopic), "%s/%s", TOPIC_CONNECTION, _id);
@@ -183,13 +189,13 @@ void MqttHandler::handleTopics(char* payload, unsigned int length) {
       return;
     }
 
-    const char* thr = doc["thr"];
+    const char* thr = doc["syncplant"];
     strlcpy(_topics.threshold, thr, sizeof(_topics.threshold));
 
-    const char* run = doc["running"];
+    const char* run = doc["startstop"];
     strlcpy(_topics.running, run, sizeof(_topics.running));
 
-    const char* set = doc["set"];
+    const char* set = doc["settings"];
     strlcpy(_topics.set, set, sizeof(_topics.set));
 
     const char* backup = doc["backup"];
@@ -240,13 +246,36 @@ bool MqttHandler::isAddressedToMe(const JsonVariant& doc) {
 }
 
 void MqttHandler::sendStatus(Status status) {
-  StaticJsonDocument<96> doc;
-  char buffer[96];
+  StaticJsonDocument<256> doc;
+  char buffer[256];
+
   doc["id"] = _id;
   doc["status"] = statusToString(status);
+  doc["type"] = "PLANT_SENSOR";
+
+  JsonArray actionsJson = doc["actions"].to<JsonArray>();
+  for (int i = 0; i < NUM_ACTIONS; i++) {
+    actionsJson.add(_actions[i]);
+  }
+
   serializeJson(doc, buffer);
 
   _client.publish(_dynamicTopic, buffer, true, 1);
+}
+
+void MqttHandler::updateWill() {
+  StaticJsonDocument<256> doc;
+
+  doc["id"] = _id;
+  doc["status"] = "OFFLINE";  // Il Will deve essere sempre OFFLINE
+  doc["type"] = "PLANT_SENSOR";
+  // Aggiungiamo anche le actions se vuoi coerenza totale
+  JsonArray actionsJson = doc["actions"].to<JsonArray>();
+  for (int i = 0; i < NUM_ACTIONS; i++) {
+    actionsJson.add(_actions[i]);
+  }
+
+  serializeJson(doc, _lwtPayload);
 }
 
 const char* MqttHandler::statusToString(Status s) {

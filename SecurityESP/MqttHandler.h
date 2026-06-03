@@ -2,6 +2,7 @@
 #define MQTT_HANDLER_H
 
 #include <Arduino.h>
+#include <time.h>
 #include <ESP8266WiFi.h>
 #include <MQTT.h>
 #include <ArduinoJson.h>
@@ -11,6 +12,8 @@
 
 #define TOPIC_CONNECTION "lab_iot/mafogani/connection"
 #define TOPIC_TOPICS "lab_iot/mafogani/topics"
+
+#define NUM_ACTIONS 2
 
 struct Topics {
   char security[32] = "";
@@ -36,6 +39,7 @@ private:
   char _dynamicTopic[128];
   Topics _topics;
   Status _status = Status::OFFLINE;
+  const char* _actions[NUM_ACTIONS] = {};
 
 public:
   // Costruttore
@@ -48,7 +52,8 @@ public:
   bool connected();
   McuSettings getSettings();
   bool isSet();
-  void sendSecurityPayload();
+  void sendDoorPayload(bool doorClose);
+  void sendFlamePayload(bool isOnFlame, float temp);
 
 private:
   const char* statusToString(Status s);
@@ -57,6 +62,7 @@ private:
   bool isAddressedToMe(const JsonVariant& doc);
   void handleTopics(char* payload, unsigned int length);
   void handleSettings(char* payload, unsigned int length);
+  void updateWill();
 };
 
 #endif

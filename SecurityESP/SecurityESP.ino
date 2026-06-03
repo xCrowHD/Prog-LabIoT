@@ -14,8 +14,8 @@
 #define NTC_C 2.620131e-06
 #define NTC_D 6.383091e-08
 
-bool collisionStatus = false;
-bool incendioStatus = false;
+bool isDoorClose = false;
+bool isOnFlame = false;
 unsigned long ultimoControlloSicurezza = 0;
 
 WiFiClient client;
@@ -32,6 +32,14 @@ void setup() {
   digitalWrite(BUZZER, HIGH);
   pinMode(FLAME_DIG, INPUT);
   pinMode(FLAME_DIG, INPUT_PULLUP);
+  configTime(0, 0, "pool.ntp.org", "time.nist.gov");
+
+  Serial.print("Sincronizzazione orario Unix");
+  while (time(nullptr) < 10000) {  // Aspetta che il timestamp diventi un numero valido
+    delay(500);
+    Serial.print(".");
+  }
+  Serial.println("\nOrario sincronizzato!");
   Serial.println(F("\n\nSetup completed.\n\n"));
 }
 
@@ -39,9 +47,9 @@ void loop() {
   mqtt.handle();
   if (millis() - ultimoControlloSicurezza >= 500) {
     ultimoControlloSicurezza = millis();
-    
-    getCollisioneState(); // Controlla la porta
-    checkIncendioState();  // Controlla l'incendio (Fiamma + Temp)
+
+    checkCollisioneState();  // Controlla la porta
+    checkIncendioState();    // Controlla l'incendio (Fiamma + Temp)
   }
 }
 
@@ -77,18 +85,18 @@ bool detectFlames() {
   return false;
 }
 
-void getCollisioneState() {
+void checkCollisioneState() {
   bool statoAttuale = detectCollision();
-  if (statoAttuale != collisionStatus) {
+  if (statoAttuale != isDoorClose) {
 
-    collisionStatus = statoAttuale;
+    isDoorClose = statoAttuale;
 
-    if (collisionStatus == true) {
+    if (isDoorClose == true) {
       Serial.println(F("Collisione Rilevata!"));
-      // mqtt.sendStatus(...);
+      mqtt.sendDoorPayload(true);
     } else {
       Serial.println(F("Collisione Risolta / Stato Ripristinato!"));
-      // mqtt.sendStatus(...);
+      mqtt.sendDoorPayload(false);
     }
   }
 }
@@ -98,20 +106,18 @@ void checkIncendioState() {
   float tempAttuale = getTemperature();
   bool statoAttualeIncendio = (fiammaRilevata && tempAttuale > FIRE_THR);
 
-  if (statoAttualeIncendio != incendioStatus) {
-    incendioStatus = statoAttualeIncendio;
+  if (statoAttualeIncendio != isOnFlame) {
+    isOnFlame = statoAttualeIncendio;
 
-    if (incendioStatus == true) {
+    if (isOnFlame == true) {
       Serial.println(F("[ALLARME] Incendio Rilevato! Fiamma attiva e temperatura critica!"));
       turnBuzzerOn();
-      
-      // Invia la notifica a MQTT (userà lo stato ONLINE o un tuo stato di allarme)
-      //mqtt.sendStatus(Status::ONLINE); 
+      mqtt.sendFlamePayload(true, tempAttuale);
     } else {
       Serial.println(F("[RIPRISTINO] Emergenza rientrata o falso allarme terminato."));
-      digitalWrite(BUZZER, HIGH); // Spegne il buzzer
-      
-      //mqtt.sendStatus(Status::ONLINE);
+      digitalWrite(BUZZER, HIGH);  // Spegne il buzzer
+
+      mqtt.sendFlamePayload(false, tempAttuale);
     }
   }
 }
