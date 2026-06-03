@@ -170,7 +170,7 @@ void MqttHandler::sendDoorPayload(bool doorClose) {
   doc["type"] = "DOOR_ALARM";
   serializeJson(doc, buffer);
 
-  _client.publish(security, buffer, false, 1);
+  _client.publish(_topics.security, buffer, false, 1);
 }
 
 void MqttHandler::sendFlamePayload(bool isOnFlame, float temp) {
@@ -186,5 +186,5 @@ void MqttHandler::sendFlamePayload(bool isOnFlame, float temp) {
   doc["type"] = "FLAME_ALARM";
   serializeJson(doc, buffer);
 
-  _client.publish(security, buffer, false, 1);
+  _client.publish(_topics.security, buffer, false, 1);
 }

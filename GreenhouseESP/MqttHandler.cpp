@@ -243,6 +243,7 @@ void MqttHandler::sendStatus(Status status) {
   StaticJsonDocument<256> doc;
   char buffer[256];
   const char* actions[] = { "SYNCPLANT", "SETTINGS", "STARTSTOP", "BACKUP"};
+  int actionsCount = sizeof(actions) / sizeof(actions[0]);
   doc["id"] = _id;
   doc["status"] = statusToString(status);
   doc["type"] = "PLANT_SENSOR";

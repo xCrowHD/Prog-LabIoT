@@ -112,12 +112,12 @@ void checkIncendioState() {
     if (isOnFlame == true) {
       Serial.println(F("[ALLARME] Incendio Rilevato! Fiamma attiva e temperatura critica!"));
       turnBuzzerOn();
-      mqtt.sendFlamePayload(true, tempAttuale)
+      mqtt.sendFlamePayload(true, tempAttuale);
     } else {
       Serial.println(F("[RIPRISTINO] Emergenza rientrata o falso allarme terminato."));
       digitalWrite(BUZZER, HIGH);  // Spegne il buzzer
 
-      mqtt.sendFlamePayload(false, tempAttuale)
+      mqtt.sendFlamePayload(false, tempAttuale);
     }
   }
 }
