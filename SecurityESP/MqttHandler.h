@@ -13,6 +13,8 @@
 #define TOPIC_CONNECTION "lab_iot/mafogani/connection"
 #define TOPIC_TOPICS "lab_iot/mafogani/topics"
 
+#define NUM_ACTIONS 2
+
 struct Topics {
   char security[32] = "";
   char settings[32] = "";
@@ -37,6 +39,7 @@ private:
   char _dynamicTopic[128];
   Topics _topics;
   Status _status = Status::OFFLINE;
+  const char* _actions[NUM_ACTIONS] = {};
 
 public:
   // Costruttore
@@ -59,6 +62,7 @@ private:
   bool isAddressedToMe(const JsonVariant& doc);
   void handleTopics(char* payload, unsigned int length);
   void handleSettings(char* payload, unsigned int length);
+  void updateWill();
 };
 
 #endif
