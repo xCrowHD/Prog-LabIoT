@@ -2,10 +2,16 @@
   #include <Ticker.h>
   #include <ESP8266WiFi.h>
   #define RESET_ALARMS D5
+  #define LED_RED D0
+  #define LED_GREEN D4
+  #define LED_BLUE D3
 #else
   #include "MockLibraries/Ticker.h"
   #include "MockLibraries/ESP8266WiFi.h"
   #define RESET_ALARMS 5
+  #define LED_RED 0
+  #define LED_GREEN 4
+  #define LED_BLUE 3
 #endif
 
 #include "InfluxHandler.h"
@@ -43,8 +49,14 @@ SensorManager sensor;
 //LCD
 LCDHandler lcd;
 
+// LED
+LED led = {
+  .r = LED_RED, 
+  .g = LED_GREEN, 
+  .b = LED_BLUE};
+
 // Alarm LEDRGB
-AlarmHandler alarm;
+AlarmHandler alarm(lcd, led);
 Ticker writeToInflux;
 Ticker tickerBlink;
 Ticker writeLCD;
@@ -52,7 +64,7 @@ Ticker tickerAlarm;
 Ticker idTick;
 Ticker checkAlarmStatus;
 
-HandleExceptions checkStatus(alarm, lcd, client_idb, {.disableTime=sampleAfterAlarmDisabling});
+HandleExceptions checkStatus(alarm, client_idb);
 
 float lastTimerValue = 20.0;
 char id[13];
@@ -77,7 +89,7 @@ void setup() {
   });
 
   tickerAlarm.attach(1.5, []() {
-    alarm.nextAlarmColor();
+    alarm.nextAlarm();
   });
 
   idTick.attach(5.0, []{
@@ -146,7 +158,7 @@ void loop() {
             checkStatus.handleSuccess(); 
         }
         else{
-          alarm.nextAlarmColor();
+          alarm.nextAlarm();
         }
       }
   
@@ -160,10 +172,8 @@ void loop() {
   if ((millis() - lastDebounceTime) > BUTTON_DEBOUNCE_DELAY) {
     static bool wasAlreadyPressed = false;
     // Se è passato abbastanza tempo, la lettura è stabile
-    if (reading == LOW && !wasAlreadyPressed) {
-      checkStatus.flipEnabled();
-      const char* aStatus = checkStatus.isExecutionAllowed() ? "ON" : "OFF";
-      lcd.addMessage("Alarm Status:", aStatus, MessageType::INFO);       
+    if (reading == LOW && !wasAlreadyPressed) {   
+      alarm.setAllAlarmAcked();
       wasAlreadyPressed = true;   
     }
     if (reading == HIGH) {

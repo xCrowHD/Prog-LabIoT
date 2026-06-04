@@ -33,7 +33,6 @@ struct LCDMsg{
 struct LCDConfig
 {
   bool testMode = false;
-  bool enable = true;
 };
 
 class LCDHandler{
@@ -48,6 +47,7 @@ public:
   void begin(); 
   void popAndDisplay();
   void addMessage(const char* msgOne, const char* msgSec = "", MessageType type = MessageType::INFO);
+  void removeMessage(const char* msgOne, const char* msgSec = "");
   void addMessagePlantData(float temp, float hum, float lux);
   void clearErrors();
   LCDConfig& getConfig();

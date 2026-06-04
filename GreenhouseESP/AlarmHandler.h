@@ -2,20 +2,17 @@
 #define ALARMHANDLER_H
 #ifdef ARDUINO
   #include <Arduino.h>
-  #define LED_RED D0
-  #define LED_GREEN D4
-  #define LED_BLUE D3
 #else
   #include "MockLibraries/Serial.h"
   #include <cstdint>
   #include <iostream>
-  #define LED_RED 0
-  #define LED_BLUE 4
-  #define LED_GREEN 3
 #endif
 
+#include "LCDHandler.h"
 #include <set>
 #include <vector>
+#include <utility>
+#include <map>
 
 
 enum class AlarmType : uint8_t
@@ -31,9 +28,22 @@ enum class AlarmType : uint8_t
   NUM_ALARM_TYPES
 };
 
-struct AlarmConfig {
+struct LED {
+  uint8_t r;
+  uint8_t g;
+  uint8_t b;
+};
+
+struct AlarmConfig
+{
   bool testMode = false;
-  bool enable = true;
+  bool ack = false;
+  bool keepSpammingAfterAck = true; // TRUE = Mostra/Cicla comunque; FALSE = Spegni/Nascondi dopo ACK
+};
+
+struct AlarmState {
+  bool isPresent = false; // Indica se l'allarme è attualmente presente
+  bool isAcked = false;   // Indica se l'allarme è stato riconosciuto (acknowledged) dall'utente
 };
 
 class AlarmHandler{
@@ -43,21 +53,26 @@ class AlarmHandler{
     std::set<AlarmType>::iterator _currentIt;
     
     AlarmConfig _config;
+    LED& _alarmLED;
+    LCDHandler& _lcd;
+    std::map<AlarmType, AlarmState> _alarmStates; // Mappa per tenere traccia dello stato di ogni allarme
 
   public:
-    AlarmHandler(AlarmConfig config = AlarmConfig());
-    void begin();
-    void manageLEDerrors(AlarmType alarm);
-    void nextAlarmColor();
+    AlarmHandler(LCDHandler& lcd, LED& alarmLed);
+    void begin(AlarmConfig config = AlarmConfig());
+    void manageRoutineErrors(AlarmType alarm);
+    void nextAlarm();
     void addAlarm(AlarmType type);
     void removeAlarm(AlarmType type);
     void clearAlarms();
+    void setAllAlarmAcked();
     std::vector<AlarmType> getActiveAlarms();
     AlarmConfig& getConfig ();
 
   private: 
     void ledOff();
     void setLedRGB(uint8_t r, uint8_t g, uint8_t b);
+    std::pair<const char*, const char*> getAlarmMessage(AlarmType type);
 };
 
 #endif

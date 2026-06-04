@@ -39,10 +39,6 @@ void LCDHandler::displayMessage(const char* line1, const char* line2) {
 }
 
 void LCDHandler::addMessage(const char* msgOne, const char* msgSec, MessageType type) {
-  /*if (!_config.enable)
-    if (type == MessageType::ERROR) // Se LCD disabilitato, non aggiungo nuovi messaggi di errore (ma mantengo quelli già in coda)
-      return; */
-
   for (const auto& item : _queue) {
     if (strcmp(item.firstLine, msgOne) == 0 && strcmp(item.secondLine, msgSec) == 0) {
       return;  // Già in coda, esco
@@ -59,9 +55,21 @@ void LCDHandler::addMessage(const char* msgOne, const char* msgSec, MessageType 
   _queue.push_back(newMsg);
 }
 
+void LCDHandler::removeMessage(const char *msgOne, const char *msgSec)
+{
+  // Rimuove tutti i messaggi nella deque che corrispondono a msgOne e msgSec
+  _queue.erase(
+      std::remove_if(_queue.begin(), _queue.end(),
+                     [msgOne, msgSec](const LCDMsg &m)
+                     {
+                       return (strcmp(m.firstLine, msgOne) == 0 && strcmp(m.secondLine, msgSec) == 0);
+                     }),
+      _queue.end());
+
+  // Se la deque si svuota, puoi decidere di resettare lo schermo o mostrare un messaggio di default
+}
+
 void LCDHandler::clearErrors() {
-  /*if (!_config.enable)
-    return; // Se LCD disabilitato, non modifico la coda dei messaggi */
   _queue.erase(std::remove_if(_queue.begin(), _queue.end(),
     [](const LCDMsg& msg) { return msg.type == MessageType::ERROR; }),
     _queue.end());
@@ -77,15 +85,6 @@ void LCDHandler::popAndDisplay() {
 
   // Prendo il primo elemento
   LCDMsg msgToShow = _queue.front();
-
-  if (!_config.enable && msgToShow.type == MessageType::ERROR) {
-    if (_config.testMode) {
-      Serial.println("[Error achived but not displayed]:");
-      displayMessage(msgToShow.firstLine, msgToShow.secondLine); // Per test mode mostro comunque il messaggio in uscita, ma non lo rimuovo dalla coda
-    }
-    _queue.pop_front(); // <--- RIMUOVI il messaggio fallimentare dalla coda!
-    return;
-  }
 
   _queue.pop_front();
 
