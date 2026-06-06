@@ -105,6 +105,7 @@ def get_combined_event_log(device_id: str, limit: int = 5) -> list[dict]:
 
     // Uniamo i due flussi
     union(tables: [door, flame])
+        |> group()
         |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
         |> sort(columns: ["_time"], desc: true)
         |> limit(n: {limit})
@@ -140,5 +141,60 @@ def count_door_opens_today(device_id: str) -> int:
             
         # Il valore del count è nel campo _value
         return results[0].records[0].get_value()
+    finally:
+        client.close()
+
+def get_latest_door_event(device_id: str) -> dict | None:
+    """Ritorna l'ultimo record in assoluto (più recente) per il DoorAlarm di un dispositivo."""
+    
+    # Usiamo la nostra costante di retention o comunque un range definito per l'efficienza.
+    # Se hai una retention di 30 giorni, -30d va benissimo.
+    query = f"""
+    from(bucket: "{INFLUXDB_BUCKET}")
+    |> range(start: 0)
+    |> filter(fn: (r) => r["_measurement"] == "DoorAlarm")
+    |> filter(fn: (r) => r["device"] == "{device_id}")
+    |> filter(fn: (r) => r["_field"] == "doorClose")
+    |> last()
+    """
+    
+    client = _build_client()
+    try:
+        results = client.query_api().query(org=INFLUXDB_ORG, query=query)
+        
+        # Se il dispositivo non ha mai inviato dati nel range temporale, ritorniamo None
+        if not results or not results[0].records:
+            return None
+            
+        # Prendiamo il record e lo passiamo al serializzatore degli allarmi
+        record = results[0].records[0]
+        return _alarm_record_to_dict(record)
+        
+    finally:
+        client.close()
+
+def get_latest_flame_event(device_id: str) -> dict | None:
+    """Ritorna l'ultimo record in assoluto per il FlameAlarm (con isOnFlame e temp)."""
+    
+    query = f"""
+    from(bucket: "{INFLUXDB_BUCKET}")
+      |> range(start: 0)
+      |> filter(fn: (r) => r["_measurement"] == "FlameAlarm")
+      |> filter(fn: (r) => r["device"] == "{device_id}")
+      |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
+      |> group()
+      |> sort(columns: ["_time"], desc: true)
+      |> limit(n: 1)
+    """
+    
+    client = _build_client()
+    try:
+        results = client.query_api().query(org=INFLUXDB_ORG, query=query)
+        
+        if not results or not results[0].records:
+            return None
+            
+        record = results[0].records[0]
+        return _alarm_record_to_dict(record)
     finally:
         client.close()

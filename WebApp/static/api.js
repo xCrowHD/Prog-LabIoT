@@ -116,3 +116,13 @@ export async function fecthTodayDoorStats(nodeId) {
   const res = await fetch(`/api/security/stats/door-opens/${nodeId}`);
   return _checkResponse(res);
 }
+
+export async function fetchCurrentDoorStatus(nodeId) {
+  const res = await fetch(`/api/security/status/door/${nodeId}`);
+  return _checkResponse(res);
+}
+
+export async function fetchCurrentFlameStatus(nodeId) {
+  const res = await fetch(`/api/security/status/flame/${nodeId}`);
+  return _checkResponse(res);
+}
