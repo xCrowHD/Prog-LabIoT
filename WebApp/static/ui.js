@@ -12,6 +12,8 @@ import {
   fecthNodeSettings,
   fecthTodayDoorStats,
   fecthLatestSecurityEvents,
+  fetchCurrentDoorStatus,
+  fetchCurrentFlameStatus,
 } from "./api.js";
 import { renderPlantChart } from "./chart.js";
 
@@ -300,6 +302,10 @@ async function bootSecurity() {
   const doorCounter = await fecthTodayDoorStats(node.id);
   const countElement = document.getElementById("door-count");
   countElement.innerText = doorCounter.count;
+  const currentDoorStatus = await fetchCurrentDoorStatus(node.id);
+  doorStatus(currentDoorStatus.doorClose);
+  const currentFlameStatus = await fetchCurrentFlameStatus(node.id);
+  setFlameAlarm(currentFlameStatus, currentFlameStatus.timestamp);
 }
 
 // ── Tab helpers ───────────────────────────────────────────────────────────────
