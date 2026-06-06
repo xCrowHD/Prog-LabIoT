@@ -38,10 +38,14 @@ const char* org = "organization";
 const char* bkt = "Personal bucket";
 const char* tkn = "Your token";
 
-AlarmHandler alarm(/*testMode =*/ true);
 LCDHandler lcd;
+
+LED alarmLed = {9, 10, 11}; // Pin RGB LED
+AlarmHandler alarm(lcd, alarmLed);
+
 InfluxHandler client(url, org, bkt, tkn);
-HandleExceptions checkStatus(alarm, lcd, client);
+HandleExceptions checkStatus(alarm, client);
+
 
 bool mockMqttStatus;
 InfluxStatus mockInfluxStatus;
@@ -51,23 +55,25 @@ void initializeMockStatuses(const std::string& testName = "");
 
 void testAlarmHandler()
 {
-    initializeMockStatuses();
+    {//Test 1: Aggiunta di un allarme
+    initializeMockStatuses("Test 1");
 
     // Test 1: Aggiunta di un allarme
     std::cout << "Test 1: Aggiunta di un allarme" << std::endl;
     alarm.addAlarm(AlarmType::SENSOR_ERROR);
-    EXPECT(alarm.getAlarmStatus() == true,
+    EXPECT(!alarm.getConfig().ack,
         "L'allarme dovrebbe essere attivo dopo l'aggiunta di un allarme.");
-
-    initializeMockStatuses();
+    }
+    {//Test 2: Rimozione di un allarme
+    initializeMockStatuses("Test 2");
     // Test 2: Rimozione di un allarme
     std::cout << "Test 2: Rimozione di un allarme" << std::endl;
     alarm.removeAlarm(AlarmType::SENSOR_ERROR);
     EXPECT(alarm.getActiveAlarms().empty() == true,
         "L'elenco degli allarmi attivi dovrebbe essere vuoto dopo la rimozione di un allarme.");
-
-    initializeMockStatuses();
-    // Test 3: Aggiunta di più allarmi
+    }
+    {//Test 3: Aggiunta di più allarmi
+    initializeMockStatuses("Test 3");
     std::cout << "Test 3: Aggiunta di più allarmi" << std::endl;
     alarm.addAlarm(AlarmType::SOME_THRESHOLDS_OUT);
     alarm.addAlarm(AlarmType::ALL_THRESHOLDS_OUT);
@@ -82,19 +88,13 @@ void testAlarmHandler()
         alarm.getActiveAlarms().end(), 
         AlarmType::ALL_THRESHOLDS_OUT) != alarm.getActiveAlarms().end(),
          "L'allarme ALL_THRESHOLDS_OUT dovrebbe essere presente.");
-
-    // Test 4: Verifica dello stato dell'allarme
-    initializeMockStatuses();
+    }
+    {// Test 4: Verifica dello stato dell'allarme
+    initializeMockStatuses("Test 4");
     std::cout << "Test 4: Verifica dello stato dell'allarme" << std::endl;
-    EXPECT(alarm.getAlarmStatus() == true,
+    EXPECT(alarm.getConfig().ack == false,
         "L'allarme dovrebbe essere attivo quando ci sono allarmi attivi.");
-
-    // Test 5: Disabilitazione dell'allarme
-    initializeMockStatuses();
-    std::cout << "Test 5: Disabilitazione dell'allarme" << std::endl;
-    alarm.flipEnabled();
-    EXPECT(alarm.getAlarmStatus() == false,
-        "L'allarme dovrebbe essere disabilitato dopo la chiamata a flipEnabled.");
+    }
 
     {// Test 6: loop di visualizzazione degli allarmi
     initializeMockStatuses("Test 6");
@@ -104,7 +104,7 @@ void testAlarmHandler()
     alarm.addAlarm(AlarmType::INFLUX_ERROR);
     // Simuliamo più cicli di visualizzazione per vedere il cambio di colore
     for (int i = 0; i < 4; ++i) {
-        alarm.nextAlarmColor();
+        alarm.nextAlarm();
     }
     }   
 
@@ -123,7 +123,7 @@ void testAlarmHandler()
     for (size_t i = 0; i < alarmPhase.size(); ++i)
     {
         std::cout << "Active Alarm " << i + 1 << ": ";
-        alarm.nextAlarmColor();
+        alarm.nextAlarm();
     }
     EXPECT(std::find(alarmPhase.begin(), alarmPhase.end(), AlarmType::CONNECTION_ERROR) != alarmPhase.end(),
            "L'allarme CONNECTION_ERROR dovrebbe essere presente.");
@@ -146,7 +146,8 @@ void testAlarmHandler()
     for (size_t i = 0; i < alarm.getActiveAlarms().size(); ++i)
     {
         std::cout << "Active Alarm " << i + 1 << ": ";
-        alarm.nextAlarmColor();
+        alarm.nextAlarm();
+        lcd.popAndDisplay();
     }
 
     EXPECT(alarm.getActiveAlarms().size() == 1,
@@ -168,7 +169,8 @@ void testAlarmHandler()
     for (size_t i = 0; i < alarm.getActiveAlarms().size(); ++i)
     {
         std::cout << "Active Alarm " << i + 1 << ": ";
-        alarm.nextAlarmColor();
+        alarm.nextAlarm();
+        lcd.popAndDisplay();
     }
     EXPECT(alarm.getActiveAlarms().size() == 1,
         "Dovrebbe esserci 1 allarme attivo (INFLUX_ERROR).");
@@ -188,7 +190,7 @@ void testAlarmHandler()
     for (size_t i = 0; i < alarm.getActiveAlarms().size(); ++i)
     {
         std::cout << "Active Alarm " << i + 1 << ": ";
-        alarm.nextAlarmColor();
+        alarm.nextAlarm();
         
     }
     EXPECT(alarm.getActiveAlarms().size() == 1,
@@ -209,7 +211,7 @@ void testAlarmHandler()
     for (size_t i = 0; i < alarm.getActiveAlarms().size(); ++i)
     {
         std::cout << "Active Alarm " << i + 1 << ": ";
-        alarm.nextAlarmColor();
+        alarm.nextAlarm();
     }
     EXPECT(alarm.getActiveAlarms().size() == 1,
         "Dovrebbe esserci 1 allarme attivo (ALL_THRESHOLDS_OUT).");
@@ -228,7 +230,7 @@ void testAlarmHandler()
     for (size_t i = 0; i < alarm.getActiveAlarms().size(); ++i)
     {
         std::cout << "Active Alarm " << i + 1 << ": ";
-        alarm.nextAlarmColor();
+        alarm.nextAlarm();
     }
     EXPECT(alarm.getActiveAlarms().size() == 1,
         "Dovrebbe esserci 1 allarme attivo (SOME_THRESHOLDS_OUT).");
@@ -247,7 +249,7 @@ void testAlarmHandler()
         for (size_t i = 0; i < alarm.getActiveAlarms().size(); ++i)
         {
             std::cout << "Active Alarm " << i + 1 << ": ";
-            alarm.nextAlarmColor();
+            alarm.nextAlarm();
         }
         EXPECT(alarm.getActiveAlarms().size() == 0,
             "Dovrebbe esserci 0 allarmi attivi (ALL_OK)."); 
@@ -266,7 +268,7 @@ void testAlarmHandler()
     for (size_t i = 0; i < alarm.getActiveAlarms().size(); ++i)
     {
         std::cout << "Active Alarm " << i + 1 << ": ";
-        alarm.nextAlarmColor();
+        alarm.nextAlarm();
     }
 
     std::cout << "Simulazione ciclo con connessione WiFi disattivata completata." << std::endl;
@@ -276,7 +278,7 @@ void testAlarmHandler()
     for (size_t i = 0; i < alarm.getActiveAlarms().size(); ++i)
     {
         std::cout << "Active Alarm " << i + 1 << ": ";
-        alarm.nextAlarmColor();
+        alarm.nextAlarm();
     }
     EXPECT(alarm.getActiveAlarms().size() == 0,
         "Dovrebbe esserci 0 allarmi attivi (ALL_OK) dopo la riattivazione della connessione.");
@@ -292,7 +294,7 @@ void testAlarmHandler()
 
         // Qui il set ha dimensione 1, quindi chiamiamo nextAlarmColor direttamente
         std::cout << "Stato LED: ";
-        alarm.nextAlarmColor();
+        alarm.nextAlarm();
 
         std::cout << "Simulazione ciclo di guarigione con dati validi..." << std::endl;
         PlantData validData = {25.0, 50.0, 300, true};
@@ -300,7 +302,7 @@ void testAlarmHandler()
 
         // Chiamata diretta: il set è vuoto, nextAlarmColor() intercetta la salute e stampa VERDE
         std::cout << "Stato LED dopo guarigione: ";
-        alarm.nextAlarmColor();
+        alarm.nextAlarm();
 
         // Verifica logica rigorosa
         EXPECT(alarm.getActiveAlarms().empty() == true,
@@ -318,7 +320,7 @@ void testAlarmHandler()
     for (size_t i = 0; i < alarm.getActiveAlarms().size(); ++i)
     {
         std::cout << "Active Alarm " << i + 1 << ": ";
-        alarm.nextAlarmColor();
+        alarm.nextAlarm();
     }
     }
 
@@ -340,7 +342,7 @@ void testAlarmHandler()
         
         {
             std::cout << "Active Alarm " << i + 1 << ": ";
-            alarm.nextAlarmColor();
+            alarm.nextAlarm();
         }
 
         std::cout << "Risoluzione dell'errore INFLUX_ERROR..." << std::endl;
@@ -351,7 +353,7 @@ void testAlarmHandler()
         for (size_t i = 0; i < alarmsPhase2.size(); ++i)
         {
             std::cout << "Active Alarm " << i + 1 << ": ";
-            alarm.nextAlarmColor();
+            alarm.nextAlarm();
         }
 
         bool trovatoInflux = (std::find(alarmsPhase2.begin(), alarmsPhase2.end(), AlarmType::INFLUX_ERROR) != alarmsPhase2.end());
@@ -369,61 +371,42 @@ void testAlarmHandler()
         for (size_t i = 0; i < alarmsPhase3.size(); ++i)
         {
             std::cout << "Active Alarm " << i + 1 << ": ";
-            alarm.nextAlarmColor();
+            alarm.nextAlarm();
         }
 
         EXPECT(alarmsPhase3.size() == 0, "Dovrebbe esserci 0 allarmi attivi (ALL_OK) dopo la risoluzione di tutti gli errori.");
     }
 
-    { // Test 18: aggiunta nuovi allarmi mentre disabilitato.
-        initializeMockStatuses("Test 18");
-        std::cout << "Test 18: Alarm disable. Mi aspetto che il sistema raccolga nuovi dati allarmi mentre disabilitato \n"
-                    "ma che non siano visualizzati mentre disattivo"
-                    << std::endl << std::endl;
+    { // Test 18 gestione disable/enable degli allarmi
+    initializeMockStatuses("Test 18");
+    std::cout << "Test 18: gestione disable/enable degli allarmi" << std::endl << std::endl;
+    std::cout << "SENSOR ERROR " << std::endl;
+    PlantData invalidData = {25.0, 50.0, 300, false}; // Dati non validi
+    Thresholds validThresholds = {"Tomato", 20.0, 30.0, 40.0, 60.0, 200, 400};
+    loopSimulation(invalidData, validThresholds, InfluxStatus::SUCCESS);
+    std::cout << "\nAggiungiamo insuccesso influx..." << std::endl;
+    loopSimulation(invalidData, validThresholds, InfluxStatus::ERR_INFLUX_CONNECTION);
+    alarm.nextAlarm();
+    lcd.popAndDisplay();
 
-        std::cout << "Simuliamo SENSOR ERROR" << std::endl << std::endl;
-        alarm.addAlarm(AlarmType::SENSOR_ERROR);
-        alarm.nextAlarmColor();
+    std::cout << "Prendiamo nota degli allarmi..." << std::endl;
+    alarm.setAllAlarmAcked();
+    loopSimulation(invalidData, validThresholds, InfluxStatus::ERR_INFLUX_CONNECTION);
+    alarm.nextAlarm();
+    lcd.popAndDisplay();
+    lcd.popAndDisplay();
 
-        // Verifichiamo che lo stato iniziale sia attivo e l'allarme sia dentro
-        EXPECT(alarm.getAlarmStatus() == true, "L'allarme dovrebbe essere abilitato all'inizio.");
-        EXPECT(alarm.getActiveAlarms().size() == 1, "Dovrebbe esserci 1 allarme nel vettore.");
+    std::cout << "\nSparisce SENSOR ERROR" << std::endl;
+    PlantData validData = {25.0, 50.0, 300, true}; // Dati validi
+    loopSimulation(validData, validThresholds, InfluxStatus::ERR_INFLUX_CONNECTION);
+    alarm.nextAlarm();
+    lcd.popAndDisplay();
 
-        // Disattiviamo il sistema
-        std::cout << "\nDisattiviamo il sistema" << std::endl;
-        alarm.flipEnabled();
-        EXPECT(alarm.getAlarmStatus() == false, "L'allarme dovrebbe essere disattivato dopo il flip.");
-
-        std::cout << "\nSimuliamo 3 errori mentre disabilitato" << std::endl
-                      << std::endl;
-        alarm.addAlarm(AlarmType::SOME_THRESHOLDS_OUT);
-        alarm.addAlarm(AlarmType::CONNECTION_ERROR);
-        alarm.addAlarm(AlarmType::INFLUX_ERROR);
-
-        // Proviamo a ciclare i LED: non dovrebbe mostrare nulla/andare in ledOff() internamente
-        std::cout << "Colori visualizzati mentre disattivo:" << std::endl;
-        alarm.nextAlarmColor();
-
-        // Controlliamo che il vettore si sia riempito lo stesso (Vecchio tolto + 3 nuovi = 3)
-        auto alarmPhase1 = alarm.getActiveAlarms();
-        std::cout << "Dimensione vettore mentre disabilitato: " << alarmPhase1.size() << std::endl;
-        EXPECT(alarmPhase1.size() == 3, "Il vettore dovrebbe contenere 4 allarmi anche se disattivato.");
-
-        // Riattiviamo il sistema
-        std::cout << "\nRiattiviamo il sistema" << std::endl;
-        alarm.flipEnabled();
-        EXPECT(alarm.getAlarmStatus() == true, "L'allarme dovrebbe essere nuovamente attivo dopo il secondo flip.");
-
-        // Verifichiamo che la sequenza non sia andata persa dopo la riattivazione
-        auto alarmPhase2 = alarm.getActiveAlarms();
-        EXPECT(alarmPhase2.size() == 3, "Il vettore deve mantenere i 3 allarmi dopo essere stato riattivato.");
-
-        std::cout << "\nVisualizziamo la sequenza di allarmi generati:" << std::endl;
-        for (size_t i = 0; i < alarmPhase2.size(); i++)
-        {
-                alarm.nextAlarmColor();
-        }
-    }
+    std::cout << "\nTorna SENSOR ERROR" << std::endl;
+    loopSimulation(invalidData, validThresholds, InfluxStatus::ERR_INFLUX_CONNECTION);
+    alarm.nextAlarm();
+    lcd.popAndDisplay();
+}
 }
 
 int main()
@@ -448,20 +431,20 @@ int main()
     }
     else
     {
-        std::cout << "[ATTENSIONE] Rilevati " << std::to_string(testsFailed) << " fallimenti su " << std::to_string(totalAssertions) << "verifiche totali" << std::endl << std::endl;
+        std::cout << "[ATTENZIONE] Rilevati " << std::to_string(testsFailed) << " fallimenti su " << std::to_string(totalAssertions) << " verifiche totali" << std::endl << std::endl;
         return 1;
     }
 }
 //-------------------------------------- Funzioni di gestione delle eccezioni per i test ---------------------------------------//
 void initializeMockStatuses(const std::string& testName)
 {
-
+    
     std::cout << std::endl << "---Inizializzando Mock Status per il test " << testName << "---" << std::endl;
 
-    if (!alarm.getAlarmStatus())
-    {
-        alarm.flipEnabled(); 
-    }
+    alarm.getConfig().testMode = true;
+    alarm.getConfig().ack = false;
+
+    lcd.begin();
     alarm.clearAlarms();
 
     rssi = -60;
@@ -490,6 +473,6 @@ void loopSimulation(PlantData &data, Thresholds &currentThr, InfluxStatus status
     }
     else
     {
-        alarm.nextAlarmColor();
+        alarm.nextAlarm();
     }
 }

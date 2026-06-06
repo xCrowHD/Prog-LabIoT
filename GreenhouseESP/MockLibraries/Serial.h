@@ -11,11 +11,26 @@
 #ifndef ARDUINO
 #define OUTPUT 1
 #define INPUT 0
+#define INPUT_PULLUP 2
 #define HIGH 1
 #define LOW 0
 
-// Funzioni Core di Arduino
-inline void delay(unsigned long ms) { (void)ms; }
+inline uint32_t _mock_millis_counter = 0;
+inline unsigned long millis()
+{
+    return _mock_millis_counter;
+}
+
+inline void delay(unsigned long ms)
+{
+    _mock_millis_counter += ms;
+}
+
+inline void advanceMockTime(unsigned long ms)
+{
+    _mock_millis_counter += ms;
+}
+
 inline void pinMode(uint8_t pin, uint8_t mode)
 {
     std::cout << "[Mock in" << pin << "] set to " << mode << std::endl;
@@ -25,6 +40,13 @@ inline void digitalWrite(uint8_t pin, uint8_t val)
     (void)pin;
     (void)val;
 }
+
+inline int digitalRead(uint8_t pin)
+{
+    (void)pin;
+    return HIGH; // Simula un pulsante non premuto
+}
+
 inline int analogRead(uint8_t pin)
 {
     (void)pin;

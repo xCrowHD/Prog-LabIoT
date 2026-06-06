@@ -7,7 +7,7 @@ class MockWire {
     public: 
         void begin (){};
         void beginTransmission(int addr){}
-        byte endTransmission() {return 1;}
+        byte endTransmission() {return 0;}
 };
 
 inline MockWire Wire;
