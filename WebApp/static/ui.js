@@ -154,7 +154,42 @@ export async function updateSecurityDashboard(data) {
     if (!data.doorClose) {
       incrementDoorCounter(data.timestamp);
     }
+    doorStatus(data.doorClose);
     addDoorEventToLog(data.doorClose, formattedDate);
+  }
+}
+
+async function doorStatus(doorClose) {
+  const statusLabel = document.getElementById("door-status-label");
+  const statusDot = document.getElementById("door-status-dot");
+
+  // La porta è aperta se doorClose è false
+  const isOpen = !doorClose;
+
+  // 1. Gestione del Testo (Label)
+  if (statusLabel) {
+    if (isOpen) {
+      statusLabel.innerText = "Door Opened";
+      statusLabel.classList.remove("text-on-surface-variant/50");
+      statusLabel.classList.add("text-red", "font-bold");
+    } else {
+      statusLabel.innerText = "Door Closed";
+      statusLabel.classList.remove("text-red", "font-bold");
+      statusLabel.classList.add("text-on-surface-variant/50");
+    }
+  }
+
+  // 2. Gestione del Pallino (Dot)
+  if (statusDot) {
+    if (isOpen) {
+      // Porta aperta: togliamo il verde di default (bg-primary) e mettiamo il rosso
+      statusDot.classList.remove("bg-primary");
+      statusDot.classList.add("bg-red");
+    } else {
+      // Porta chiusa: ripristiniamo il verde di default
+      statusDot.classList.remove("bg-red");
+      statusDot.classList.add("bg-primary");
+    }
   }
 }
 
