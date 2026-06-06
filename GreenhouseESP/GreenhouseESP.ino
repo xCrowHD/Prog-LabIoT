@@ -57,7 +57,6 @@ LED led = {
 
 // Alarm LEDRGB
 AlarmHandler alarm(lcd, led);
-Ticker writeToInflux;
 Ticker tickerBlink;
 Ticker writeLCD;
 Ticker tickerAlarm;
