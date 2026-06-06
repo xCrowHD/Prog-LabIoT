@@ -1,5 +1,7 @@
 #include "MqttHandler.h"
-
+#include <InfluxDbClient.h>
+#include <ESP8266WiFi.h>
+#include <time.h>
 
 #define COLLISION D1
 #define FLAME_DIG D2
@@ -20,11 +22,13 @@ unsigned long ultimoControlloSicurezza = 0;
 
 WiFiClient client;
 MqttHandler mqtt;
+InfluxDBClient influxClient(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
+char id[13];
 
 void setup() {
   Serial.begin(115200);
   WiFiHandler::begin();
-
+  WiFiHandler::getMacAddress(id);
   mqtt.begin(client, "broker.emqx.io", 1883);
   // put your setup code here, to run once:
   pinMode(COLLISION, INPUT);
@@ -91,12 +95,14 @@ void checkCollisioneState() {
 
     isDoorClose = statoAttuale;
 
-    if (isDoorClose == true) {
+    if (isDoorClose) {
       Serial.println(F("Collisione Rilevata!"));
       mqtt.sendDoorPayload(true);
+      sendDoorStatusToInflux(true);
     } else {
       Serial.println(F("Collisione Risolta / Stato Ripristinato!"));
       mqtt.sendDoorPayload(false);
+      sendDoorStatusToInflux(false);
     }
   }
 }
@@ -109,15 +115,40 @@ void checkIncendioState() {
   if (statoAttualeIncendio != isOnFlame) {
     isOnFlame = statoAttualeIncendio;
 
-    if (isOnFlame == true) {
+    if (isOnFlame) {
       Serial.println(F("[ALLARME] Incendio Rilevato! Fiamma attiva e temperatura critica!"));
       turnBuzzerOn();
       mqtt.sendFlamePayload(true, tempAttuale);
+      sendFlameStatusToInflux(true, tempAttuale);
     } else {
       Serial.println(F("[RIPRISTINO] Emergenza rientrata o falso allarme terminato."));
       digitalWrite(BUZZER, HIGH);  // Spegne il buzzer
 
       mqtt.sendFlamePayload(false, tempAttuale);
+      sendFlameStatusToInflux(false, tempAttuale);
     }
   }
+}
+
+void sendDoorStatusToInflux(bool status) {
+  if (!influxClient.validateConnection()) {
+    return;
+  }
+
+  Point doorPoint("DoorAlarm");
+  doorPoint.addTag("device", id);
+  doorPoint.addField("doorClose", status);
+  influxClient.writePoint(doorPoint);
+}
+
+void sendFlameStatusToInflux(bool status, float temp) {
+  if (!influxClient.validateConnection()) {
+    return;
+  }
+
+  Point doorPoint("FlameAlarm");
+  doorPoint.addTag("device", id);
+  doorPoint.addField("isOnFlame", status);
+  doorPoint.addField("temp", temp);
+  influxClient.writePoint(doorPoint);
 }
