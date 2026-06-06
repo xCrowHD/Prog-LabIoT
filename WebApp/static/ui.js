@@ -10,6 +10,8 @@ import {
   fetchLatestPlantData,
   fetchCurrentNode,
   fecthNodeSettings,
+  fecthTodayDoorStats,
+  fecthLatestSecurityEvents,
 } from "./api.js";
 import { renderPlantChart } from "./chart.js";
 
@@ -29,6 +31,7 @@ export async function switchDashboardView() {
     dashsec.classList.remove("hidden");
     dashplant.classList.add("hidden");
     console.log("[UI] show security dashboard");
+    bootSecurity();
   }
 }
 
@@ -241,6 +244,27 @@ async function addDoorEventToLog(doorClose, time) {
   while (logContainer.children.length > 20) {
     logContainer.removeChild(logContainer.lastElementChild);
   }
+}
+
+async function bootSecurity() {
+  const logContainer = document.getElementById("event-log-list");
+  logContainer.innerHTML = "";
+
+  const node = await fetchCurrentNode();
+  const eventsData = await fecthLatestSecurityEvents(node.id, 5);
+
+  for (const event of [...eventsData].reverse()) {
+    if (event.alarmType == "FlameAlarm") {
+      addFlameEventToLog(event.temp, event.timestamp, event.isOnFlame);
+    }
+    if (event.alarmType == "DoorAlarm") {
+      addDoorEventToLog(event.doorClose, event.timestamp);
+    }
+  }
+
+  const doorCounter = await fecthTodayDoorStats(node.id);
+  const countElement = document.getElementById("door-count");
+  countElement.innerText = doorCounter.count;
 }
 
 // ── Tab helpers ───────────────────────────────────────────────────────────────

@@ -31,8 +31,8 @@ def _alarm_record_to_dict(record) -> dict:
     
     # Struttura base condivisa
     data = {
-        "timestamp": record.get_time().strftime("%d/%m/%Y %H:%M"),
-        "type":      measurement,
+        "timestamp": record.get_time().strftime("%d/%m/%Y %H:%M:%S"),
+        "alarmType":      measurement,
         "device":    record.values.get("device"),
     }
     
