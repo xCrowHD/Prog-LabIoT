@@ -162,8 +162,21 @@ void MqttHandler::handleSettings(char* payload, unsigned int length) {
 
       strlcpy(_settings.mcuName, nameFromData, sizeof(_settings.mcuName));
     }
-    _settings.isBackup = doc["backup"];
-    _settings.timer = doc["timer"];
+
+    if (doc.containsKey("backup")){
+      _settings.isBackup = doc["backup"];
+    }
+    
+    if (doc.containsKey("timer")){
+      _settings.timer = doc["timer"];
+    }
+    
+    if (doc.containsKey("location")) {
+      const char* locationFromData = doc["location"];
+
+      strlcpy(_settings.location, locationFromData, sizeof(_settings.location));
+    }
+
 
     Serial.println(F("--- Settings Aggiornati ---"));
     Serial.print(F("Nome MCU: "));

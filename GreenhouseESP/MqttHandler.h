@@ -19,10 +19,6 @@
 
 #define TOPIC_CONNECTION "lab_iot/mafogani/connection"
 #define TOPIC_TOPICS "lab_iot/mafogani/topics"
-//#define TOPIC_THRESHOLD "lab_iot/mafogani/threshold"
-//#define TOPIC_START_STOP "lab_iot/mafogani/start-stop"
-//#define TOPIC_MCU_SET "lab_iot/mafogani/set-mcu"
-//#define TOPIC_BACKUP "lab_iot/mafogani/backup"
 
 #define NUM_ACTIONS 4
 
@@ -48,6 +44,7 @@ struct McuSettings {
   char mcuName[32] = "";
   bool isBackup = false;
   float timer = 0;
+  char location[64] = "";
 };
 
 enum class Status {
