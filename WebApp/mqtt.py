@@ -269,12 +269,12 @@ class MQTTManager:
         settings_db_manager.update_node_running_state(node_id, is_running)
         self.client.publish(TOPIC_SET_START_STOP, json.dumps(payload), qos=1)
 
-    def send_set_mcu(self, node_id: str, name: str, is_backup: bool, timer: float):
+    def send_set_mcu(self, node_id: str, name: str, is_backup: bool, timer: float, location: str):
         if self._node_name_already_taken(node_id, name, is_backup):
             print(f"[MQTT] ERROR: name '{name}' already in use by a non-backup node")
             return
 
-        settings_db_manager.update_node_settings(node_id, name, is_backup, timer)
+        settings_db_manager.update_node_settings(node_id, name, is_backup, timer, location)
 
         if is_backup:
             # Se sto diventando un backup, controllo se il mio (nuovo) main è online
@@ -294,7 +294,8 @@ class MQTTManager:
             "id": node_id,
             "name": name,
             "backup": is_backup,
-            "timer": timer
+            "timer": timer,
+            "location": location
         }
         self.client.publish(TOPIC_SET_MCU, json.dumps(payload), qos=1)
 

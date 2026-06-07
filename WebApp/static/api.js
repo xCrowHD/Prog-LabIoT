@@ -85,7 +85,7 @@ export async function sendStartStop(start) {
   return _checkResponse(res);
 }
 
-/** @param {{ name: string, backup: boolean, timer: number }} config */
+/** @param {{ name: string, backup: boolean, timer: number, location: string }} config */
 export async function sendSetMcu(config) {
   const res = await fetch("/api/nodes/set-mcu", {
     method: "POST",

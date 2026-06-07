@@ -27,4 +27,5 @@ class NodeSettingsModel(Base):
     is_running = Column(Boolean, default=False)
     # Chiave esterna verso la pianta
     plant_id = Column(String, ForeignKey("plants.id"))
+    location = Column(String, nullable=True)
     plant = relationship("PlantModel", back_populates="nodes")

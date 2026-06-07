@@ -310,6 +310,15 @@
                   >None</span
                 >
               </div>
+
+              <div class="flex justify-between items-center py-2">
+                <span class="text-sm text-on-surface-variant">Location</span>
+                <span
+                  id="mcu-location-info"
+                  class="text-sm font-mono text-on-surface"
+                  >None</span
+                >
+              </div>
             </div>
 
             <div id="set-mcu-form" class="hidden">
@@ -344,6 +353,19 @@
                 <input
                   id="mcu-timer"
                   type="number"
+                  class="bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-on-surface"
+                />
+              </div>
+
+              <div
+                class="flex justify-between items-center py-2 border-b border-outline-variant/10"
+              >
+                <span class="text-sm text-on-surface-variant"
+                  >MCU Location</span
+                >
+                <input
+                  id="mcu-location"
+                  type="text"
                   class="bg-black/40 border border-white/10 rounded px-2 py-2 text-xs text-on-surface"
                 />
               </div>
