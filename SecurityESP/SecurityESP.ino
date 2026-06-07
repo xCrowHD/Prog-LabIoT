@@ -1,7 +1,9 @@
 #include "MqttHandler.h"
+#include "TelegramNotifier.h"
 #include <InfluxDbClient.h>
 #include <ESP8266WiFi.h>
 #include <time.h>
+#include "secrets.h"
 
 #define COLLISION D1
 #define FLAME_DIG D2
@@ -23,6 +25,7 @@ unsigned long ultimoControlloSicurezza = 0;
 WiFiClient client;
 MqttHandler mqtt;
 InfluxDBClient influxClient(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
+TelegramNotifier notifier(BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_CERTIFICATE_ROOT);
 char id[13];
 
 void setup() {
@@ -38,12 +41,13 @@ void setup() {
   pinMode(FLAME_DIG, INPUT_PULLUP);
   configTime(0, 0, "pool.ntp.org", "time.nist.gov");
 
-  Serial.print("Sincronizzazione orario Unix");
+  Serial.print(F("Sincronizzazione orario Unix"));
   while (time(nullptr) < 10000) {  // Aspetta che il timestamp diventi un numero valido
     delay(500);
     Serial.print(".");
   }
-  Serial.println("\nOrario sincronizzato!");
+  Serial.println(F("\nOrario sincronizzato!"));
+  notifier.begin();
   Serial.println(F("\n\nSetup completed.\n\n"));
 }
 
@@ -120,12 +124,14 @@ void checkIncendioState() {
       turnBuzzerOn();
       mqtt.sendFlamePayload(true, tempAttuale);
       sendFlameStatusToInflux(true, tempAttuale);
+      notifier.sendFlameAlert(true, tempAttuale);
     } else {
       Serial.println(F("[RIPRISTINO] Emergenza rientrata o falso allarme terminato."));
       digitalWrite(BUZZER, HIGH);  // Spegne il buzzer
 
       mqtt.sendFlamePayload(false, tempAttuale);
       sendFlameStatusToInflux(false, tempAttuale);
+      notifier.sendFlameAlert(true, tempAttuale);
     }
   }
 }
