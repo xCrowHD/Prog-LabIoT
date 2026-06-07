@@ -58,11 +58,9 @@ bool HandleExceptions::handleInfluxException(InfluxStatus status)
     if (status == InfluxStatus::ERR_INFLUX_CONNECTION)
     {
         _alarm.addAlarm(AlarmType::INFLUX_ERROR);
-        //Serial.print(F("Connection Error: "));
         //Serial.println(_client_idb.getLastErrorMessage());
         return false;
     }
-
     _alarm.removeAlarm(AlarmType::INFLUX_ERROR);
     return true;
 }

@@ -69,6 +69,10 @@ void LCDHandler::removeMessage(const char *msgOne, const char *msgSec)
   // Se la deque si svuota, puoi decidere di resettare lo schermo o mostrare un messaggio di default
 }
 
+void LCDHandler::clearAll(){
+  _queue.clear();
+}
+
 void LCDHandler::clearErrors() {
   _queue.erase(std::remove_if(_queue.begin(), _queue.end(),
     [](const LCDMsg& msg) { return msg.type == MessageType::ERROR; }),

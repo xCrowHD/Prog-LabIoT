@@ -72,7 +72,7 @@ class AlarmHandler{
   private: 
     void ledOff();
     void setLedRGB(uint8_t r, uint8_t g, uint8_t b);
-    std::pair<const char*, const char*> getAlarmMessage(AlarmType type);
+    LCDMsg getAlarmMessage(AlarmType type);
 };
 
 #endif

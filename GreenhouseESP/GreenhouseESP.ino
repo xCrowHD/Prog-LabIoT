@@ -1,18 +1,9 @@
-#ifdef ARDUINO
-  #include <Ticker.h>
-  #include <ESP8266WiFi.h>
-  #define RESET_ALARMS D5
-  #define LED_RED D0
-  #define LED_GREEN D4
-  #define LED_BLUE D3
-#else
-  #include "MockLibraries/Ticker.h"
-  #include "MockLibraries/ESP8266WiFi.h"
-  #define RESET_ALARMS 5
-  #define LED_RED 0
-  #define LED_GREEN 4
-  #define LED_BLUE 3
-#endif
+#include <Ticker.h>
+#include <ESP8266WiFi.h>
+#define RESET_ALARMS D5
+#define LED_RED D0
+#define LED_GREEN D4
+#define LED_BLUE D3
 
 #include "InfluxHandler.h"
 #include "secrets.h"
@@ -23,6 +14,15 @@
 #include "WiFiHandler.h"
 #include "HandleExceptions.h"
 
+extern "C"
+{
+#include "gpio.h"
+}
+// Required for LIGHT_SLEEP_T delay mode
+extern "C"
+{
+#include "user_interface.h"
+}
 
 // D0, LED on the development board (between the ESP module and the USB port)
 //https://github.com/nodemcu/nodemcu-devkit-v1.0/blob/master/NODEMCU_DEVKIT_V1.0.PDF
@@ -32,7 +32,6 @@
 #define BUTTON_DEBOUNCE_DELAY 20
 unsigned long lastDebounceTime = 0;  // L'ultima volta che il pin è stato campionato
 bool lastButtonState = HIGH;
-float sampleAfterAlarmDisabling = 25.0f; // Intervallo di tempo dopo il quale Alarm torna sensibile alla raccolta degi errori
 
 // WiFi config
 WiFiClient client;
@@ -57,21 +56,31 @@ LED led = {
 
 // Alarm LEDRGB
 AlarmHandler alarm(lcd, led);
-Ticker tickerBlink;
-Ticker writeLCD;
+
+
 Ticker tickerAlarm;
-Ticker idTick;
 Ticker checkAlarmStatus;
 
 HandleExceptions checkStatus(alarm, client_idb);
 
-float lastTimerValue = 20.0;
+// NOTA: Se MQTT invia il tempo in secondi, inizializziamo coerentemente (es: 20 secondi)
+uint32_t lastTimerValue = 20;
+uint32_t maxTimerValue = 268434; // 1 ms sotto il limite hardware
+
 char id[13];
 
 volatile bool flagCheckSensor;
+volatile bool flagWrite;
 
+unsigned long lastLcdUpdate = 0; //ms
+const unsigned long lcdInterval = 2000; //ms
 
-void setup() {
+void manageSleepTime(uint32_t sleepTimeMs);
+bool updateInfluxInterval(uint32_t newIntervalSeconds);
+void keepButtonAlive();
+
+void setup()
+{
   Serial.begin(115200);
   WiFiHandler::begin();
   WiFiHandler::getMacAddress(id);
@@ -81,105 +90,211 @@ void setup() {
   lcd.begin();
   sensor.begin();
   alarm.begin();
-  client_idb.begin(lastTimerValue);
-
-  writeLCD.attach(2.0, []() {
-    lcd.popAndDisplay();
-  });
 
   tickerAlarm.attach(1.5, []() {
     alarm.nextAlarm();
   });
 
-  idTick.attach(5.0, []{
-    lcd.addMessage("ID:", id, MessageType::INFO);
-  });
-
   checkAlarmStatus.attach(5.0, [](){
     flagCheckSensor = true;
   });
-
 }
 
-void loop() {
+void loop()
+{
   mqtt.handle();
+  
+  if (millis() - lastLcdUpdate >= lcdInterval){
+    lastLcdUpdate = millis();
+    lcd.popAndDisplay();
+  }
+
   if (mqtt.isStandBy()){
     lcd.addMessage("Status", "StandByMode", MessageType::INFO);
     return;
   }
 
-  if (!mqtt.isSet()) {
+  if (!mqtt.isSet()){
     lcd.addMessage("Status", "Need Settings", MessageType::INFO);
     return;
   }
 
-
-  if (!mqtt.isRunning()) {
-    lcd.addMessage("Status", "OFFLINE", MessageType::INFO);
-    return;
-  } else {
-    lcd.addMessage("Status", "ONLINE", MessageType::INFO);
+  if(!mqtt.isRunning()){
+   lcd.addMessage("Status", "OFFLINE", MessageType::INFO);
+   return;
+  } else{
+    lcd.addMessage("Status", "Online", MessageType::INFO);
   }
 
-  float mqttTimer = mqtt.getSettings().timer;
-  if (mqttTimer != lastTimerValue) {
-    client_idb.updateInterval(mqttTimer);
-    lastTimerValue = mqttTimer;
+  uint32_t mqttTimer = mqtt.getSettings().timer;
+  if (mqttTimer != lastTimerValue){
+    updateInfluxInterval(mqttTimer);
   }
-    if (flagCheckSensor) {
-        flagCheckSensor = false; 
 
-        long rssi = WiFiHandler::getRSSI();
-        PlantData data = sensor.getAllData();
-        Thresholds currentThr = mqtt.getThresholds();
+  if (flagCheckSensor){
+    flagCheckSensor = false;
 
-        // I singoli metodi qui sotto aggiungono o rimuovono gli allarmi in autonomia
-        bool connStatus = checkStatus.handleConnectionException(rssi, RSSI_THRESHOLD);
-        bool dataStatus = checkStatus.handleDataException(data);
-        bool mqttStatus = checkStatus.handleMqttExceptions(currentThr);
-        bool thrStatus  = checkStatus.handleThresholds(data, currentThr);
-        
-        if (dataStatus){
-          lcd.addMessagePlantData(data.temperature, data.humidity, data.light);
-        }
-        // Gestione InfluxDB
-        InfluxStatus status = InfluxStatus::SUCCESS;
+    long rssi = WiFiHandler::getRSSI();
+    PlantData data = sensor.getAllData();
+    Thresholds currentThr = mqtt.getThresholds();
 
-        if (client_idb.isReadyToWrite() && connStatus && dataStatus) {
-            status = client_idb.sendDataToInflux(data, rssi, "Serra", "NodeMCU", currentThr);
-        }
-        
-        bool influxStatus = checkStatus.handleInfluxException(status);
+    // I singoli metodi aggiungono o rimuovono gli allarmi in autonomia
+    bool connStatus = checkStatus.handleConnectionException(rssi, RSSI_THRESHOLD);
+    bool dataStatus = checkStatus.handleDataException(data);  
+    bool mqttStatus = checkStatus.handleMqttExceptions(currentThr);
+    bool thrStatus = checkStatus.handleThresholds(data, currentThr);
 
+    if (dataStatus){
+      lcd.addMessagePlantData(data.temperature, data.humidity, data.light);
+    }
 
-        // Valutazione dello stato globale per aggiornare scritte LCD di successo
-        if (connStatus && dataStatus && mqttStatus && thrStatus && influxStatus) {
-            checkStatus.handleSuccess(); 
-        }
-        else{
-          alarm.nextAlarm();
-        }
+    // Logica risveglio e invio dati a Influx ESATTAMENTE 1 volta mentre è sveglio
+    bool influxStatus = true;
+
+    if (flagWrite){
+      InfluxStatus status = InfluxStatus::SUCCESS;
+
+      if (connStatus && dataStatus){
+        status = client_idb.sendDataToInflux(data, rssi, "Serra", "NodeMCU", currentThr);
       }
-  
-     
+      else{
+        status = InfluxStatus::ERR_INFLUX_CONNECTION;
+      }
+
+      influxStatus = checkStatus.handleInfluxException(status);
+
+      if (influxStatus){
+        // SUCCESSO: Abbassiamo il flag così NON ci riproverà più fino al prossimo risveglio
+        flagWrite = false;
+      }
+    }
+    // ---------------------------------
+
+    // Valutazione dello stato globale per l'ingresso in Light Sleep
+    if (connStatus && dataStatus && mqttStatus && thrStatus && influxStatus)
+    {
+      checkStatus.handleSuccess();
+
+      lcd.addMessage("System", "Going to sleep", MessageType::INFO);
+
+      // -- CICLO DI SVUOTAMENTO PRIMA DELLO SLEEP ---
+      // Manteniamo LCD attivo fintanto che non ha mostrato tutti i messaggi una volta
+      // anche nel caso di successo immediato dei booleani nel loop
+
+      unsigned long int lastMessageTime = millis();
+
+      while (millis() - lastMessageTime < 3*lcdInterval){ //mostra gli ultimi 3 messaggi
+        if (millis() - lastLcdUpdate >= lcdInterval){
+          lastLcdUpdate = millis();
+          lcd.popAndDisplay();
+        }
+
+        keepButtonAlive();
+        yield();
+      }
+
+      // --- CONFIGURAZIONE DISPLAY PER IL PERIODO DI SLEEP ---
+      // La coda è stata mostrata. Adesso stampiamo sul display SOLO l'ID dell'ESP.
+      // Questo messaggio rimarrà impresso staticamente sul display per tutta la durata del sonno.
+      lcd.clearAll();                               // Se il tuo handler ha un clear, pulisce lo schermo
+      lcd.addMessage("ID", id, MessageType::INFO); 
+      lcd.popAndDisplay();
+      
+      uint32_t sleepTimeMs = lastTimerValue * 1000;
+      if (sleepTimeMs > 3*lcdInterval){
+        sleepTimeMs -= 3*lcdInterval;
+      } else{
+        sleepTimeMs = 10;
+      }
+
+      manageSleepTime(sleepTimeMs); // Entra in sleep e al risveglio rimetterà flagWrite = true
+    }
+    else
+    {
+      // Se c'è un qualunque problema (allarme attivo O invio Influx fallito),
+      // gestisce l'allarme visivo. Il Ticker checkAlarmStatus riattiverà flagCheckSensor tra 5 secondi.
+      alarm.nextAlarm();
+    }
+  } // Chiusura corretta di if (flagCheckSensor)
+  keepButtonAlive();
+}
+
+void keepButtonAlive(){
   int reading = digitalRead(RESET_ALARMS);
-  if (reading != lastButtonState) {
-    // Reset del timer
+  if (reading != lastButtonState)
+  {
     lastDebounceTime = millis();
   }
 
-  if ((millis() - lastDebounceTime) > BUTTON_DEBOUNCE_DELAY) {
+  if ((millis() - lastDebounceTime) > BUTTON_DEBOUNCE_DELAY)
+  {
     static bool wasAlreadyPressed = false;
-    // Se è passato abbastanza tempo, la lettura è stabile
-    if (reading == LOW && !wasAlreadyPressed) {   
+    if (reading == LOW && !wasAlreadyPressed)
+    {
       alarm.setAllAlarmAcked();
-      wasAlreadyPressed = true;   
+      wasAlreadyPressed = true;
     }
-    if (reading == HIGH) {
-      // Quando rilasci il bottone, resettiamo la guardia per la prossima volta
+    if (reading == HIGH)
+    {
       wasAlreadyPressed = false;
     }
   }
-
   lastButtonState = reading;
+}
+void wakeupCallback()
+{ // unlike ISRs, you can do a print() from a callback function
+  Serial.println(F("Woke from Light Sleep - this is the callback"));
+  Serial.flush();
+}
+
+void manageSleepTime(uint32_t sleepTimeMs)
+{
+  // carichiamo i millisecondi effettivi che vogliamo dormire in questo ciclo.
+  uint32_t remainingSleepTime = sleepTimeMs;
+
+  Serial.print(F("CPU going to sleep for "));
+  Serial.print(sleepTimeMs);
+  Serial.println(F(" ms..."));
+  Serial.flush();
+
+  wifi_set_opmode_current(NULL_MODE);
+  extern os_timer_t *timer_list;
+  timer_list = nullptr; // ferma i 4 timer del sistema operativo per consentire lo sleep
+
+  wifi_fpm_set_sleep_type(LIGHT_SLEEP_T);
+  wifi_fpm_open();
+  wifi_fpm_set_wakeup_cb(wakeupCallback);
+
+  // dall'hardware (maxTimerValue), facciamo dormire il chip a "blocchi" di durata massima.
+  while (remainingSleepTime > maxTimerValue)
+  {
+    wifi_fpm_do_sleep(maxTimerValue * 1000); // Vuole i microsecondi (ms * 1000)
+    esp_delay(maxTimerValue + 1);            // Il delay deve essere di 1ms superiore allo sleep
+    remainingSleepTime -= maxTimerValue;     // Sottraiamo il blocco appena dormito
+  }
+
+  // Non ha senso mandare l'ESP in light sleep per un tempo inferiore a 10 ms (limite hardware)
+  if (remainingSleepTime >= 10)
+  {
+    wifi_fpm_do_sleep(remainingSleepTime * 1000); // Usa il tempo rimanente effettivo!
+    esp_delay(remainingSleepTime + 1);
+  }
+
+  // --- OPERAZIONI DI RISVEGLIO ---
+  flagWrite = true;       // Autorizziamo UN NUOVO invio pulito a InfluxDB per questo risveglio
+  flagCheckSensor = true; // Forziamo l'aggiornamento immediato dei sensori senza attendere i 5s del Ticker
+}
+
+bool updateInfluxInterval(uint32_t newIntervalSeconds){
+  if (newIntervalSeconds <=0){
+    return false;
+  }
+
+  Serial.print(F("Aggiornamento intervallo InfluxDB: "));
+  Serial.print(newIntervalSeconds);
+  Serial.println(F(" secondi"));
+
+  lastTimerValue = newIntervalSeconds;
+
+  return true;
 }

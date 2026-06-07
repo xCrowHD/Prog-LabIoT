@@ -26,11 +26,6 @@ inline void delay(unsigned long ms)
     _mock_millis_counter += ms;
 }
 
-inline void advanceMockTime(unsigned long ms)
-{
-    _mock_millis_counter += ms;
-}
-
 inline void pinMode(uint8_t pin, uint8_t mode)
 {
     std::cout << "[Mock in" << pin << "] set to " << mode << std::endl;

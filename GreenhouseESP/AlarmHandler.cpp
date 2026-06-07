@@ -80,9 +80,9 @@ void AlarmHandler::addAlarm(AlarmType type)
   if ((!state.isAcked) || _config.keepSpammingAfterAck)
   {
       auto msg = getAlarmMessage(type);
-      if (strlen(msg.first) > 0)
+      if (strlen(msg.firstLine) > 0)
       {
-        _lcd.addMessage(msg.first, msg.second, MessageType::ERROR);
+        _lcd.addMessage(msg.firstLine, msg.secondLine, msg.type);
       }
       //state.lcdNotified = true;
   }
@@ -109,7 +109,7 @@ void AlarmHandler::removeAlarm(AlarmType type)
 
   // 2. Pulizia fisica da LCD e dal set del LED
   auto msg = getAlarmMessage(type);
-  _lcd.removeMessage(msg.first, msg.second);
+  _lcd.removeMessage(msg.firstLine, msg.secondLine);
   _activeAlarms.erase(type);
 
   _currentIt = _activeAlarms.begin();
@@ -127,7 +127,7 @@ void AlarmHandler::setAllAlarmAcked()
       if (!_config.keepSpammingAfterAck)
       {
         auto msg = getAlarmMessage(alarmType);
-        _lcd.removeMessage(msg.first, msg.second);
+        _lcd.removeMessage(msg.firstLine, msg.secondLine);
       }
 
       // IL LED SI SPEGNE SEMPRE: Cancelliamo tassativamente l'allarme dal ciclo LED
@@ -196,25 +196,25 @@ void AlarmHandler::setLedRGB(uint8_t r, uint8_t g, uint8_t b)
 
 AlarmConfig &AlarmHandler::getConfig() { return _config; }
 
-std::pair<const char *, const char *> AlarmHandler::getAlarmMessage(AlarmType type)
+LCDMsg AlarmHandler::getAlarmMessage(AlarmType type)
 {
   switch (type)
   {
   case AlarmType::ALL_OK:
-    return {"All OK!", ""};
+    return LCDMsg { "Status", "All OK", MessageType::INFO };
   case AlarmType::SOME_THRESHOLDS_OUT:
-    return {"Some thresholds", "O.O.R"};
+    return LCDMsg{"[WAR]: Some", "thresholds O.O.R", MessageType::WARNING};
   case AlarmType::ALL_THRESHOLDS_OUT:
-    return {"All thresholds", "O.O.R"};
+    return LCDMsg{"[WAR]: All", "thresholds O.O.R", MessageType::WARNING};
   case AlarmType::SENSOR_ERROR:
-    return {"Error", "Sensor error"};
+    return LCDMsg{"[ERROR]", "Sensor error", MessageType::ERROR};
   case AlarmType::CONNECTION_ERROR:
-    return {"Error", "Connection error"};
+    return LCDMsg{"[ERROR]", "Connection error", MessageType::ERROR};
   case AlarmType::INFLUX_ERROR:
-    return {"Error", "Influx error"};
+    return LCDMsg{"[ERROR]", "Influx error", MessageType::ERROR};
   case AlarmType::NO_SEND_DATA:
-    return {"Error", "Missing data"};
+    return LCDMsg{"[ERROR]", "Missing data", MessageType::ERROR};
   default:
-    return {"", ""};
+    return LCDMsg{"", "", MessageType::INFO};
   }
 }

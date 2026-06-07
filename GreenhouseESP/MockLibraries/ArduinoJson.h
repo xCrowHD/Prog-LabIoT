@@ -4,6 +4,7 @@
 #include <string>
 #include <iostream>
 #include <cmath>
+#include <cstring>
 
 #ifndef ARDUINO
 inline size_t strlcpy(char *dst, const char *src, size_t siz)
@@ -26,8 +27,9 @@ public:
     const char *c_str() const { return "Ok"; }
 };
 
-// Dichiarazione anticipata delle classi per evitare l'errore "expected type-specifier"
+// Dichiarazioni anticipate
 class JsonObject;
+class JsonArray;
 
 class JsonVariant
 {
@@ -38,15 +40,23 @@ public:
     JsonVariant operator[](const char *key) const { return JsonVariant(); }
     JsonVariant operator[](const std::string &key) const { return JsonVariant(); }
 
-    // Operatori di conversione non ambigui
+    // Operatori di conversione espliciti e ampliati per evitare ambiguità
     operator int() const { return 0; }
+    operator unsigned int() const { return 0; } // Risolve l'ambiguità con uint32_t
     operator float() const { return 0.0f; }
+    operator double() const { return 0.0; }
     operator bool() const { return false; }
     operator const char *() const { return ""; }
     operator std::string() const { return ""; }
 
-    // Risolve l'ambiguità nei confronti come strcmp o uguaglianze dirette
+    // Supporto al metodo .to<T>() (es. doc["actions"].to<JsonArray>())
+    template <typename T>
+    T to() { return T(); }
+
+    // conversioni verso i tipi contenitore
     operator JsonObject() const;
+    operator JsonArray() const;
+
     bool operator==(const char *s) const { return true; }
     friend bool operator==(const char *s, const JsonVariant &j) { return true; }
 };
@@ -58,9 +68,25 @@ public:
     bool containsKey(const char *key) const { return true; }
 };
 
+class JsonArray
+{
+public:
+    // Permette chiamate come actionsJson.add(_actions[i])
+    template <typename T>
+    void add(const T &value) {}
+
+    JsonVariant operator[](size_t index) const { return JsonVariant(); }
+};
+
+// Definizioni degli operatori di conversione posticipate per conoscere i tipi completi
 inline JsonVariant::operator JsonObject() const
 {
     return JsonObject();
+}
+
+inline JsonVariant::operator JsonArray() const
+{
+    return JsonArray();
 }
 
 template <size_t N>
@@ -69,7 +95,7 @@ class StaticJsonDocument
 public:
     JsonVariant operator[](const char *key) const { return JsonVariant(); }
     operator JsonObject() const { return JsonObject(); }
-    operator JsonVariant() const { return JsonVariant(); } // Permette il passaggio a isAddressedToMe(doc)
+    operator JsonVariant() const { return JsonVariant(); }
 
     template <typename T>
     T as() const { return T(); }
@@ -77,7 +103,7 @@ public:
     void clear() {}
 };
 
-// Overload di deserializzazione a 2 e 3 argomenti richiesti da MqttHandler
+// Overload di deserializzazione
 template <typename T>
 DeserializationError deserializeJson(T &doc, const std::string &input) { return DeserializationError(); }
 template <typename T>
@@ -87,7 +113,7 @@ DeserializationError deserializeJson(T &doc, char *input, size_t len) { return D
 template <typename T>
 DeserializationError deserializeJson(T &doc, const char *input, size_t len) { return DeserializationError(); }
 
-// Overload di serializzazione a 2 argomenti per i buffer di char tradizionali
+// Overload di serializzazione
 template <typename T>
 size_t serializeJson(const T &doc, char *buffer, size_t bufSize)
 {

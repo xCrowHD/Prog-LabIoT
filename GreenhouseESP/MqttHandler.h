@@ -47,7 +47,7 @@ struct Topics {
 struct McuSettings {
   char mcuName[32] = "";
   bool isBackup = false;
-  float timer = 0;
+  uint32_t timer = 0;
 };
 
 enum class Status {

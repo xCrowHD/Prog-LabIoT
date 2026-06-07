@@ -4,36 +4,6 @@ InfluxHandler::InfluxHandler(const char* url, const char* org, const char* bucke
 : _clientIdb(url, org, bucket, token), _flagWrite(false){
 }
 
-void InfluxHandler::begin(float defaultIntervalSeconds) {
-    updateInterval(defaultIntervalSeconds);
-}
-
-bool InfluxHandler::updateInterval(float newIntervalSeconds) { //aggiungere logica gestione errori
-  // Protezione: evita valori assurdi o zero che farebbero crashare l'ESP
-  if (newIntervalSeconds <= 0)
-    return false;
-
-  Serial.print(F("Aggiornamento intervallo InfluxDB: "));
-  Serial.print(newIntervalSeconds);
-  Serial.println(F(" secondi"));
-
-  // Stacchiamo il ticker e lo riattacchiamo con il nuovo valore
-  _writeTicker.detach();
-  _writeTicker.attach(newIntervalSeconds, [this]() {
-    _flagWrite= true;
-  });
-
-  return true;
-}
-
-bool InfluxHandler::isReadyToWrite() {
-    if (_flagWrite) {
-        _flagWrite = false; 
-        return true;
-    }
-    return false;
-}
-
 InfluxStatus InfluxHandler::influxStatus(PlantData& data, const Thresholds& currentThr){
   
   if (!_clientIdb.validateConnection()) { 

@@ -18,10 +18,12 @@
 #define DISPLAY_LINES 2
 #define DISPLAY_ADDR 0x27
 
-enum class MessageType {
-    DATA,
-    ERROR,
-    INFO
+enum class MessageType
+{
+  DATA,
+  INFO,
+  ERROR,
+  WARNING
 };
 
 struct LCDMsg{
@@ -49,6 +51,7 @@ public:
   void addMessage(const char* msgOne, const char* msgSec = "", MessageType type = MessageType::INFO);
   void removeMessage(const char* msgOne, const char* msgSec = "");
   void addMessagePlantData(float temp, float hum, float lux);
+  void clearAll();
   void clearErrors();
   LCDConfig& getConfig();
   std::deque<LCDMsg> getQueue();
