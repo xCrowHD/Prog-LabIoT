@@ -13,6 +13,25 @@ import {
 } from "./api.js";
 import { renderPlantChart } from "./chart.js";
 
+// ── Dashboard display ─────────────────────────────────────────────────────────────
+
+export async function switchDashboardView() {
+  const node = await fetchCurrentNode();
+  const dashplant = document.getElementById("dashboard-plant");
+  const dashsec = document.getElementById("dashboard-security");
+  console.log(node);
+  if (node.type == "PLANT_SENSOR") {
+    dashplant.classList.remove("hidden");
+    dashsec.classList.add("hidden");
+    console.log("[UI] show plant dashboard");
+  }
+  if (node.type == "SECURITY_SENSOR") {
+    dashsec.classList.remove("hidden");
+    dashplant.classList.add("hidden");
+    console.log("[UI] show security dashboard");
+  }
+}
+
 // ── Plant display ─────────────────────────────────────────────────────────────
 
 /**
@@ -102,6 +121,126 @@ export function renderNodeStatus(data) {
   document.getElementById("node-id").innerText =
     `Monitoring Node: MCU-${data.id}`;
   document.getElementById("esp-status").innerText = `System ${data.status}`;
+}
+
+// ── Security ─────────────────────────────────────────────────────────────
+/**
+ * Aggiorna l'interfaccia grafica in tempo reale con i dati di sicurezza
+ * ricevuti dal WebSocket (Sensore Fiamma, Collisione/Porta, Temperatura).
+ * * @param data
+ */
+export async function updateSecurityDashboard(data) {
+  console.log("[ui] Got Security Data");
+  console.log(data);
+  const dateObj = new Date(data.timestamp * 1000);
+
+  // Formattazione locale (es: "02/06/2026, 19:17:41")
+  const formattedDate = dateObj.toLocaleString("it-IT", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+  });
+  if (data.type == "FLAME_ALARM") {
+    setFlameAlarm(data, formattedDate);
+    addFlameEventToLog(data.temp, formattedDate, data.isOnFlame);
+  }
+  if (data.type == "DOOR_ALARM") {
+    if (!data.doorClose) {
+      incrementDoorCounter(data.timestamp);
+    }
+    addDoorEventToLog(data.doorClose, formattedDate);
+  }
+}
+
+async function incrementDoorCounter(timestampRaw) {
+  const countElement = document.getElementById("door-count");
+
+  const eventDate = new Date(timestampRaw * 1000);
+  const today = new Date();
+
+  // Verifica se è oggi
+  const isToday =
+    eventDate.getDate() === today.getDate() &&
+    eventDate.getMonth() === today.getMonth() &&
+    eventDate.getFullYear() === today.getFullYear();
+
+  if (isToday) {
+    let currentCount = parseInt(countElement.innerText) || 0;
+    countElement.innerText = currentCount + 1;
+  }
+}
+
+async function setFlameAlarm(data, formattedDate) {
+  document.getElementById("flame-last-event").innerText = formattedDate;
+  document.getElementById("analog-temp").innerText = data.temp;
+  _swapClass("flame-indicator", data.isOnFlame, "bg-primary", "bg-red");
+  document.getElementById("flame-status").innerText = data.isOnFlame
+    ? "FIRE DETECTED!"
+    : "CLEAR";
+}
+
+async function addFlameEventToLog(temp, time, isOnFlame) {
+  const logContainer = document.getElementById("event-log-list");
+
+  // Definiamo i testi e le classi in base allo stato
+  const isAlert = isOnFlame;
+  const statusLabel = isAlert ? "ALERT" : "RESTORED";
+  const statusColor = isAlert ? "text-red" : "text-primary-500";
+  const bgClass = isAlert ? "bg-red/10" : "bg-primary-500/10";
+  const message = isAlert ? "Flame detected" : "Flame cleared";
+
+  const newEventHTML = `
+    <div class="flex items-center gap-3 px-3 py-2 bg-surface-container-lowest rounded-lg mb-2 border-l-4 ${isAlert ? "border-red" : "border-emerald-500"}">
+      <span class="material-symbols-outlined text-[16px] ${statusColor}">
+        ${isAlert ? "local_fire_department" : "check_circle"}
+      </span>
+      <span class="text-[10px] font-mono text-on-surface-variant/50 shrink-0">${time}</span>
+      <span class="text-xs text-on-surface">${message} — temp ${temp}°C</span>
+      <span class="ml-auto px-2 py-0.5 ${bgClass} ${statusColor} text-[9px] font-bold rounded uppercase">${statusLabel}</span>
+    </div>
+  `;
+
+  logContainer.insertAdjacentHTML("afterbegin", newEventHTML);
+
+  while (logContainer.children.length > 20) {
+    logContainer.removeChild(logContainer.lastElementChild);
+  }
+}
+
+async function addDoorEventToLog(doorClose, time) {
+  const logContainer = document.getElementById("event-log-list");
+
+  // La porta è aperta quando doorClose è false
+  const isOpen = !doorClose;
+
+  // Definiamo i testi e le classi in base allo stato
+  // Se è aperta (isOpen) è un avviso, se è chiusa è un ripristino
+  const statusLabel = isOpen ? "OPENED" : "CLOSED";
+  const statusColor = isOpen ? "text-red" : "text-primary"; // text-primary usa il verde del tuo config
+  const bgClass = isOpen ? "bg-red/10" : "bg-primary/10";
+  const message = isOpen ? "Door opened" : "Door closed";
+  const icon = isOpen ? "door_open" : "door_back";
+
+  const newEventHTML = `
+    <div class="flex items-center gap-3 px-3 py-2 bg-surface-container-lowest rounded-lg mb-2 border-l-4 ${isOpen ? "border-red" : "border-primary"}">
+      <span class="material-symbols-outlined text-[16px] ${statusColor}">
+        ${icon}
+      </span>
+      <span class="text-[10px] font-mono text-on-surface-variant/50 shrink-0">${time}</span>
+      <span class="text-xs text-on-surface">${message}</span>
+      <span class="ml-auto px-2 py-0.5 ${bgClass} ${statusColor} text-[9px] font-bold rounded uppercase">${statusLabel}</span>
+    </div>
+  `;
+
+  logContainer.insertAdjacentHTML("afterbegin", newEventHTML);
+
+  // Manteniamo il limite di 20 elementi
+  while (logContainer.children.length > 20) {
+    logContainer.removeChild(logContainer.lastElementChild);
+  }
 }
 
 // ── Tab helpers ───────────────────────────────────────────────────────────────

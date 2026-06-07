@@ -25,10 +25,12 @@ import {
   clearFormInputs,
   loadLatestSensorData,
   loadMcuInfo,
+  updateSecurityDashboard,
+  switchDashboardView,
 } from "./ui.js";
 
 import { renderPlantChart } from "./chart.js";
-
+import { initWebSocket } from "./websocket.js";
 // ── Application state ─────────────────────────────────────────────────────────
 let activePlantIndex = 0;
 let activeMcuFormStep = 0; // 0 = info panel, 1 = set-mcu form
@@ -143,6 +145,7 @@ async function onSavePlant() {
 
 async function onNextNode() {
   const data = await fetchNextNode();
+  switchDashboardView();
   renderNodeStatus(data);
   loadMcuInfo();
 }
@@ -181,12 +184,25 @@ async function boot() {
   } else {
     showAddPlantForm();
   }
+
+  try {
+    const nodeData = await fetchCurrentNode();
+    switchDashboardView();
+    renderNodeStatus(nodeData);
+  } catch (error) {
+    console.warn(
+      "Nessun nodo MQTT disponibile al boot, gestione della UI vuota:",
+      error,
+    );
+    const fallbackNode = { id: "Nessun Nodo Disponibile", status: "OFFLINE" };
+    renderNodeStatus(fallbackNode);
+  }
   loadMcuInfo();
-  const nodeData = await fetchCurrentNode();
-  renderNodeStatus(nodeData);
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  initWebSocket(updateSecurityDashboard);
+
   boot();
   startPollers();
   document.getElementById("plant-loop").addEventListener("click", onLoopPlants);
