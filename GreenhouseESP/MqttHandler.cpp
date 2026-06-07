@@ -1,4 +1,5 @@
 #include "MqttHandler.h"
+#include "WeatherService.h"
 
 MqttHandler::MqttHandler()
   : _client(512), _plantThresholds{}, _settings{}, _topics{}, _status(Status::OFFLINE) {
@@ -163,16 +164,23 @@ void MqttHandler::handleSettings(char* payload, unsigned int length) {
       strlcpy(_settings.mcuName, nameFromData, sizeof(_settings.mcuName));
     }
 
-    if (doc.containsKey("backup")){
+    if (doc.containsKey("backup")) {
       _settings.isBackup = doc["backup"];
     }
-    
-    if (doc.containsKey("timer")){
+
+    if (doc.containsKey("timer")) {
       _settings.timer = doc["timer"];
     }
-    
+
     if (doc.containsKey("location")) {
+
       const char* locationFromData = doc["location"];
+      if (strcmp(_settings.location, locationFromData) != 0) {
+        Serial.print(F("Nuova location rilevata: "));
+        Serial.println(locationFromData);
+        WeatherService weather;
+        weather.updateForecast(locationFromData);
+      }
 
       strlcpy(_settings.location, locationFromData, sizeof(_settings.location));
     }

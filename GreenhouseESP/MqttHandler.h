@@ -44,7 +44,7 @@ struct McuSettings {
   char mcuName[32] = "";
   bool isBackup = false;
   float timer = 0;
-  char location[64] = "";
+  char location[32] = "";
 };
 
 enum class Status {
