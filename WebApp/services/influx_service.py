@@ -27,7 +27,7 @@ def _plant_record_to_dict(record) -> dict:
 
 def _alarm_record_to_dict(record) -> dict:
     """Serializza i record unificati di DoorAlarm e FlameAlarm."""
-    measurement = record.get_measurement()
+    measurement = record.values.get("_measurement")
     
     # Struttura base condivisa
     data = {
@@ -89,28 +89,24 @@ def get_latest_plant_data(plant_id: str) -> dict | None:
         client.close()
 
 def get_combined_event_log(device_id: str, limit: int = 5) -> list[dict]:
-    """Recupera gli ultimi N eventi unificati (Porte + Incendi) per il dispositivo."""
-    
     query = f"""
-    // Definiamo i due stream separatamente
     door = from(bucket: "{INFLUXDB_BUCKET}")
         |> range(start: 0)
         |> filter(fn: (r) => r["_measurement"] == "DoorAlarm")
         |> filter(fn: (r) => r["device"] == "{device_id}")
+        |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
 
     flame = from(bucket: "{INFLUXDB_BUCKET}")
         |> range(start: 0)
         |> filter(fn: (r) => r["_measurement"] == "FlameAlarm")
         |> filter(fn: (r) => r["device"] == "{device_id}")
+        |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
 
-    // Uniamo i due flussi
     union(tables: [door, flame])
         |> group()
-        |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
         |> sort(columns: ["_time"], desc: true)
         |> limit(n: {limit})
     """
-    
     client = _build_client()
     try:
         results = client.query_api().query(org=INFLUXDB_ORG, query=query)
@@ -146,9 +142,7 @@ def count_door_opens_today(device_id: str) -> int:
 
 def get_latest_door_event(device_id: str) -> dict | None:
     """Ritorna l'ultimo record in assoluto (più recente) per il DoorAlarm di un dispositivo."""
-    
-    # Usiamo la nostra costante di retention o comunque un range definito per l'efficienza.
-    # Se hai una retention di 30 giorni, -30d va benissimo.
+
     query = f"""
     from(bucket: "{INFLUXDB_BUCKET}")
     |> range(start: 0)
@@ -156,6 +150,7 @@ def get_latest_door_event(device_id: str) -> dict | None:
     |> filter(fn: (r) => r["device"] == "{device_id}")
     |> filter(fn: (r) => r["_field"] == "doorClose")
     |> last()
+    |> pivot(rowKey:["_time"], columnKey: ["_field"], valueColumn: "_value")
     """
     
     client = _build_client()

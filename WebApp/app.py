@@ -16,7 +16,7 @@ from fastapi import WebSocket, WebSocketDisconnect
 from mqtt import mqtt_hub
 from config import UPLOAD_DIR
 from db.plants_db import plant_db_manager
-from routers import plants, nodes, web_sockets
+from routers import plants, nodes, web_sockets, security
 
 # ── Initialisation ────────────────────────────────────────────────────────────
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -44,6 +44,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(plants.router)
 app.include_router(nodes.router)
 app.include_router(web_sockets.router)
+app.include_router(security.router)
 
 @app.get("/")
 async def home():
@@ -52,4 +53,4 @@ async def home():
 
 if __name__ == "__main__":
     import uvicorn
-    uvicorn.run("app:app", host="127.0.0.1", port=8000, reload=True)
+    uvicorn.run("app:app", host="127.0.0.1", port=8001, reload=True)

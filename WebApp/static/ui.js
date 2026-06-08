@@ -214,7 +214,8 @@ async function incrementDoorCounter(timestampRaw) {
 }
 
 async function setFlameAlarm(data, formattedDate) {
-  document.getElementById("flame-last-event").innerText = formattedDate;
+  document.getElementById("flame-last-event").innerText =
+    formattedDate + "(UTC)";
   document.getElementById("analog-temp").innerText = data.temp;
   _swapClass("flame-indicator", data.isOnFlame, "bg-primary", "bg-red");
   document.getElementById("flame-status").innerText = data.isOnFlame
@@ -237,7 +238,7 @@ async function addFlameEventToLog(temp, time, isOnFlame) {
       <span class="material-symbols-outlined text-[16px] ${statusColor}">
         ${isAlert ? "local_fire_department" : "check_circle"}
       </span>
-      <span class="text-[10px] font-mono text-on-surface-variant/50 shrink-0">${time}</span>
+      <span class="text-[10px] font-mono text-on-surface-variant/50 shrink-0">${time} (UTC)</span>
       <span class="text-xs text-on-surface">${message} — temp ${temp}°C</span>
       <span class="ml-auto px-2 py-0.5 ${bgClass} ${statusColor} text-[9px] font-bold rounded uppercase">${statusLabel}</span>
     </div>
@@ -269,7 +270,7 @@ async function addDoorEventToLog(doorClose, time) {
       <span class="material-symbols-outlined text-[16px] ${statusColor}">
         ${icon}
       </span>
-      <span class="text-[10px] font-mono text-on-surface-variant/50 shrink-0">${time}</span>
+      <span class="text-[10px] font-mono text-on-surface-variant/50 shrink-0">${time} (UTC)</span>
       <span class="text-xs text-on-surface">${message}</span>
       <span class="ml-auto px-2 py-0.5 ${bgClass} ${statusColor} text-[9px] font-bold rounded uppercase">${statusLabel}</span>
     </div>
