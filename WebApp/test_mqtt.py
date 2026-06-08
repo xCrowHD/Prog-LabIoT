@@ -53,13 +53,13 @@ try:
     }
     payload_porta = {
         "id": "ESP32_LAB_01",         # Sostituisci con il tuo ID reale
-        "doorClose": False,            # True (chiusa) o False (aperta)
+        "doorClose": True,            # True (chiusa) o False (aperta)
         "timestamp": int(time.time()), # Il numero Unix Time corrente
         "type": "DOOR_ALARM"          # Il tipo di messaggio fisso
     }
     
     print(f"🚀 [STEP 2] Spedisco l'allarme sul topic: {TOPIC_SICUREZZA}")
-    client.publish(TOPIC_SICUREZZA, json.dumps(payload_allarme_incendio), qos=1).wait_for_publish()
+    client.publish(TOPIC_SICUREZZA, json.dumps(payload_porta), qos=1).wait_for_publish()
     print("✅ Allarme inviato!")
 
 except Exception as e:

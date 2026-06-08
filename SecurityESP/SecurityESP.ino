@@ -1,5 +1,9 @@
 #include "MqttHandler.h"
-
+#include "TelegramNotifier.h"
+#include <InfluxDbClient.h>
+#include <ESP8266WiFi.h>
+#include <time.h>
+#include "secrets.h"
 
 #define COLLISION D1
 #define FLAME_DIG D2
@@ -20,11 +24,14 @@ unsigned long ultimoControlloSicurezza = 0;
 
 WiFiClient client;
 MqttHandler mqtt;
+InfluxDBClient influxClient(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
+TelegramNotifier notifier(BOT_TOKEN, TELEGRAM_CHAT_ID);
+char id[13];
 
 void setup() {
   Serial.begin(115200);
   WiFiHandler::begin();
-
+  WiFiHandler::getMacAddress(id);
   mqtt.begin(client, "broker.emqx.io", 1883);
   // put your setup code here, to run once:
   pinMode(COLLISION, INPUT);
@@ -34,12 +41,13 @@ void setup() {
   pinMode(FLAME_DIG, INPUT_PULLUP);
   configTime(0, 0, "pool.ntp.org", "time.nist.gov");
 
-  Serial.print("Sincronizzazione orario Unix");
+  Serial.print(F("Sincronizzazione orario Unix"));
   while (time(nullptr) < 10000) {  // Aspetta che il timestamp diventi un numero valido
     delay(500);
     Serial.print(".");
   }
-  Serial.println("\nOrario sincronizzato!");
+  Serial.println(F("\nOrario sincronizzato!"));
+  notifier.begin();
   Serial.println(F("\n\nSetup completed.\n\n"));
 }
 
@@ -91,13 +99,14 @@ void checkCollisioneState() {
 
     isDoorClose = statoAttuale;
 
-    if (isDoorClose == true) {
+    if (isDoorClose) {
       Serial.println(F("Collisione Rilevata!"));
-      mqtt.sendDoorPayload(true);
     } else {
       Serial.println(F("Collisione Risolta / Stato Ripristinato!"));
-      mqtt.sendDoorPayload(false);
     }
+
+    mqtt.sendDoorPayload(isDoorClose);
+    sendDoorStatusToInflux(isDoorClose);
   }
 }
 
@@ -109,15 +118,38 @@ void checkIncendioState() {
   if (statoAttualeIncendio != isOnFlame) {
     isOnFlame = statoAttualeIncendio;
 
-    if (isOnFlame == true) {
+    if (isOnFlame) {
       Serial.println(F("[ALLARME] Incendio Rilevato! Fiamma attiva e temperatura critica!"));
       turnBuzzerOn();
-      mqtt.sendFlamePayload(true, tempAttuale);
     } else {
       Serial.println(F("[RIPRISTINO] Emergenza rientrata o falso allarme terminato."));
       digitalWrite(BUZZER, HIGH);  // Spegne il buzzer
-
-      mqtt.sendFlamePayload(false, tempAttuale);
     }
+    mqtt.sendFlamePayload(isOnFlame, tempAttuale);
+    sendFlameStatusToInflux(isOnFlame, tempAttuale);
+    notifier.sendFlameAlert(isOnFlame, tempAttuale);
   }
+}
+
+void sendDoorStatusToInflux(bool status) {
+  if (!influxClient.validateConnection()) {
+    return;
+  }
+
+  Point doorPoint("DoorAlarm");
+  doorPoint.addTag("device", id);
+  doorPoint.addField("doorClose", status);
+  influxClient.writePoint(doorPoint);
+}
+
+void sendFlameStatusToInflux(bool status, float temp) {
+  if (!influxClient.validateConnection()) {
+    return;
+  }
+
+  Point doorPoint("FlameAlarm");
+  doorPoint.addTag("device", id);
+  doorPoint.addField("isOnFlame", status);
+  doorPoint.addField("temp", temp);
+  influxClient.writePoint(doorPoint);
 }
