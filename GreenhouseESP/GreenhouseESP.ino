@@ -64,7 +64,7 @@ Ticker checkAlarmStatus;
 HandleExceptions checkStatus(alarm, client_idb);
 
 // NOTA: Se MQTT invia il tempo in secondi, inizializziamo coerentemente (es: 20 secondi)
-uint32_t lastTimerValue = 20;
+uint32_t lastTimerValue = 20*1e3; //20 secondi
 uint32_t maxTimerValue = 268434; // 1 ms sotto il limite hardware
 
 char id[13];
@@ -102,8 +102,10 @@ void setup()
 
 void loop()
 {
+
   mqtt.handle();
-  
+  lcd.addMessage("ID", id, MessageType::INFO); 
+
   if (millis() - lastLcdUpdate >= lcdInterval){
     lastLcdUpdate = millis();
     lcd.popAndDisplay();
@@ -115,20 +117,17 @@ void loop()
   }
 
   if (!mqtt.isSet()){
-    lcd.addMessage("Status", "Need Settings", MessageType::INFO);
+    alarm.addAlarm(AlarmType::NEED_SETTINGS);
+    alarm.nextAlarm();
     return;
   }
+  alarm.removeAlarm(AlarmType::NEED_SETTINGS);
 
   if(!mqtt.isRunning()){
    lcd.addMessage("Status", "OFFLINE", MessageType::INFO);
    return;
   } else{
     lcd.addMessage("Status", "Online", MessageType::INFO);
-  }
-
-  uint32_t mqttTimer = mqtt.getSettings().timer;
-  if (mqttTimer != lastTimerValue){
-    updateInfluxInterval(mqttTimer);
   }
 
   if (flagCheckSensor){
@@ -176,6 +175,9 @@ void loop()
       checkStatus.handleSuccess();
 
       lcd.addMessage("System", "Going to sleep", MessageType::INFO);
+      lcd.popAndDisplay();
+
+      mqtt.sendSleepingStatus();
 
       // -- CICLO DI SVUOTAMENTO PRIMA DELLO SLEEP ---
       // Manteniamo LCD attivo fintanto che non ha mostrato tutti i messaggi una volta
@@ -199,8 +201,13 @@ void loop()
       lcd.clearAll();                               // Se il tuo handler ha un clear, pulisce lo schermo
       lcd.addMessage("ID", id, MessageType::INFO); 
       lcd.popAndDisplay();
+
+      uint32_t mqttTimer = mqtt.getSettings().timer * 1e3;
+      if (mqttTimer != lastTimerValue){
+        updateInfluxInterval(mqttTimer); 
+      }
       
-      uint32_t sleepTimeMs = lastTimerValue * 1000;
+      uint32_t sleepTimeMs = lastTimerValue;
       if (sleepTimeMs > 3*lcdInterval){
         sleepTimeMs -= 3*lcdInterval;
       } else{
@@ -249,15 +256,23 @@ void wakeupCallback()
 
 void manageSleepTime(uint32_t sleepTimeMs)
 {
+  tickerAlarm.detach();
+  checkAlarmStatus.detach();
+  Serial.flush();
   // carichiamo i millisecondi effettivi che vogliamo dormire in questo ciclo.
   uint32_t remainingSleepTime = sleepTimeMs;
+
+
 
   Serial.print(F("CPU going to sleep for "));
   Serial.print(sleepTimeMs);
   Serial.println(F(" ms..."));
   Serial.flush();
+  delay(100);
 
   wifi_set_opmode_current(NULL_MODE);
+  yield();
+  delay(50);
   extern os_timer_t *timer_list;
   timer_list = nullptr; // ferma i 4 timer del sistema operativo per consentire lo sleep
 
@@ -281,8 +296,56 @@ void manageSleepTime(uint32_t sleepTimeMs)
   }
 
   // --- OPERAZIONI DI RISVEGLIO ---
+  tickerAlarm.attach(1.5, []() {
+    alarm.nextAlarm();
+  });
+
+  checkAlarmStatus.attach(5.0, [](){
+    flagCheckSensor = true;
+  });
+
+  resetConnection();
+  mqtt.sendWakeupStatus();
+
+  unsigned long startMqttWindow = millis();
+  while (millis() - startMqttWindow < 2000) {
+    mqtt.handle();
+    keepButtonAlive(); // Manteniamo comunque il pulsante reattivo
+    yield();
+  }
+
   flagWrite = true;       // Autorizziamo UN NUOVO invio pulito a InfluxDB per questo risveglio
   flagCheckSensor = true; // Forziamo l'aggiornamento immediato dei sensori senza attendere i 5s del Ticker
+}
+
+void resetConnection() {
+  Serial.println(F("\n--- RISVEGLIO: Ripristino dello stack di rete ---"));
+  
+  // 1. Riaccendiamo la radio Wi-Fi in modalità Station
+  wifi_set_opmode(STATION_MODE);
+  wifi_station_connect();
+
+  Serial.print(F("Connessione al Wi-Fi in corso"));
+  
+  // Attendiamo la connessione fisica al router (max 10 secondi)
+  while (WiFi.status() != WL_CONNECTED) {
+    delay(250);
+    Serial.print(".");
+    yield();
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    Serial.println(F("\n[Wi-Fi] Connesso con successo!"));
+
+    // 2. Re-inizializziamo e connettiamo MQTT
+    Serial.println(F("[MQTT] Riconnessione al broker..."));
+    mqtt.begin(client, "broker.emqx.io", 1883);
+    
+    // Forziamo un ciclo di handle per avviare la connessione MQTT
+    mqtt.handle(); 
+  } else {
+    Serial.println(F("\n[Wi-Fi] Errore: Timeout connessione fallita al risveglio."));
+  }
 }
 
 bool updateInfluxInterval(uint32_t newIntervalSeconds){

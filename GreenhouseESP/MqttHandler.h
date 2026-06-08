@@ -54,6 +54,7 @@ enum class Status {
   ONLINE,
   CONNECTING,
   OFFLINE,
+  SLEEPING
 };
 
 class MqttHandler {
@@ -84,7 +85,8 @@ public:
   bool isSet();
   McuSettings getSettings();
   bool isStandBy();
-
+  void sendSleepingStatus();
+  void sendWakeupStatus();
 
 private:
   const char* statusToString(Status s);

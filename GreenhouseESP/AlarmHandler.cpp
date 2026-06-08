@@ -12,6 +12,9 @@ void AlarmHandler::manageRoutineErrors(AlarmType alarm)
   case AlarmType::ALL_OK:
     setLedRGB(LOW, HIGH, LOW);
     break; // Verde
+  case AlarmType::NEED_SETTINGS:
+    setLedRGB(HIGH, HIGH, HIGH);
+    break;
   case AlarmType::SOME_THRESHOLDS_OUT:
     setLedRGB(HIGH, LOW, HIGH);
     break; // Purple
@@ -25,8 +28,8 @@ void AlarmHandler::manageRoutineErrors(AlarmType alarm)
     setLedRGB(LOW, LOW, HIGH);
     break; // Blu
   case AlarmType::INFLUX_ERROR:
-    setLedRGB(HIGH, HIGH, HIGH);
-    break; // Bianco
+    setLedRGB(LOW, LOW, HIGH);
+    break; // Blu
   case AlarmType::NO_SEND_DATA:
     setLedRGB(LOW, HIGH, HIGH);
     break; // Azzurro
@@ -202,6 +205,8 @@ LCDMsg AlarmHandler::getAlarmMessage(AlarmType type)
   {
   case AlarmType::ALL_OK:
     return LCDMsg { "Status", "All OK", MessageType::INFO };
+  case AlarmType::NEED_SETTINGS:
+    return LCDMsg {"Status", "Need settings", MessageType::INFO};
   case AlarmType::SOME_THRESHOLDS_OUT:
     return LCDMsg{"[WAR]: Some", "thresholds O.O.R", MessageType::WARNING};
   case AlarmType::ALL_THRESHOLDS_OUT:

@@ -40,52 +40,66 @@ class MQTTManager:
     # ── Internal callbacks ────────────────────────────────────────────────────
 
     def _on_node_status(self, client, userdata, msg):
-        data = json.loads(msg.payload.decode('utf-8'))
-        esp_id = data.get("id")
-        status = data.get("status")
-        esp_type = data.get("type")
+        try:
+            payload_str = msg.payload.decode('utf-8')
+            data = json.loads(payload_str)
+            esp_id = data.get("id")
+            status = data.get("status")
+            esp_type = data.get("type")
 
-        if esp_id not in self.esp_list:
-            self.esp_list[esp_id] = {}
-        self.esp_list[esp_id]["status"] = status
-        self.esp_list[esp_id]["type"] = esp_type
+            if esp_id not in self.esp_list:
+                self.esp_list[esp_id] = {}
+            self.esp_list[esp_id]["status"] = status
+            self.esp_list[esp_id]["type"] = esp_type
 
-        settings_db_manager.ensure_node_exists(esp_id)
-        node_db = settings_db_manager.get_node_settings_by_id(esp_id)
-        print(self.esp_list)
+            settings_db_manager.ensure_node_exists(esp_id)
+            node_db = settings_db_manager.get_node_settings_by_id(esp_id)
+            print(self.esp_list)
 
-        if status == "CONNECTING":
-            self._send_dynamic_topics_list(esp_id, esp_type)
-        
-
-        if status == "ONLINE":
-            if esp_type == "SECURITY_SENSOR":
-                return
+            if status == "CONNECTING":
+                self._send_dynamic_topics_list(esp_id, esp_type)
             
-            self._restore_node_state(esp_id) # Ripristina soglie/timer
 
-            if node_db and node_db.name:
-                if not node_db.is_backup:
-                    # Sono un MAIN: metto il mio backup in standby
-                    self._set_backup_standby(esp_id, in_standby=True)
-                else:
-                    # Sono un BACKUP: devo attivarmi o stare in standby?
-                    main_id = self._get_partner_node(node_db.name, node_db.id)
-                    
-                    # Se il main è ONLINE, io sto in standby. Altrimenti mi attivo.
-                    should_standby = (main_id is not None and self.esp_list.get(main_id, {}).get("status") == "ONLINE")
-                    
-                    msg = {"id": esp_id, "standby": should_standby}
-                    self.client.publish(TOPIC_BACKUP, json.dumps(msg), qos=1)
-                    print(f"[MQTT] Backup {esp_id} checked partner: standby={should_standby}")
+            if status == "ONLINE":
+                if esp_type == "SECURITY_SENSOR":
+                    return
+                
+                self._restore_node_state(esp_id) # Ripristina soglie/timer
 
-        elif status == "OFFLINE":
-            if esp_type == "SECURITY_SENSOR":
-                return
+                if node_db and node_db.name:
+                    if not node_db.is_backup:
+                        # Sono un MAIN: metto il mio backup in standby
+                        self._set_backup_standby(esp_id, in_standby=True)
+                    else:
+                        # Sono un BACKUP: devo attivarmi o stare in standby?
+                        main_id = self._get_partner_node(node_db.name, node_db.id)
+                        
+                        # Se il main è ONLINE, io sto in standby. Altrimenti mi attivo.
+                        should_standby = (main_id is not None and self.esp_list.get(main_id, {}).get("status") == "ONLINE")
+                        
+                        msg = {"id": esp_id, "standby": should_standby}
+                        self.client.publish(TOPIC_BACKUP, json.dumps(msg), qos=1)
+                        print(f"[MQTT] Backup {esp_id} checked partner: standby={should_standby}")
+
+            elif status == "OFFLINE":
+                if esp_type == "SECURITY_SENSOR":
+                    return
+                
+                if node_db and not node_db.is_backup:
+                    # Se un Main muore, svegliamo il backup
+                    self._set_backup_standby(esp_id, in_standby=False)
+                    
+            elif status == "SLEEPING":
+                print(f"[MQTT] Il nodo Main {esp_id} è entrato in Light Sleep controllato. Il backup resta in standby.")
+
+        except json.JSONDecodeError as e:
+            print(f"[MQTT ERROR] Ricevuto JSON corrotto o troncato: {e}")
+            print(f"[MQTT ERROR] Payload incriminato: {msg.payload}")
+            # Non fare nulla o gestisci l'errore, l'importante è che il thread non muoia!
             
-            if node_db and not node_db.is_backup:
-                # Se un Main muore, svegliamo il backup
-                self._set_backup_standby(esp_id, in_standby=False)
+        except Exception as e:
+            print(f"[MQTT ERROR] Errore generico nel callback: {e}")
+
         
         
 

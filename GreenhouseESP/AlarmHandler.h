@@ -19,6 +19,7 @@ enum class AlarmType : uint8_t
 {
   NONE,
   ALL_OK,
+  NEED_SETTINGS,
   SENSOR_ERROR,
   ALL_THRESHOLDS_OUT,
   SOME_THRESHOLDS_OUT,

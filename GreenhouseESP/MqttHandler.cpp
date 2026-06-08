@@ -283,6 +283,31 @@ const char* MqttHandler::statusToString(Status s) {
     case Status::CONNECTING: return "CONNECTING";
     case Status::ONLINE: return "ONLINE";
     case Status::OFFLINE: return "OFFLINE";
+    case Status::SLEEPING:   return "SLEEPING"; 
     default: return "UNKNOWN";
   }
+}
+
+void MqttHandler::sendSleepingStatus() {
+  Serial.println(F("[MQTT] Invio stato SLEEPING al broker..."));
+  
+  sendStatus(Status::SLEEPING);
+  
+  // 2. IMPORTANTE: Diamo il tempo allo stack TCP/IP di svuotare i buffer 
+  // e inviare fisicamente i pacchetti di byte prima del blackout della radio.
+  // loop() o yield() aiutano la libreria MQTT sottostante (spesso PubSubClient o simile)
+  // a completare la transazione.
+  unsigned long startFlush = millis();
+  while (millis() - startFlush < 150) {
+    _client.loop();
+    yield();
+  }
+}
+
+void MqttHandler::sendWakeupStatus() {
+    Serial.println(F("[MQTT] Notifico il risveglio al broker..."));
+    // Essendo un metodo della classe, può chiamare sendStatus privato
+    sendStatus(Status::CONNECTING); 
+    yield();
+    delay(25);
 }
