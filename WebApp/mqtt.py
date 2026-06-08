@@ -40,7 +40,7 @@ class MQTTManager:
     # ── Internal callbacks ────────────────────────────────────────────────────
 
     def _on_node_status(self, client, userdata, msg):
-        data = json.loads(msg.payload.decode())
+        data = json.loads(msg.payload.decode('utf-8'))
         esp_id = data.get("id")
         status = data.get("status")
         esp_type = data.get("type")
