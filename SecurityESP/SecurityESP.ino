@@ -25,7 +25,7 @@ unsigned long ultimoControlloSicurezza = 0;
 WiFiClient client;
 MqttHandler mqtt;
 InfluxDBClient influxClient(INFLUXDB_URL, INFLUXDB_ORG, INFLUXDB_BUCKET, INFLUXDB_TOKEN);
-TelegramNotifier notifier(BOT_TOKEN, TELEGRAM_CHAT_ID, TELEGRAM_CERTIFICATE_ROOT);
+TelegramNotifier notifier(BOT_TOKEN, TELEGRAM_CHAT_ID);
 char id[13];
 
 void setup() {
@@ -101,13 +101,12 @@ void checkCollisioneState() {
 
     if (isDoorClose) {
       Serial.println(F("Collisione Rilevata!"));
-      mqtt.sendDoorPayload(true);
-      sendDoorStatusToInflux(true);
     } else {
       Serial.println(F("Collisione Risolta / Stato Ripristinato!"));
-      mqtt.sendDoorPayload(false);
-      sendDoorStatusToInflux(false);
     }
+
+    mqtt.sendDoorPayload(isDoorClose);
+    sendDoorStatusToInflux(isDoorClose);
   }
 }
 
@@ -122,17 +121,13 @@ void checkIncendioState() {
     if (isOnFlame) {
       Serial.println(F("[ALLARME] Incendio Rilevato! Fiamma attiva e temperatura critica!"));
       turnBuzzerOn();
-      mqtt.sendFlamePayload(true, tempAttuale);
-      sendFlameStatusToInflux(true, tempAttuale);
-      notifier.sendFlameAlert(true, tempAttuale);
     } else {
       Serial.println(F("[RIPRISTINO] Emergenza rientrata o falso allarme terminato."));
       digitalWrite(BUZZER, HIGH);  // Spegne il buzzer
-
-      mqtt.sendFlamePayload(false, tempAttuale);
-      sendFlameStatusToInflux(false, tempAttuale);
-      notifier.sendFlameAlert(true, tempAttuale);
     }
+    mqtt.sendFlamePayload(isOnFlame, tempAttuale);
+    sendFlameStatusToInflux(isOnFlame, tempAttuale);
+    notifier.sendFlameAlert(isOnFlame, tempAttuale);
   }
 }
 

@@ -14,7 +14,7 @@ private:
     UniversalTelegramBot _bot;
 
 public:
-    TelegramNotifier(const char* token, const char* chatId, const char* certRoot);
+    TelegramNotifier(const char* token, const char* chatId);
 
     void begin();
     bool sendNotification(const char* message);
