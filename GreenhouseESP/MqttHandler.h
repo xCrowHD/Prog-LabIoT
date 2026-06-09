@@ -56,7 +56,7 @@ enum class Status {
 class MqttHandler {
 private:
   MQTTClient _client;
-  char _lwtPayload[64];
+  char _lwtPayload[512];
   Thresholds _plantThresholds;
   McuSettings _settings;
   bool _isStartMode = false;

@@ -40,10 +40,23 @@ class MQTTManager:
     # ── Internal callbacks ────────────────────────────────────────────────────
 
     def _on_node_status(self, client, userdata, msg):
-        data = json.loads(msg.payload.decode('utf-8'))
-        esp_id = data.get("id")
-        status = data.get("status")
-        esp_type = data.get("type")
+        try:
+            payload_str = msg.payload.decode('utf-8')
+            data = json.loads(payload_str)
+            
+            # Estraiamo i dati solo se il parsing è andato a buon fine
+            esp_id = data.get("id")
+            status = data.get("status")
+            esp_type = data.get("type")
+            
+        except json.JSONDecodeError as e:
+            # Se l'ESP manda robaccia, lo stampiamo ma il thread NON crasha!
+            print(f"[MQTT ERROR] JSON malformato rifiutato: {e}")
+            print(f"Payload grezzo incriminato: {msg.payload}")
+            return # Usciamo dalla funzione perché non abbiamo dati validi su cui lavorare
+        except Exception as e:
+            print(f"[MQTT ERROR] Errore generico nel parsing dello status: {e}")
+            return
 
         if esp_id not in self.esp_list:
             self.esp_list[esp_id] = {}
@@ -146,7 +159,7 @@ class MQTTManager:
         # Ripristino CONFIGURAZIONE MCU (name, timer, backup)
         # Inviato se il nome è stato configurato
         if node_db.name is not None and node_db.timer is not None:
-            self.send_set_mcu(esp_id, node_db.name, node_db.is_backup, node_db.timer)
+            self.send_set_mcu(esp_id, node_db.name, node_db.is_backup, node_db.timer, node_db.location)
             
         print(f"[MQTT] Ripristino completato per {esp_id}")
 
