@@ -109,6 +109,7 @@ export async function loadMcuInfo() {
   document.getElementById("mcu-timer-info").innerText = data.timer;
   document.getElementById("mcu-running-info").innerText = data.is_running;
   document.getElementById("mcu-plantsync-info").innerText = data.plant_id;
+  document.getElementById("mcu-location-info").innerText = data.location;
 }
 
 export function showSetMcuForm() {
