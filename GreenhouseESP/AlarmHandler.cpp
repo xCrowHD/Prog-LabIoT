@@ -96,26 +96,39 @@ void AlarmHandler::addAlarm(AlarmType type)
     if (_activeAlarms.find(type) == _activeAlarms.end())
     {
       _activeAlarms.insert(type);
-      _currentIt = _activeAlarms.begin();
     }
   }
 }
 
 void AlarmHandler::removeAlarm(AlarmType type)
 {
-  // 1. Reset dello stato hardware (Rientro errore)
+  // 1. Aggiorna lo stato logico
   if (_alarmStates.find(type) != _alarmStates.end())
   {
     _alarmStates[type].isPresent = false;
     _alarmStates[type].isAcked = false;
   }
 
-  // 2. Pulizia fisica da LCD e dal set del LED
+  // 2. Rimuovi i messaggi dall'LCD
   auto msg = getAlarmMessage(type);
   _lcd.removeMessage(msg.firstLine, msg.secondLine);
+
+  // 3. CONTROLLO CHIRURGICO DEL "BUCO":
+  // Verifichiamo se l'allarme che stiamo per cancellare è PROPRIO quello 
+  // che l'iteratore sta puntando in questo momento.
+  bool deletingCurrentAlarm = (_currentIt != _activeAlarms.end() && *_currentIt == type);
+
+  // 4. Cancellazione fisica dall'insieme
   _activeAlarms.erase(type);
 
-  _currentIt = _activeAlarms.begin();
+  // 5. Risoluzione del puntatore orfano
+  if (deletingCurrentAlarm || _currentIt == _activeAlarms.end())
+  {
+    // Se abbiamo fatto un buco sotto i piedi dell'iteratore, lo riportiamo al sicuro all'inizio
+    _currentIt = _activeAlarms.begin();
+  }
+  // Se invece abbiamo cancellato un allarme che era "indietro" o "avanti" rispetto a dove 
+  // si trova il LED adesso, non tocchiamo _currentIt. Rimane dove si trova e continua a ciclatre!
 }
 
 void AlarmHandler::setAllAlarmAcked()
@@ -208,17 +221,17 @@ LCDMsg AlarmHandler::getAlarmMessage(AlarmType type)
   case AlarmType::NEED_SETTINGS:
     return LCDMsg {"Status", "Need settings", MessageType::INFO};
   case AlarmType::SOME_THRESHOLDS_OUT:
-    return LCDMsg{"[WAR]: Some", "thresholds O.O.R", MessageType::WARNING};
+    return LCDMsg{"WARNING: Some", "thresholds O.O.R", MessageType::WARNING};
   case AlarmType::ALL_THRESHOLDS_OUT:
-    return LCDMsg{"[WAR]: All", "thresholds O.O.R", MessageType::WARNING};
+    return LCDMsg{"WARNING: All", "thresholds O.O.R", MessageType::WARNING};
   case AlarmType::SENSOR_ERROR:
-    return LCDMsg{"[ERROR]", "Sensor error", MessageType::ERROR};
+    return LCDMsg{"ERROR", "Sensor error", MessageType::ERROR};
   case AlarmType::CONNECTION_ERROR:
-    return LCDMsg{"[ERROR]", "Connection error", MessageType::ERROR};
+    return LCDMsg{"ERROR", "Connection error", MessageType::ERROR};
   case AlarmType::INFLUX_ERROR:
-    return LCDMsg{"[ERROR]", "Influx error", MessageType::ERROR};
+    return LCDMsg{"ERROR", "Influx error", MessageType::ERROR};
   case AlarmType::NO_SEND_DATA:
-    return LCDMsg{"[ERROR]", "Missing data", MessageType::ERROR};
+    return LCDMsg{"ERROR", "Missing data", MessageType::ERROR};
   default:
     return LCDMsg{"", "", MessageType::INFO};
   }

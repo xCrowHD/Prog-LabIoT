@@ -49,7 +49,6 @@ struct AlarmState {
 
 class AlarmHandler{
   private:
-
     std::set<AlarmType> _activeAlarms;
     std::set<AlarmType>::iterator _currentIt;
     
@@ -69,11 +68,12 @@ class AlarmHandler{
     void setAllAlarmAcked();
     std::vector<AlarmType> getActiveAlarms();
     AlarmConfig& getConfig ();
+    LCDMsg getAlarmMessage(AlarmType type);
 
   private: 
     void ledOff();
     void setLedRGB(uint8_t r, uint8_t g, uint8_t b);
-    LCDMsg getAlarmMessage(AlarmType type);
+    
 };
 
 #endif

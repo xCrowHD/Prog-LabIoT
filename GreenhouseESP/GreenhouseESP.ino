@@ -57,8 +57,6 @@ LED led = {
 // Alarm LEDRGB
 AlarmHandler alarm(lcd, led);
 
-
-Ticker tickerAlarm;
 Ticker checkAlarmStatus;
 
 HandleExceptions checkStatus(alarm, client_idb);
@@ -75,9 +73,20 @@ volatile bool flagWrite;
 unsigned long lastLcdUpdate = 0; //ms
 const unsigned long lcdInterval = 2000; //ms
 
+volatile bool flagAwakeFromBtn = false;
+unsigned long timeStampStartSleeping = 0;
+uint32_t totalSleepTime = 0;
+
+
 void manageSleepTime(uint32_t sleepTimeMs);
 bool updateInfluxInterval(uint32_t newIntervalSeconds);
 void keepButtonAlive();
+
+// Funzione di interrupt (ISR) posizionata in IRAM
+void IRAM_ATTR manageButtonInterrupt() {
+  gpio_pin_wakeup_disable();
+  flagAwakeFromBtn = true;
+}
 
 void setup()
 {
@@ -86,29 +95,30 @@ void setup()
   WiFiHandler::getMacAddress(id);
   pinMode(RESET_ALARMS, INPUT_PULLUP);
 
+  attachInterrupt(digitalPinToInterrupt(RESET_ALARMS), manageButtonInterrupt, FALLING);
+
   mqtt.begin(client, "broker.emqx.io", 1883);
   lcd.begin();
   sensor.begin();
   alarm.begin();
 
-  tickerAlarm.attach(1.5, []() {
-    alarm.nextAlarm();
-  });
-
   checkAlarmStatus.attach(5.0, [](){
     flagCheckSensor = true;
   });
+
+  flagWrite = true;
 }
 
 void loop()
 {
-
   mqtt.handle();
-  lcd.addMessage("ID", id, MessageType::INFO); 
+  
 
   if (millis() - lastLcdUpdate >= lcdInterval){
     lastLcdUpdate = millis();
-    lcd.popAndDisplay();
+    lcd.addMessage("ID", id, MessageType::INFO); 
+    lcd.popAndDisplay(); 
+    alarm.nextAlarm();
   }
 
   if (mqtt.isStandBy()){
@@ -118,13 +128,12 @@ void loop()
 
   if (!mqtt.isSet()){
     alarm.addAlarm(AlarmType::NEED_SETTINGS);
-    alarm.nextAlarm();
     return;
   }
   alarm.removeAlarm(AlarmType::NEED_SETTINGS);
 
   if(!mqtt.isRunning()){
-   lcd.addMessage("Status", "OFFLINE", MessageType::INFO);
+   lcd.addMessage("Status", "Offline", MessageType::INFO);
    return;
   } else{
     lcd.addMessage("Status", "Online", MessageType::INFO);
@@ -151,16 +160,15 @@ void loop()
     bool influxStatus = true;
 
     if (flagWrite){
-      InfluxStatus status = InfluxStatus::SUCCESS;
 
       if (connStatus && dataStatus){
-        status = client_idb.sendDataToInflux(data, rssi, "Serra", "NodeMCU", currentThr);
+        InfluxStatus status = client_idb.sendDataToInflux(data, rssi, "Serra", "NodeMCU", currentThr);
+        influxStatus = checkStatus.handleInfluxException(status);
       }
       else{
-        status = InfluxStatus::ERR_INFLUX_CONNECTION;
+        influxStatus = false;
       }
 
-      influxStatus = checkStatus.handleInfluxException(status);
 
       if (influxStatus){
         // SUCCESSO: Abbassiamo il flag così NON ci riproverà più fino al prossimo risveglio
@@ -168,11 +176,30 @@ void loop()
       }
     }
     // ---------------------------------
-
+    
     // Valutazione dello stato globale per l'ingresso in Light Sleep
-    if (connStatus && dataStatus && mqttStatus && thrStatus && influxStatus)
+    std::deque<LCDMsg> lcdQueue = lcd.getQueue();
+
+    bool hasWarnings = false;
+    bool hasErrors = false;
+
+    std::vector<AlarmType> activeAlarms = alarm.getActiveAlarms();
+
+    for (const auto &alarmType : activeAlarms){
+      MessageType type = alarm.getAlarmMessage(alarmType).type;
+
+      if (type == MessageType::ERROR)
+        hasErrors = true;
+
+      if (type == MessageType::WARNING)
+        hasWarnings = true;
+    }
+
+    if (!hasErrors) // Se non ha errori può entrare in deepsleep
     {
-      checkStatus.handleSuccess();
+      if (!hasWarnings) // Se non ha neanche warnings lampeggerà di verde, altrimenti dei colori corretti
+        checkStatus.handleSuccess();
+        
 
       lcd.addMessage("System", "Going to sleep", MessageType::INFO);
       lcd.popAndDisplay();
@@ -183,14 +210,17 @@ void loop()
       // Manteniamo LCD attivo fintanto che non ha mostrato tutti i messaggi una volta
       // anche nel caso di successo immediato dei booleani nel loop
 
-      unsigned long int lastMessageTime = millis();
 
-      while (millis() - lastMessageTime < 3*lcdInterval){ //mostra gli ultimi 3 messaggi
+      unsigned long int lastMessageTime = millis();
+      int que_lenght = lcd.getQueue().size();
+
+      while (millis() - lastMessageTime < que_lenght*lcdInterval){ //mostra l'ultimo ciclo di messaggi
         if (millis() - lastLcdUpdate >= lcdInterval){
           lastLcdUpdate = millis();
           lcd.popAndDisplay();
+          alarm.nextAlarm();
         }
-
+        delay(1);
         keepButtonAlive();
         yield();
       }
@@ -199,7 +229,8 @@ void loop()
       // La coda è stata mostrata. Adesso stampiamo sul display SOLO l'ID dell'ESP.
       // Questo messaggio rimarrà impresso staticamente sul display per tutta la durata del sonno.
       lcd.clearAll();                               // Se il tuo handler ha un clear, pulisce lo schermo
-      lcd.addMessage("ID", id, MessageType::INFO); 
+
+      lcd.addMessage("Sleep Mode", id, MessageType::INFO); 
       lcd.popAndDisplay();
 
       uint32_t mqttTimer = mqtt.getSettings().timer * 1e3;
@@ -208,46 +239,43 @@ void loop()
       }
       
       uint32_t sleepTimeMs = lastTimerValue;
-      if (sleepTimeMs > 3*lcdInterval){
-        sleepTimeMs -= 3*lcdInterval;
+      if (sleepTimeMs > que_lenght*lcdInterval){
+        sleepTimeMs -= que_lenght*lcdInterval;
       } else{
         sleepTimeMs = 10;
       }
 
+      totalSleepTime = sleepTimeMs;
+      timeStampStartSleeping = millis();
       manageSleepTime(sleepTimeMs); // Entra in sleep e al risveglio rimetterà flagWrite = true
     }
-    else
-    {
-      // Se c'è un qualunque problema (allarme attivo O invio Influx fallito),
-      // gestisce l'allarme visivo. Il Ticker checkAlarmStatus riattiverà flagCheckSensor tra 5 secondi.
-      alarm.nextAlarm();
-    }
   } // Chiusura corretta di if (flagCheckSensor)
+ 
   keepButtonAlive();
 }
 
 void keepButtonAlive(){
   int reading = digitalRead(RESET_ALARMS);
+  
   if (reading != lastButtonState)
   {
     lastDebounceTime = millis();
   }
 
+  // Se è passato il tempo di debounce, lo stato è considerato stabile
   if ((millis() - lastDebounceTime) > BUTTON_DEBOUNCE_DELAY)
   {
-    static bool wasAlreadyPressed = false;
-    if (reading == LOW && !wasAlreadyPressed)
+    static int lastStableState = reading; 
+
+    if (reading != lastStableState)
     {
       alarm.setAllAlarmAcked();
-      wasAlreadyPressed = true;
-    }
-    if (reading == HIGH)
-    {
-      wasAlreadyPressed = false;
+      lastStableState = reading;
     }
   }
   lastButtonState = reading;
 }
+
 void wakeupCallback()
 { // unlike ISRs, you can do a print() from a callback function
   Serial.println(F("Woke from Light Sleep - this is the callback"));
@@ -256,13 +284,15 @@ void wakeupCallback()
 
 void manageSleepTime(uint32_t sleepTimeMs)
 {
-  tickerAlarm.detach();
-  checkAlarmStatus.detach();
   Serial.flush();
-  // carichiamo i millisecondi effettivi che vogliamo dormire in questo ciclo.
   uint32_t remainingSleepTime = sleepTimeMs;
 
+  if (totalSleepTime == 0) {
+    totalSleepTime = sleepTimeMs;
+    timeStampStartSleeping = millis();
+  }
 
+  checkAlarmStatus.detach();
 
   Serial.print(F("CPU going to sleep for "));
   Serial.print(sleepTimeMs);
@@ -273,32 +303,76 @@ void manageSleepTime(uint32_t sleepTimeMs)
   wifi_set_opmode_current(NULL_MODE);
   yield();
   delay(50);
+  
   extern os_timer_t *timer_list;
-  timer_list = nullptr; // ferma i 4 timer del sistema operativo per consentire lo sleep
+  os_timer_t *old_timer_list = timer_list;
+  timer_list = nullptr; 
 
   wifi_fpm_set_sleep_type(LIGHT_SLEEP_T);
   wifi_fpm_open();
   wifi_fpm_set_wakeup_cb(wakeupCallback);
 
-  // dall'hardware (maxTimerValue), facciamo dormire il chip a "blocchi" di durata massima.
-  while (remainingSleepTime > maxTimerValue)
+  detachInterrupt(digitalPinToInterrupt(RESET_ALARMS));
+  gpio_pin_wakeup_enable(RESET_ALARMS, GPIO_PIN_INTR_LOLEVEL);
+  flagAwakeFromBtn = false;
+
+  // Ciclo di sleep a blocchi hardware
+  while (remainingSleepTime > maxTimerValue && !flagAwakeFromBtn)
   {
-    wifi_fpm_do_sleep(maxTimerValue * 1000); // Vuole i microsecondi (ms * 1000)
-    esp_delay(maxTimerValue + 1);            // Il delay deve essere di 1ms superiore allo sleep
-    remainingSleepTime -= maxTimerValue;     // Sottraiamo il blocco appena dormito
+    wifi_fpm_do_sleep(maxTimerValue * 1000); 
+    delay(maxTimerValue + 1);            
+    remainingSleepTime -= maxTimerValue; 
   }
 
-  // Non ha senso mandare l'ESP in light sleep per un tempo inferiore a 10 ms (limite hardware)
-  if (remainingSleepTime >= 10)
+  if (remainingSleepTime >= 10 && !flagAwakeFromBtn)
   {
-    wifi_fpm_do_sleep(remainingSleepTime * 1000); // Usa il tempo rimanente effettivo!
-    esp_delay(remainingSleepTime + 1);
+    wifi_fpm_do_sleep(remainingSleepTime * 1000); 
+    delay(remainingSleepTime + 1);
   }
 
-  // --- OPERAZIONI DI RISVEGLIO ---
-  tickerAlarm.attach(1.5, []() {
-    alarm.nextAlarm();
-  });
+  // --- OPERAZIONI IMMEDIATE POST-RISVEGLIO (STRATO BASSO) ---
+  gpio_pin_wakeup_disable();
+  timer_list = old_timer_list;
+  
+  // Ripristiniamo subito l'interrupt standard di Arduino sul pin per i click a CPU sveglia
+  attachInterrupt(digitalPinToInterrupt(RESET_ALARMS), manageButtonInterrupt, FALLING);
+
+  // Controllo se il risveglio è stato causato dal pulsante
+  if (flagAwakeFromBtn) {
+    flagAwakeFromBtn = false;
+    
+    Serial.println(F("[WAKE] Svegliato anzitempo dal pulsante! Esecuzione ACK..."));
+    
+    // Esegui l'ACK (aggiorna lo stato interno dell'AlarmHandler e spegne/cambia i LED)
+    alarm.setAllAlarmAcked(); 
+
+    // Calcoliamo quanto tempo reale è rimasto per completare lo sleep globale originale
+    unsigned long currentSleepTime = millis() - timeStampStartSleeping;
+
+    if (currentSleepTime < totalSleepTime) {
+      uint32_t remaingSleepTime = totalSleepTime - currentSleepTime;
+      
+      if (remaingSleepTime > 100) {
+        Serial.println(F("[WAKE] ACK eseguito. Torno subito in Light Sleep..."));
+        Serial.flush();
+        
+        // RICORSIONE: Si rimette a dormire.
+        manageSleepTime(remaingSleepTime); 
+        
+        // CRITICO: Quando la chiamata sopra terminerà (sonno finito), questa istanza 
+        // deve interrompersi immediatamente con un 'return' per evitare di scendere 
+        // ed eseguire il risveglio completo una seconda volta.
+        return; 
+      }
+    }
+  }
+
+  // --- RISVEGLIO EFFETTIVO COMPLETATO ---
+  // Questo blocco viene eseguito SOLO dall'istanza principale quando il timer originario è scaduto del tutto
+  totalSleepTime = 0;
+  timeStampStartSleeping = 0;
+
+  Serial.println(F("[SYSTEM] Tempo totale di sleep esaurito. Avvio periferiche e invio dati..."));
 
   checkAlarmStatus.attach(5.0, [](){
     flagCheckSensor = true;
@@ -310,12 +384,14 @@ void manageSleepTime(uint32_t sleepTimeMs)
   unsigned long startMqttWindow = millis();
   while (millis() - startMqttWindow < 2000) {
     mqtt.handle();
-    keepButtonAlive(); // Manteniamo comunque il pulsante reattivo
+    keepButtonAlive(); 
+    lcd.addMessage("Status", "Waking up", MessageType::INFO);
+    lcd.popAndDisplay();
     yield();
   }
 
-  flagWrite = true;       // Autorizziamo UN NUOVO invio pulito a InfluxDB per questo risveglio
-  flagCheckSensor = true; // Forziamo l'aggiornamento immediato dei sensori senza attendere i 5s del Ticker
+  flagWrite = true;       // Autorizza l'invio a InfluxDB solo ora che lo sleep è finito del tutto
+  flagCheckSensor = true; // Forza il controllo dei sensori
 }
 
 void resetConnection() {
@@ -327,9 +403,11 @@ void resetConnection() {
 
   Serial.print(F("Connessione al Wi-Fi in corso"));
   
+  unsigned long startWifiTimeout = millis();
   // Attendiamo la connessione fisica al router (max 10 secondi)
-  while (WiFi.status() != WL_CONNECTED) {
-    delay(250);
+  while (WiFi.status() != WL_CONNECTED && millis() - startWifiTimeout < 10000) {
+    keepButtonAlive();
+    delay(50);
     Serial.print(".");
     yield();
   }

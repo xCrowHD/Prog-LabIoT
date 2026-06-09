@@ -37,7 +37,7 @@ bool HandleExceptions::handleThresholds(PlantData &data, Thresholds &currentThr)
     {
         _alarm.addAlarm(AlarmType::ALL_THRESHOLDS_OUT);
         _alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
-        //Serial.println(F("All thresholds out of range"));
+        Serial.println(F("All thresholds out of range"));
         return false;
     }
     else if (!tempInRange || !humInRange || !luxInRange)
