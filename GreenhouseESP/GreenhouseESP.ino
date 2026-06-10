@@ -102,8 +102,9 @@ void setup() {
 }
 
 void loop() {
+  mqtt.handleDeferredActions();
   mqtt.handle();
-  mqtt.handleWeather();
+
   if (mqtt.isStandBy()){
     lcd.addMessage("Status", "StandByMode", MessageType::INFO);
     return;

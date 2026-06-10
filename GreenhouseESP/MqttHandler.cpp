@@ -30,10 +30,22 @@ void MqttHandler::handle() {
   _client.loop();
 }
 
-void MqttHandler::handleWeather() {
+void MqttHandler::handleDeferredActions() {
   if (_sendWeather) {
     _weather.updateForecast(_settings.location);
     _sendWeather = false;
+  }
+
+  if (_sendOnlineStatus) {
+    _sendOnlineStatus = false;
+    Serial.println(F("[MQTT] Invio status ONLINE..."));
+    sendStatus(Status::ONLINE);
+  }
+
+  if (_sendConnectStatus) {
+    _sendConnectStatus = false;
+    Serial.println(F("[MQTT] Invio status CONNECTING..."));
+    sendStatus(Status::CONNECTING);
   }
 }
 
@@ -45,7 +57,7 @@ void MqttHandler::reconnect() {
     if (_client.connect(_id)) {
       Serial.println(F("Connesso!"));
       _client.subscribe(TOPIC_TOPICS, 1);
-      sendStatus(Status::CONNECTING);
+      _sendConnectStatus = true;
     } else {
       Serial.print(F("fallito, err="));
       Serial.print(_client.lastError());
@@ -232,7 +244,7 @@ void MqttHandler::handleTopics(char* payload, unsigned int length) {
     _client.subscribe(_topics.set, 1);
     _client.subscribe(_topics.backup, 1);
 
-    sendStatus(Status::ONLINE);
+    _sendOnlineStatus = true;
   } else {
     Serial.println(F("Could no set topics"));
   }
