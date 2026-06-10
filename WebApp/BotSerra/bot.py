@@ -268,7 +268,7 @@ def genera_tastiera_periodo(comando_origine: str) -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(tastiera)
 
 # --- CONFIGURAZIONE E AVVIO DEL BOT ---
-def main():
+async def start_bot() -> Application:
     # Costruiamo l'applicazione con il Token
     app = Application.builder().token(TOKEN_BOT).build()
     
@@ -287,8 +287,8 @@ def main():
     app.add_handler(CommandHandler("plantlast", comando_last_plant_data))
     app.add_handler(CallbackQueryHandler(gestisci_last_plant_data, pattern=r"^planttype:.*"))
     # Facciamo partire il bot in ascolto continuo (Polling)
-    print("[Bot Telegram] In esecuzione (Separato). Premi CTRL+Z per fermarlo.")
-    app.run_polling()
-
-if __name__ == "__main__":
-    main()
+    print("[Bot Telegram] In esecuzione.")
+    await app.initialize()
+    await app.start()
+    await app.updater.start_polling()
+    return app
