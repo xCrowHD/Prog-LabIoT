@@ -32,7 +32,8 @@ async def lifespan(app: FastAPI):
     mqtt_hub.start()
     bot_app = await start_bot()
     
-    yield # Qui l'applicazione gira normalmente...
+    yield # Qui l'applicazione gira normalmente..
+    await bot_app.updater.stop()
     await bot_app.stop()
     await bot_app.shutdown()
     mqtt_hub.client.loop_stop()
