@@ -13,6 +13,7 @@ void MqttHandler::begin(WiFiClient& wifiClient, const char* broker, int port) {
   updateWill();
 
   _client.begin(broker, port, wifiClient);
+  _weather.begin();
 
   snprintf(_dynamicTopic, sizeof(_dynamicTopic), "%s/%s", TOPIC_CONNECTION, _id);
   _client.setWill(_dynamicTopic, _lwtPayload, true, 1);
@@ -29,6 +30,25 @@ void MqttHandler::handle() {
   _client.loop();
 }
 
+void MqttHandler::handleDeferredActions() {
+  if (_sendWeather) {
+    _weather.updateForecast(_settings.location);
+    _sendWeather = false;
+  }
+
+  if (_sendOnlineStatus) {
+    _sendOnlineStatus = false;
+    Serial.println(F("[MQTT] Invio status ONLINE..."));
+    sendStatus(Status::ONLINE);
+  }
+
+  if (_sendConnectStatus) {
+    _sendConnectStatus = false;
+    Serial.println(F("[MQTT] Invio status CONNECTING..."));
+    sendStatus(Status::CONNECTING);
+  }
+}
+
 void MqttHandler::reconnect() {
   while (!_client.connected()) {
     Serial.print(F("Tentativo connessione MQTT..."));
@@ -37,7 +57,7 @@ void MqttHandler::reconnect() {
     if (_client.connect(_id)) {
       Serial.println(F("Connesso!"));
       _client.subscribe(TOPIC_TOPICS, 1);
-      sendStatus(Status::CONNECTING);
+      _sendConnectStatus = true;
     } else {
       Serial.print(F("fallito, err="));
       Serial.print(_client.lastError());
@@ -162,8 +182,26 @@ void MqttHandler::handleSettings(char* payload, unsigned int length) {
 
       strlcpy(_settings.mcuName, nameFromData, sizeof(_settings.mcuName));
     }
-    _settings.isBackup = doc["backup"];
-    _settings.timer = doc["timer"];
+
+    if (doc.containsKey("backup")) {
+      _settings.isBackup = doc["backup"];
+    }
+
+    if (doc.containsKey("timer")) {
+      _settings.timer = doc["timer"];
+    }
+
+    if (doc.containsKey("location") && !doc["location"].isNull()) {
+
+      const char* locationFromData = doc["location"];
+      if (strcmp(_settings.location, locationFromData) != 0) {
+        Serial.print(F("Nuova location rilevata: "));
+        Serial.println(locationFromData);
+        _sendWeather = true;
+      }
+      strlcpy(_settings.location, locationFromData, sizeof(_settings.location));
+    }
+
 
     Serial.println(F("--- Settings Aggiornati ---"));
     Serial.print(F("Nome MCU: "));
@@ -206,7 +244,7 @@ void MqttHandler::handleTopics(char* payload, unsigned int length) {
     _client.subscribe(_topics.set, 1);
     _client.subscribe(_topics.backup, 1);
 
-    sendStatus(Status::ONLINE);
+    _sendOnlineStatus = true;
   } else {
     Serial.println(F("Could no set topics"));
   }
@@ -246,8 +284,8 @@ bool MqttHandler::isAddressedToMe(const JsonVariant& doc) {
 }
 
 void MqttHandler::sendStatus(Status status) {
-  StaticJsonDocument<256> doc;
-  char buffer[256];
+  StaticJsonDocument<512> doc;
+  char buffer[512];
 
   doc["id"] = _id;
   doc["status"] = statusToString(status);
@@ -264,7 +302,7 @@ void MqttHandler::sendStatus(Status status) {
 }
 
 void MqttHandler::updateWill() {
-  StaticJsonDocument<256> doc;
+  StaticJsonDocument<512> doc;
 
   doc["id"] = _id;
   doc["status"] = "OFFLINE";  // Il Will deve essere sempre OFFLINE

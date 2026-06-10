@@ -33,7 +33,7 @@ enum class Status {
 class MqttHandler {
 private:
   MQTTClient _client;
-  char _lwtPayload[64];
+  char _lwtPayload[512];
   McuSettings _settings;
   char _id[13];
   char _dynamicTopic[128];

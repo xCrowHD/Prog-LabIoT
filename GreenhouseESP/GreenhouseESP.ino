@@ -1,10 +1,5 @@
 #include <Ticker.h>
 #include <ESP8266WiFi.h>
-#define RESET_ALARMS D5
-#define LED_RED D0
-#define LED_GREEN D4
-#define LED_BLUE D3
-
 #include "InfluxHandler.h"
 #include "secrets.h"
 #include "MqttHandler.h"
@@ -23,6 +18,11 @@ extern "C"
 {
 #include "user_interface.h"
 }
+
+#define RESET_ALARMS D5
+#define LED_RED D0
+#define LED_GREEN D4
+#define LED_BLUE D3
 
 // D0, LED on the development board (between the ESP module and the USB port)
 //https://github.com/nodemcu/nodemcu-devkit-v1.0/blob/master/NODEMCU_DEVKIT_V1.0.PDF
@@ -100,15 +100,16 @@ void setup()
 
 void loop()
 {
+  mqtt.handleDeferredActions();
   mqtt.handle();
   
-
   if (millis() - lastLcdUpdate >= lcdInterval){
     lastLcdUpdate = millis();
     lcd.addMessage("ID", id, MessageType::INFO); 
     lcd.popAndDisplay(); 
     alarm.nextAlarm();
   }
+  
 
   if (mqtt.isStandBy()){
     lcd.addMessage("Status", "StandByMode", MessageType::INFO);

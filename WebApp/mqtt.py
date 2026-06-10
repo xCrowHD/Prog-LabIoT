@@ -43,12 +43,23 @@ class MQTTManager:
         try:
             payload_str = msg.payload.decode('utf-8')
             data = json.loads(payload_str)
+            
+            # Estraiamo i dati solo se il parsing è andato a buon fine
             esp_id = data.get("id")
             status = data.get("status")
             esp_type = data.get("type")
+            
+        except json.JSONDecodeError as e:
+            # Se l'ESP manda robaccia, lo stampiamo ma il thread NON crasha!
+            print(f"[MQTT ERROR] JSON malformato rifiutato: {e}")
+            print(f"Payload grezzo incriminato: {msg.payload}")
+            return # Usciamo dalla funzione perché non abbiamo dati validi su cui lavorare
+        except Exception as e:
+            print(f"[MQTT ERROR] Errore generico nel parsing dello status: {e}")
+            return
 
-            if esp_id not in self.esp_list:
-                self.esp_list[esp_id] = {}
+        if esp_id not in self.esp_list:
+            self.esp_list[esp_id] = {}
             self.esp_list[esp_id]["status"] = status
             self.esp_list[esp_id]["type"] = esp_type
 
@@ -91,14 +102,6 @@ class MQTTManager:
                     
             elif status == "SLEEPING":
                 print(f"[MQTT] Il nodo Main {esp_id} è entrato in Light Sleep controllato. Il backup resta in standby.")
-
-        except json.JSONDecodeError as e:
-            print(f"[MQTT ERROR] Ricevuto JSON corrotto o troncato: {e}")
-            print(f"[MQTT ERROR] Payload incriminato: {msg.payload}")
-            # Non fare nulla o gestisci l'errore, l'importante è che il thread non muoia!
-            
-        except Exception as e:
-            print(f"[MQTT ERROR] Errore generico nel callback: {e}")
 
         
         
@@ -160,7 +163,7 @@ class MQTTManager:
         # Ripristino CONFIGURAZIONE MCU (name, timer, backup)
         # Inviato se il nome è stato configurato
         if node_db.name is not None and node_db.timer is not None:
-            self.send_set_mcu(esp_id, node_db.name, node_db.is_backup, node_db.timer)
+            self.send_set_mcu(esp_id, node_db.name, node_db.is_backup, node_db.timer, node_db.location)
             
         print(f"[MQTT] Ripristino completato per {esp_id}")
 
@@ -283,12 +286,12 @@ class MQTTManager:
         settings_db_manager.update_node_running_state(node_id, is_running)
         self.client.publish(TOPIC_SET_START_STOP, json.dumps(payload), qos=1)
 
-    def send_set_mcu(self, node_id: str, name: str, is_backup: bool, timer: float):
+    def send_set_mcu(self, node_id: str, name: str, is_backup: bool, timer: float, location: str):
         if self._node_name_already_taken(node_id, name, is_backup):
             print(f"[MQTT] ERROR: name '{name}' already in use by a non-backup node")
             return
 
-        settings_db_manager.update_node_settings(node_id, name, is_backup, timer)
+        settings_db_manager.update_node_settings(node_id, name, is_backup, timer, location)
 
         if is_backup:
             # Se sto diventando un backup, controllo se il mio (nuovo) main è online
@@ -308,7 +311,8 @@ class MQTTManager:
             "id": node_id,
             "name": name,
             "backup": is_backup,
-            "timer": timer
+            "timer": timer,
+            "location": location
         }
         self.client.publish(TOPIC_SET_MCU, json.dumps(payload), qos=1)
 

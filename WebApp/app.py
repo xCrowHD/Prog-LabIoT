@@ -16,7 +16,8 @@ from fastapi import WebSocket, WebSocketDisconnect
 from mqtt import mqtt_hub
 from config import UPLOAD_DIR
 from db.plants_db import plant_db_manager
-from routers import plants, nodes, web_sockets
+from routers import plants, nodes, web_sockets, security
+from BotSerra.bot import start_bot
 
 # ── Initialisation ────────────────────────────────────────────────────────────
 os.makedirs(UPLOAD_DIR, exist_ok=True)
@@ -29,10 +30,12 @@ async def lifespan(app: FastAPI):
     
     # 2. Avvia la connessione MQTT adesso che tutto è pronto e asincrono
     mqtt_hub.start()
+    bot_app = await start_bot()
     
-    yield # Qui l'applicazione gira normalmente...
-    
-    # Codice eseguito allo spegnimento (opzionale)
+    yield # Qui l'applicazione gira normalmente..
+    await bot_app.updater.stop()
+    await bot_app.stop()
+    await bot_app.shutdown()
     mqtt_hub.client.loop_stop()
     mqtt_hub.client.disconnect()
 
@@ -44,6 +47,7 @@ app.mount("/static", StaticFiles(directory="static"), name="static")
 app.include_router(plants.router)
 app.include_router(nodes.router)
 app.include_router(web_sockets.router)
+app.include_router(security.router)
 
 @app.get("/")
 async def home():

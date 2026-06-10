@@ -10,6 +10,10 @@ import {
   fetchLatestPlantData,
   fetchCurrentNode,
   fecthNodeSettings,
+  fecthTodayDoorStats,
+  fecthLatestSecurityEvents,
+  fetchCurrentDoorStatus,
+  fetchCurrentFlameStatus,
 } from "./api.js";
 import { renderPlantChart } from "./chart.js";
 
@@ -29,6 +33,7 @@ export async function switchDashboardView() {
     dashsec.classList.remove("hidden");
     dashplant.classList.add("hidden");
     console.log("[UI] show security dashboard");
+    bootSecurity();
   }
 }
 
@@ -104,6 +109,7 @@ export async function loadMcuInfo() {
   document.getElementById("mcu-timer-info").innerText = data.timer;
   document.getElementById("mcu-running-info").innerText = data.is_running;
   document.getElementById("mcu-plantsync-info").innerText = data.plant_id;
+  document.getElementById("mcu-location-info").innerText = data.location;
 }
 
 export function showSetMcuForm() {
@@ -151,7 +157,42 @@ export async function updateSecurityDashboard(data) {
     if (!data.doorClose) {
       incrementDoorCounter(data.timestamp);
     }
+    doorStatus(data.doorClose);
     addDoorEventToLog(data.doorClose, formattedDate);
+  }
+}
+
+async function doorStatus(doorClose) {
+  const statusLabel = document.getElementById("door-status-label");
+  const statusDot = document.getElementById("door-status-dot");
+
+  // La porta è aperta se doorClose è false
+  const isOpen = !doorClose;
+
+  // 1. Gestione del Testo (Label)
+  if (statusLabel) {
+    if (isOpen) {
+      statusLabel.innerText = "Door Opened";
+      statusLabel.classList.remove("text-on-surface-variant/50");
+      statusLabel.classList.add("text-red", "font-bold");
+    } else {
+      statusLabel.innerText = "Door Closed";
+      statusLabel.classList.remove("text-red", "font-bold");
+      statusLabel.classList.add("text-on-surface-variant/50");
+    }
+  }
+
+  // 2. Gestione del Pallino (Dot)
+  if (statusDot) {
+    if (isOpen) {
+      // Porta aperta: togliamo il verde di default (bg-primary) e mettiamo il rosso
+      statusDot.classList.remove("bg-primary");
+      statusDot.classList.add("bg-red");
+    } else {
+      // Porta chiusa: ripristiniamo il verde di default
+      statusDot.classList.remove("bg-red");
+      statusDot.classList.add("bg-primary");
+    }
   }
 }
 
@@ -174,7 +215,8 @@ async function incrementDoorCounter(timestampRaw) {
 }
 
 async function setFlameAlarm(data, formattedDate) {
-  document.getElementById("flame-last-event").innerText = formattedDate;
+  document.getElementById("flame-last-event").innerText =
+    formattedDate + "(UTC)";
   document.getElementById("analog-temp").innerText = data.temp;
   _swapClass("flame-indicator", data.isOnFlame, "bg-primary", "bg-red");
   document.getElementById("flame-status").innerText = data.isOnFlame
@@ -197,7 +239,7 @@ async function addFlameEventToLog(temp, time, isOnFlame) {
       <span class="material-symbols-outlined text-[16px] ${statusColor}">
         ${isAlert ? "local_fire_department" : "check_circle"}
       </span>
-      <span class="text-[10px] font-mono text-on-surface-variant/50 shrink-0">${time}</span>
+      <span class="text-[10px] font-mono text-on-surface-variant/50 shrink-0">${time} (UTC)</span>
       <span class="text-xs text-on-surface">${message} — temp ${temp}°C</span>
       <span class="ml-auto px-2 py-0.5 ${bgClass} ${statusColor} text-[9px] font-bold rounded uppercase">${statusLabel}</span>
     </div>
@@ -229,7 +271,7 @@ async function addDoorEventToLog(doorClose, time) {
       <span class="material-symbols-outlined text-[16px] ${statusColor}">
         ${icon}
       </span>
-      <span class="text-[10px] font-mono text-on-surface-variant/50 shrink-0">${time}</span>
+      <span class="text-[10px] font-mono text-on-surface-variant/50 shrink-0">${time} (UTC)</span>
       <span class="text-xs text-on-surface">${message}</span>
       <span class="ml-auto px-2 py-0.5 ${bgClass} ${statusColor} text-[9px] font-bold rounded uppercase">${statusLabel}</span>
     </div>
@@ -241,6 +283,31 @@ async function addDoorEventToLog(doorClose, time) {
   while (logContainer.children.length > 20) {
     logContainer.removeChild(logContainer.lastElementChild);
   }
+}
+
+async function bootSecurity() {
+  const logContainer = document.getElementById("event-log-list");
+  logContainer.innerHTML = "";
+
+  const node = await fetchCurrentNode();
+  const eventsData = await fecthLatestSecurityEvents(node.id, 5);
+
+  for (const event of [...eventsData].reverse()) {
+    if (event.alarmType == "FlameAlarm") {
+      addFlameEventToLog(event.temp, event.timestamp, event.isOnFlame);
+    }
+    if (event.alarmType == "DoorAlarm") {
+      addDoorEventToLog(event.doorClose, event.timestamp);
+    }
+  }
+
+  const doorCounter = await fecthTodayDoorStats(node.id);
+  const countElement = document.getElementById("door-count");
+  countElement.innerText = doorCounter.count;
+  const currentDoorStatus = await fetchCurrentDoorStatus(node.id);
+  doorStatus(currentDoorStatus.doorClose);
+  const currentFlameStatus = await fetchCurrentFlameStatus(node.id);
+  setFlameAlarm(currentFlameStatus, currentFlameStatus.timestamp);
 }
 
 // ── Tab helpers ───────────────────────────────────────────────────────────────

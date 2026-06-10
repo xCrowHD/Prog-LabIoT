@@ -1,0 +1,5 @@
+broker.hivemq.com
+test.mosquitto.org
+broker.emqx.io
+
+broker alternativi in caso qualcuno fosse giù da cambiare sia nel .ino dei sensori sia nel config.py

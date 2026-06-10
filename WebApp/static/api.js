@@ -85,7 +85,7 @@ export async function sendStartStop(start) {
   return _checkResponse(res);
 }
 
-/** @param {{ name: string, backup: boolean, timer: number }} config */
+/** @param {{ name: string, backup: boolean, timer: number, location: string }} config */
 export async function sendSetMcu(config) {
   const res = await fetch("/api/nodes/set-mcu", {
     method: "POST",
@@ -102,5 +102,27 @@ export async function syncMqttThresholds(plantId) {
 
 export async function fecthNodeSettings(nodeId) {
   const res = await fetch(`/api/nodes/nodeinfo/${nodeId}`);
+  return _checkResponse(res);
+}
+
+// ── Security ─────────────────────────────────────────────────────────────────────
+
+export async function fecthLatestSecurityEvents(nodeId, limit) {
+  const res = await fetch(`/api/security/events/${nodeId}/${limit}`);
+  return _checkResponse(res);
+}
+
+export async function fecthTodayDoorStats(nodeId) {
+  const res = await fetch(`/api/security/stats/door-opens/${nodeId}`);
+  return _checkResponse(res);
+}
+
+export async function fetchCurrentDoorStatus(nodeId) {
+  const res = await fetch(`/api/security/status/door/${nodeId}`);
+  return _checkResponse(res);
+}
+
+export async function fetchCurrentFlameStatus(nodeId) {
+  const res = await fetch(`/api/security/status/flame/${nodeId}`);
   return _checkResponse(res);
 }

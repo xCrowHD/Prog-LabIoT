@@ -133,7 +133,7 @@ class SettingsDatabaseManager:
         finally:
             session.close()
     
-    def update_node_settings(self, node_id, name, is_backup, timer):
+    def update_node_settings(self, node_id, name, is_backup, timer, location):
         """
         Aggiorna i parametri di configurazione del nodo.
         """
@@ -145,9 +145,10 @@ class SettingsDatabaseManager:
                 node.name = name
                 node.is_backup = is_backup
                 node.timer = timer # Assicuriamoci che sia un intero per il DB
-                
+                node.location = location
+
                 session.commit()
-                print(f"[DB] Configurazione aggiornata per {node_id}: {name}, Backup={is_backup}, Timer={timer}")
+                print(f"[DB] Configurazione aggiornata per {node_id}: {name}, Backup={is_backup}, Timer={timer}, Location={location}")
                 return True
             
             print(f"[DB] Errore: Nodo {node_id} non trovato per aggiornamento settings.")
