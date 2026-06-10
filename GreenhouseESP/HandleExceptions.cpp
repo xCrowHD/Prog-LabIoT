@@ -93,5 +93,6 @@ bool HandleExceptions::handleConnectionException(long rssi, const long RSSI_THRE
 void HandleExceptions::handleSuccess()
 {
     _alarm.clearAlarms();
+    
     //Serial.println(F("All OK!"));
 }

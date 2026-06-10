@@ -65,8 +65,9 @@ class AlarmHandler{
     void addAlarm(AlarmType type);
     void removeAlarm(AlarmType type);
     void clearAlarms();
-    void setAllAlarmAcked();
+    void setErrorsAcked();
     std::vector<AlarmType> getActiveAlarms();
+    const std::map<AlarmType, AlarmState>& getAlarmStatus();
     AlarmConfig& getConfig ();
     LCDMsg getAlarmMessage(AlarmType type);
 

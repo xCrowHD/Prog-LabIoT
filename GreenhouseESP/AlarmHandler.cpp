@@ -44,39 +44,60 @@ void AlarmHandler::nextAlarm()
   // 1. GESTIONE TRIGGER ACK GLOBALE
   if (_config.ack == true)
   {
-    setAllAlarmAcked();
+    setErrorsAcked();
     _config.ack = false;
   }
 
   // 2. ROUTINE LED
-  // Se la lista attiva è vuota, significa che non ci sono errori oppure che sono stati tutti ackati.
-  // In entrambi i casi, per il LED è una situazione nominale (Verde o Spento, in base a come preferite ALL_OK)
   if (_activeAlarms.empty())
   {
     manageRoutineErrors(AlarmType::ALL_OK);
     return;
   }
 
-  // Avanzamento ciclo LED originale (solo sugli allarmi rimasti non-ackati)
   if (_currentIt == _activeAlarms.end())
   {
     _currentIt = _activeAlarms.begin();
   }
 
-  AlarmType current = *_currentIt;
-  manageRoutineErrors(current);
-  _currentIt++;
+  // Cicliamo per saltare gli allarmi già confermati (Acked)
+  size_t countChecked = 0;
+  while (countChecked < _activeAlarms.size())
+  {
+    AlarmType currentType = *_currentIt;
+    
+    // Controlliamo lo stato di ACK dentro la mappa degli stati
+    if (!_alarmStates[currentType].isAcked)
+    {
+      // Abbiamo trovato un allarme NON ancora ackato! Lo mostriamo sul LED
+      manageRoutineErrors(currentType);
+      _currentIt++; // Avanziamo per il prossimo timeout dell'LCD
+      return;       // Usciamo: il LED mostrerà questo colore per i prossimi 2 secondi
+    }
+
+    // Se era ackato, avanziamo all'elemento successivo per cercarne uno attivo
+    _currentIt++;
+    if (_currentIt == _activeAlarms.end())
+    {
+      _currentIt = _activeAlarms.begin();
+    }
+    
+    countChecked++;
+  }
+
+  // Se il ciclo termina significa che abbiamo controllato TUTTI gli allarmi 
+  // presenti in _activeAlarms e sono TUTTI nello stato isAcked == true.
+  manageRoutineErrors(AlarmType::ALL_OK);
 }
 
 void AlarmHandler::addAlarm(AlarmType type)
 {
-  if (type == AlarmType::NONE)
-  {
+  if (type == AlarmType::NONE){
     _activeAlarms.erase(AlarmType::NONE);
     return;
   }
 
-  AlarmState &state = _alarmStates[type];
+  AlarmState &state = _alarmStates[type]; //se aggiungo l'allarme di tipo type per la prima volte, come fa a estrarre il contenuto del dizionario?
   state.isPresent = true;
 
   // Gestione LCD: notifica se non è ackato OPPURE se vogliamo continuare a spammare a schermo
@@ -128,29 +149,48 @@ void AlarmHandler::removeAlarm(AlarmType type)
     _currentIt = _activeAlarms.begin();
   }
   // Se invece abbiamo cancellato un allarme che era "indietro" o "avanti" rispetto a dove 
-  // si trova il LED adesso, non tocchiamo _currentIt. Rimane dove si trova e continua a ciclatre!
+  // si trova il LED adesso, non tocchiamo _currentIt. Rimane dove si trova e continua a ciclare!
 }
 
-void AlarmHandler::setAllAlarmAcked()
+void AlarmHandler::setErrorsAcked()
 {
+  bool resettareIteratore = false;
+
   for (auto &[alarmType, state] : _alarmStates)
   {
     if (state.isPresent && !state.isAcked)
     {
-      state.isAcked = true;
+      MessageType infoTipo = getAlarmMessage(alarmType).type;
 
-      // Se NON dobbiamo spammare sull'LCD, rimuoviamo il messaggio adesso
-      if (!_config.keepSpammingAfterAck)
+      // Agiamo TASSETTIVAMENTE solo sugli ERROR
+      if (infoTipo == MessageType::ERROR)
       {
-        auto msg = getAlarmMessage(alarmType);
-        _lcd.removeMessage(msg.firstLine, msg.secondLine);
-      }
+        state.isAcked = true;
 
-      // IL LED SI SPEGNE SEMPRE: Cancelliamo tassativamente l'allarme dal ciclo LED
-      _activeAlarms.erase(alarmType);
+        if (!_config.keepSpammingAfterAck)
+        {
+          auto msg = getAlarmMessage(alarmType);
+          _lcd.removeMessage(msg.firstLine, msg.secondLine);
+        }
+
+        // Se l'errore che stiamo ackando è quello che il LED sta mostrando ora,
+        // dovremo riallineare l'iteratore
+        if (_currentIt != _activeAlarms.end() && *_currentIt == alarmType)
+        {
+          resettareIteratore = true;
+        }
+
+        // Rimuoviamo l'errore confermato dal ciclo visivo del LED
+        _activeAlarms.erase(alarmType);
+      }
     }
   }
-  _currentIt = _activeAlarms.begin();
+
+  // Resettiamo l'iteratore solo se abbiamo rimosso l'allarme corrente o se è diventato invalido
+  if (resettareIteratore || _currentIt == _activeAlarms.end())
+  {
+    _currentIt = _activeAlarms.begin();
+  }
 }
 
 void AlarmHandler::clearAlarms()
@@ -165,6 +205,11 @@ void AlarmHandler::clearAlarms()
 std::vector<AlarmType> AlarmHandler::getActiveAlarms()
 {
   return std::vector<AlarmType>(_activeAlarms.begin(), _activeAlarms.end());
+}
+
+const std::map<AlarmType, AlarmState>& AlarmHandler::getAlarmStatus()
+{
+  return _alarmStates;
 }
 
 void AlarmHandler::begin(AlarmConfig config)
