@@ -133,8 +133,8 @@ bool MqttHandler::isAddressedToMe(const JsonVariant& doc) {
 }
 
 void MqttHandler::sendStatus(Status status) {
-  StaticJsonDocument<256> doc;
-  char buffer[256];
+  StaticJsonDocument<512> doc;
+  char buffer[512];
 
   doc["id"] = _id;
   doc["status"] = statusToString(status);
@@ -151,7 +151,7 @@ void MqttHandler::sendStatus(Status status) {
 }
 
 void MqttHandler::updateWill() {
-  StaticJsonDocument<256> doc;
+  StaticJsonDocument<512> doc;
 
   doc["id"] = _id;
   doc["status"] = "OFFLINE";  // Il Will deve essere sempre OFFLINE

@@ -114,6 +114,7 @@ async function onSetMcu() {
     name: document.getElementById("mcu-name").value,
     backup: document.getElementById("mcu-backup").checked,
     timer: document.getElementById("mcu-timer").value,
+    location: document.getElementById("mcu-location").value,
   };
 
   try {

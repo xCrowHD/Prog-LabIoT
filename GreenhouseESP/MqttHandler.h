@@ -15,14 +15,11 @@
 //usiamo staicJsonDocument cosi da mettere nello stack ed evita frammentazione
 //se usassimo JsonDocument lo metterebbe nell'heap portando possibile frammentazione in seguito
 #include "WiFiHandler.h"
+#include "WeatherService.h"
 
 
 #define TOPIC_CONNECTION "lab_iot/mafogani/connection"
 #define TOPIC_TOPICS "lab_iot/mafogani/topics"
-//#define TOPIC_THRESHOLD "lab_iot/mafogani/threshold"
-//#define TOPIC_START_STOP "lab_iot/mafogani/start-stop"
-//#define TOPIC_MCU_SET "lab_iot/mafogani/set-mcu"
-//#define TOPIC_BACKUP "lab_iot/mafogani/backup"
 
 #define NUM_ACTIONS 4
 
@@ -48,6 +45,7 @@ struct McuSettings {
   char mcuName[32] = "";
   bool isBackup = false;
   float timer = 0;
+  char location[32] = "";
 };
 
 enum class Status {
@@ -59,11 +57,13 @@ enum class Status {
 class MqttHandler {
 private:
   MQTTClient _client;
-  char _lwtPayload[64];
+  char _lwtPayload[512];
+  WeatherService _weather;
   Thresholds _plantThresholds;
   McuSettings _settings;
   bool _isStartMode = false;
   bool _isStandBy = false;
+  bool _sendWeather = false;
   char _id[13];
   char _dynamicTopic[128];
   Topics _topics;
@@ -83,6 +83,7 @@ public:
   bool isRunning();
   bool isSet();
   McuSettings getSettings();
+  void handleWeather();
   bool isStandBy();
 
 
