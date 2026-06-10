@@ -179,7 +179,7 @@ void MqttHandler::handleSettings(char* payload, unsigned int length) {
       _settings.timer = doc["timer"];
     }
 
-    if (doc.containsKey("location")) {
+    if (doc.containsKey("location") && !doc["location"].isNull()) {
 
       const char* locationFromData = doc["location"];
       if (strcmp(_settings.location, locationFromData) != 0) {
