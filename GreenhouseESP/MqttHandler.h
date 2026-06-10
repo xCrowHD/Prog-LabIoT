@@ -66,6 +66,8 @@ private:
   bool _sendWeather = false;
   char _id[13];
   char _dynamicTopic[128];
+  bool _sendOnlineStatus = false;
+  bool _sendConnectStatus = false;
   Topics _topics;
   Status _status = Status::OFFLINE;
   const char* _actions[NUM_ACTIONS] = {};
@@ -83,7 +85,7 @@ public:
   bool isRunning();
   bool isSet();
   McuSettings getSettings();
-  void handleWeather();
+  void handleDeferredActions();
   bool isStandBy();
 
 
