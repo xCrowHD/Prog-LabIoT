@@ -15,6 +15,7 @@
 //usiamo staicJsonDocument cosi da mettere nello stack ed evita frammentazione
 //se usassimo JsonDocument lo metterebbe nell'heap portando possibile frammentazione in seguito
 #include "WiFiHandler.h"
+#include "WeatherService.h"
 
 
 #define TOPIC_CONNECTION "lab_iot/mafogani/connection"
@@ -57,10 +58,12 @@ class MqttHandler {
 private:
   MQTTClient _client;
   char _lwtPayload[512];
+  WeatherService _weather;
   Thresholds _plantThresholds;
   McuSettings _settings;
   bool _isStartMode = false;
   bool _isStandBy = false;
+  bool _sendWeather = false;
   char _id[13];
   char _dynamicTopic[128];
   Topics _topics;
@@ -80,6 +83,7 @@ public:
   bool isRunning();
   bool isSet();
   McuSettings getSettings();
+  void handleWeather();
   bool isStandBy();
 
 

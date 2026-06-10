@@ -1,5 +1,4 @@
 #include "MqttHandler.h"
-#include "WeatherService.h"
 
 MqttHandler::MqttHandler()
   : _client(512), _plantThresholds{}, _settings{}, _topics{}, _status(Status::OFFLINE) {
@@ -14,6 +13,7 @@ void MqttHandler::begin(WiFiClient& wifiClient, const char* broker, int port) {
   updateWill();
 
   _client.begin(broker, port, wifiClient);
+  _weather.begin();
 
   snprintf(_dynamicTopic, sizeof(_dynamicTopic), "%s/%s", TOPIC_CONNECTION, _id);
   _client.setWill(_dynamicTopic, _lwtPayload, true, 1);
@@ -28,6 +28,13 @@ void MqttHandler::handle() {
     reconnect();
   }
   _client.loop();
+}
+
+void MqttHandler::handleWeather() {
+  if (_sendWeather) {
+    _weather.updateForecast(_settings.location);
+    _sendWeather = false;
+  }
 }
 
 void MqttHandler::reconnect() {
@@ -178,10 +185,8 @@ void MqttHandler::handleSettings(char* payload, unsigned int length) {
       if (strcmp(_settings.location, locationFromData) != 0) {
         Serial.print(F("Nuova location rilevata: "));
         Serial.println(locationFromData);
-        WeatherService weather;
-        weather.updateForecast(locationFromData);
+        _sendWeather = true;
       }
-
       strlcpy(_settings.location, locationFromData, sizeof(_settings.location));
     }
 
