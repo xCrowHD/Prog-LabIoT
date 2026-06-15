@@ -342,6 +342,6 @@ void MqttHandler::sendSleepingStatus() {
   }
 }
 
-void MqttHandler::clearWill() {
-  _client.clearWill();
+void MqttHandler::disconnect() {
+  _client.disconnect();
 }

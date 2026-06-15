@@ -292,8 +292,9 @@ void manageSleepTime(uint32_t sleepTimeMs)
   Serial.flush();
   delay(100);
 
-  mqtt.clearWill();
+  
   mqtt.sendSleepingStatus();
+  mqtt.disconnect();
   
   wifi_set_opmode_current(NULL_MODE);
   yield();
