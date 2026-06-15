@@ -37,7 +37,7 @@ bool HandleExceptions::handleThresholds(PlantData &data, Thresholds &currentThr)
     {
         _alarm.addAlarm(AlarmType::ALL_THRESHOLDS_OUT);
         _alarm.removeAlarm(AlarmType::SOME_THRESHOLDS_OUT);
-        //Serial.println(F("All thresholds out of range"));
+        Serial.println(F("All thresholds out of range"));
         return false;
     }
     else if (!tempInRange || !humInRange || !luxInRange)
@@ -58,11 +58,9 @@ bool HandleExceptions::handleInfluxException(InfluxStatus status)
     if (status == InfluxStatus::ERR_INFLUX_CONNECTION)
     {
         _alarm.addAlarm(AlarmType::INFLUX_ERROR);
-        //Serial.print(F("Connection Error: "));
         //Serial.println(_client_idb.getLastErrorMessage());
         return false;
     }
-
     _alarm.removeAlarm(AlarmType::INFLUX_ERROR);
     return true;
 }
@@ -95,5 +93,6 @@ bool HandleExceptions::handleConnectionException(long rssi, const long RSSI_THRE
 void HandleExceptions::handleSuccess()
 {
     _alarm.clearAlarms();
+    
     //Serial.println(F("All OK!"));
 }

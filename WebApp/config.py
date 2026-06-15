@@ -16,7 +16,7 @@ INFLUXDB_BUCKET = os.getenv("INFLUXDB_BUCKET")
 INFLUXDB_URL    = os.getenv("INFLUXDB_URL")
 
 # ── MQTT ──────────────────────────────────────────────────────────────────────
-MQTT_IP   = "broker.emqx.io"
+MQTT_IP   = "test.mosquitto.org"
 MQTT_PORT = 1883
 
 TOPIC_TEST            = "lab_iot/mafogani/test"

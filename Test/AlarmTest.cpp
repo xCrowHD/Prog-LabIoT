@@ -1,42 +1,26 @@
-#include <iostream>
-#include <algorithm>
-#include <cstdint>
-#include <fstream> 
-#include <stdlib.h>
-#include <stdio.h>
-
-#include "../GreenhouseESP/AlarmHandler.h"
-#include "../GreenhouseESP/InfluxHandler.h"
-#include "../GreenhouseESP/LCDHandler.h"
-#include "../GreenhouseESP/MqttHandler.h"
-#include "../GreenhouseESP/SensorManager.h"
-#include "../GreenhouseESP/HandleExceptions.h"
-
-#include <iostream>
-#include <string>
-
-inline int testsFailed = 0;
-inline int totalAssertions = 0;
-
-#define EXPECT(condizione, messaggio)                                                                         \
-    do                                                                                                        \
-    {                                                                                                         \
-        totalAssertions++;                                                                                    \
-        if (!(condizione))                                                                                    \
-        {                                                                                                     \
-            testsFailed++;                                                                                    \
-            std::cout << "\n[FALLITO] Assertion mancata alla riga " << __LINE__ << " di " << __FILE__ << "\n" \
-                      << "  -> Condizione: " << #condizione << "\n"                                           \
-                      << "  -> Messaggio:  " << messaggio << "\n\n";                                          \
-        }                                                                                                     \
-    } while (0)
+#include "TestLibrary.h"
 
 #define RSSI_THRESHOLD -80
+#define RESET_ALARMS 5
+#define BUTTON_DEBOUNCE_DELAY 20 
+
+unsigned long lastTimerValue;
 long rssi;
 const char* url = "influx url";
 const char* org = "organization";
 const char* bkt = "Personal bucket";
 const char* tkn = "Your token";
+
+unsigned long lastDebounceTime = 0; // L'ultima volta che il pin è stato campionato
+bool lastButtonState = HIGH;
+
+char id[13];
+
+volatile bool flagCheckSensor;
+volatile bool flagWrite;
+
+unsigned long lastLcdUpdate = 0;        // ms
+const unsigned long lcdInterval = 2000; // ms
 
 LCDHandler lcd;
 
@@ -52,6 +36,8 @@ InfluxStatus mockInfluxStatus;
 
 void loopSimulation(PlantData &data, Thresholds &currentThr, InfluxStatus status);
 void initializeMockStatuses(const std::string& testName = "");
+void keepButtonAlive();
+void manageSleepTime(uint32_t sleepTimeMs);
 
 void testAlarmHandler()
 {
@@ -414,7 +400,7 @@ int main()
     // Apre il file sovrascrivendo eventuali esecuzioni precedenti
 
     std::cout << "=======================================" << std::endl;
-    std::cout << "              SUITE TEST               " << std::endl;
+    std::cout << "              ALARM TEST               " << std::endl;
     std::cout << "=======================================" << std::endl;
 
     testAlarmHandler();
@@ -443,6 +429,7 @@ void initializeMockStatuses(const std::string& testName)
 
     alarm.getConfig().testMode = true;
     alarm.getConfig().ack = false;
+    flagWrite = true;
 
     lcd.begin();
     alarm.clearAlarms();
@@ -454,25 +441,139 @@ void initializeMockStatuses(const std::string& testName)
 
 void loopSimulation(PlantData &data, Thresholds &currentThr, InfluxStatus status)
 {
-    bool connStatus = checkStatus.handleConnectionException(rssi, RSSI_THRESHOLD);
-    bool dataStatus = checkStatus.handleDataException(data);
-    bool mqttStatus = checkStatus.handleMqttExceptions(currentThr);
-    bool thrStatus = checkStatus.handleThresholds(data, currentThr);
+        // I singoli metodi aggiungono o rimuovono gli allarmi in autonomia
+        bool connStatus = checkStatus.handleConnectionException(rssi, RSSI_THRESHOLD);
+        bool dataStatus = checkStatus.handleDataException(data);
+        bool mqttStatus = checkStatus.handleMqttExceptions(currentThr);
+        bool thrStatus = checkStatus.handleThresholds(data, currentThr);
 
-    if (client.isReadyToWrite() && connStatus && dataStatus)
+        if (dataStatus)
+        {
+            lcd.addMessagePlantData(data.temperature, data.humidity, data.light);
+        }
+
+        // Logica risveglio e invio dati a Influx ESATTAMENTE 1 volta mentre è sveglio
+        bool influxStatus = true;
+
+        if (flagWrite)
+        {
+            /*InfluxStatus status = InfluxStatus::SUCCESS;
+
+            if (connStatus && dataStatus)
+            {
+                status = client.sendDataToInflux(data, rssi, "Serra", "NodeMCU", currentThr);
+            }
+            else
+            {
+                status = InfluxStatus::ERR_INFLUX_CONNECTION;
+            }*/
+
+            influxStatus = checkStatus.handleInfluxException(status);
+
+            if (influxStatus)
+            {
+                // SUCCESSO: Abbassiamo il flag così NON ci riproverà più fino al prossimo risveglio
+                flagWrite = false;
+            }
+        }
+        // ---------------------------------
+
+        // Valutazione dello stato globale per l'ingresso in Light Sleep
+        if (connStatus && dataStatus && mqttStatus && thrStatus && influxStatus)
+        {
+            checkStatus.handleSuccess();
+
+            lcd.addMessage("System", "Going to sleep", MessageType::INFO);
+
+            // -- CICLO DI SVUOTAMENTO PRIMA DELLO SLEEP ---
+            // Manteniamo LCD attivo fintanto che non ha mostrato tutti i messaggi una volta
+            // anche nel caso di successo immediato dei booleani nel loop
+
+            unsigned long int lastMessageTime = millis();
+
+            while (millis() - lastMessageTime < 3 * lcdInterval)
+            { // mostra gli ultimi 3 messaggi
+                if (millis() - lastLcdUpdate >= lcdInterval)
+                {
+                    lastLcdUpdate = millis();
+                    lcd.popAndDisplay();
+                }
+                delay(10);
+                keepButtonAlive();
+            }
+
+            // --- CONFIGURAZIONE DISPLAY PER IL PERIODO DI SLEEP ---
+            // La coda è stata mostrata. Adesso stampiamo sul display SOLO l'ID dell'ESP.
+            // Questo messaggio rimarrà impresso staticamente sul display per tutta la durata del sonno.
+            lcd.clearAll(); // Se il tuo handler ha un clear, pulisce lo schermo
+            lcd.addMessage("ID", id, MessageType::INFO);
+            lcd.popAndDisplay();
+
+            uint32_t sleepTimeMs = lastTimerValue * 1000;
+            if (sleepTimeMs > 3 * lcdInterval)
+            {
+                sleepTimeMs -= 3 * lcdInterval;
+            }
+            else
+            {
+                sleepTimeMs = 10;
+            }
+
+            manageSleepTime(sleepTimeMs); // Entra in sleep e al risveglio rimetterà flagWrite = true
+        }
+        else
+        {
+            // Se c'è un qualunque problema (allarme attivo O invio Influx fallito),
+            // gestisce l'allarme visivo. Il Ticker checkAlarmStatus riattiverà flagCheckSensor tra 5 secondi.
+            alarm.nextAlarm();
+        }
+    } // Chiusura corretta di if (flagCheckSensor)
+
+void keepButtonAlive()
+{
+    int reading = digitalRead(RESET_ALARMS);
+    if (reading != lastButtonState)
     {
-        status = client.sendDataToInflux(data, rssi, "Serra", "NodeMCU", currentThr);
+        lastDebounceTime = millis();
     }
 
-    bool influxStatus = checkStatus.handleInfluxException(status);
+    if ((millis() - lastDebounceTime) > BUTTON_DEBOUNCE_DELAY)
+    {
+        static bool wasAlreadyPressed = false;
+        if (reading == LOW && !wasAlreadyPressed)
+        {
+            alarm.setAllAlarmAcked();
+            wasAlreadyPressed = true;
+        }
+        if (reading == HIGH)
+        {
+            wasAlreadyPressed = false;
+        }
+    }
+    lastButtonState = reading;
+}
+void wakeupCallback()
+{ // unlike ISRs, you can do a print() from a callback function
+    Serial.println(F("Woke from Light Sleep - this is the callback"));
+}
 
-    // Valutazione dello stato globale per aggiornare scritte LCD di successo
-    if (connStatus && dataStatus && mqttStatus && thrStatus && influxStatus)
+void manageSleepTime(uint32_t sleepTimeMs)
+{
+    delay(10);
+}
+
+bool updateInfluxInterval(uint32_t newIntervalSeconds)
+{
+    if (newIntervalSeconds <= 0)
     {
-        checkStatus.handleSuccess();
+        return false;
     }
-    else
-    {
-        alarm.nextAlarm();
-    }
+
+    Serial.print(F("Aggiornamento intervallo InfluxDB: "));
+    Serial.print(newIntervalSeconds);
+    Serial.println(F(" secondi"));
+
+    lastTimerValue = newIntervalSeconds;
+
+    return true;
 }

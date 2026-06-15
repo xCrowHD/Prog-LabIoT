@@ -2,12 +2,12 @@
 #include <stdio.h>  // Richiesto per snprintf
 
 TelegramNotifier::TelegramNotifier(const char* token, const char* chatId)
-  : _botToken(token), _chatId(chatId), _telegramCert(TELEGRAM_CERTIFICATE_ROOT), _bot(token, _secureClient) {
+  : _botToken(token), _chatId(chatId), _bot(token, _secureClient) {
 }
 
 void TelegramNotifier::begin() {
   configTime(0, 0, "it.pool.ntp.org", "time.nist.gov");
-  _secureClient.setTrustAnchors(&_telegramCert);
+  _secureClient.setInsecure();
 }
 
 bool TelegramNotifier::sendNotification(const char* message) {

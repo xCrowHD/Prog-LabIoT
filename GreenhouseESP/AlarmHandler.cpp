@@ -12,6 +12,9 @@ void AlarmHandler::manageRoutineErrors(AlarmType alarm)
   case AlarmType::ALL_OK:
     setLedRGB(LOW, HIGH, LOW);
     break; // Verde
+  case AlarmType::NEED_SETTINGS:
+    setLedRGB(HIGH, HIGH, HIGH);
+    break; // Bianco
   case AlarmType::SOME_THRESHOLDS_OUT:
     setLedRGB(HIGH, LOW, HIGH);
     break; // Purple
@@ -25,8 +28,8 @@ void AlarmHandler::manageRoutineErrors(AlarmType alarm)
     setLedRGB(LOW, LOW, HIGH);
     break; // Blu
   case AlarmType::INFLUX_ERROR:
-    setLedRGB(HIGH, HIGH, HIGH);
-    break; // Bianco
+    setLedRGB(LOW, LOW, HIGH);
+    break; // Blu
   case AlarmType::NO_SEND_DATA:
     setLedRGB(LOW, HIGH, HIGH);
     break; // Azzurro
@@ -41,48 +44,69 @@ void AlarmHandler::nextAlarm()
   // 1. GESTIONE TRIGGER ACK GLOBALE
   if (_config.ack == true)
   {
-    setAllAlarmAcked();
+    setErrorsAcked();
     _config.ack = false;
   }
 
   // 2. ROUTINE LED
-  // Se la lista attiva è vuota, significa che non ci sono errori oppure che sono stati tutti ackati.
-  // In entrambi i casi, per il LED è una situazione nominale (Verde o Spento, in base a come preferite ALL_OK)
   if (_activeAlarms.empty())
   {
     manageRoutineErrors(AlarmType::ALL_OK);
     return;
   }
 
-  // Avanzamento ciclo LED originale (solo sugli allarmi rimasti non-ackati)
   if (_currentIt == _activeAlarms.end())
   {
     _currentIt = _activeAlarms.begin();
   }
 
-  AlarmType current = *_currentIt;
-  manageRoutineErrors(current);
-  _currentIt++;
+  // Cicliamo per saltare gli allarmi già confermati (Acked)
+  size_t countChecked = 0;
+  while (countChecked < _activeAlarms.size())
+  {
+    AlarmType currentType = *_currentIt;
+    
+    // Controlliamo lo stato di ACK dentro la mappa degli stati
+    if (!_alarmStates[currentType].isAcked)
+    {
+      // Abbiamo trovato un allarme NON ancora ackato! Lo mostriamo sul LED
+      manageRoutineErrors(currentType);
+      _currentIt++; // Avanziamo per il prossimo timeout dell'LCD
+      return;       // Usciamo: il LED mostrerà questo colore per i prossimi 2 secondi
+    }
+
+    // Se era ackato, avanziamo all'elemento successivo per cercarne uno attivo
+    _currentIt++;
+    if (_currentIt == _activeAlarms.end())
+    {
+      _currentIt = _activeAlarms.begin();
+    }
+    
+    countChecked++;
+  }
+
+  // Se il ciclo termina significa che abbiamo controllato TUTTI gli allarmi 
+  // presenti in _activeAlarms e sono TUTTI nello stato isAcked == true.
+  manageRoutineErrors(AlarmType::ALL_OK);
 }
 
 void AlarmHandler::addAlarm(AlarmType type)
 {
-  if (type == AlarmType::NONE)
-  {
+  if (type == AlarmType::NONE){
     _activeAlarms.erase(AlarmType::NONE);
     return;
   }
 
-  AlarmState &state = _alarmStates[type];
+  AlarmState &state = _alarmStates[type]; //se aggiungo l'allarme di tipo type per la prima volte, come fa a estrarre il contenuto del dizionario?
   state.isPresent = true;
 
   // Gestione LCD: notifica se non è ackato OPPURE se vogliamo continuare a spammare a schermo
   if ((!state.isAcked) || _config.keepSpammingAfterAck)
   {
       auto msg = getAlarmMessage(type);
-      if (strlen(msg.first) > 0)
+      if (strlen(msg.firstLine) > 0)
       {
-        _lcd.addMessage(msg.first, msg.second, MessageType::ERROR);
+        _lcd.addMessage(msg.firstLine, msg.secondLine, msg.type);
       }
       //state.lcdNotified = true;
   }
@@ -93,48 +117,80 @@ void AlarmHandler::addAlarm(AlarmType type)
     if (_activeAlarms.find(type) == _activeAlarms.end())
     {
       _activeAlarms.insert(type);
-      _currentIt = _activeAlarms.begin();
     }
   }
 }
 
 void AlarmHandler::removeAlarm(AlarmType type)
 {
-  // 1. Reset dello stato hardware (Rientro errore)
+  // 1. Aggiorna lo stato logico
   if (_alarmStates.find(type) != _alarmStates.end())
   {
     _alarmStates[type].isPresent = false;
     _alarmStates[type].isAcked = false;
   }
 
-  // 2. Pulizia fisica da LCD e dal set del LED
+  // 2. Rimuovi i messaggi dall'LCD
   auto msg = getAlarmMessage(type);
-  _lcd.removeMessage(msg.first, msg.second);
+  _lcd.removeMessage(msg.firstLine, msg.secondLine);
+
+  // 3. CONTROLLO CHIRURGICO DEL "BUCO":
+  // Verifichiamo se l'allarme che stiamo per cancellare è PROPRIO quello 
+  // che l'iteratore sta puntando in questo momento.
+  bool deletingCurrentAlarm = (_currentIt != _activeAlarms.end() && *_currentIt == type);
+
+  // 4. Cancellazione fisica dall'insieme
   _activeAlarms.erase(type);
 
-  _currentIt = _activeAlarms.begin();
+  // 5. Risoluzione del puntatore orfano
+  if (deletingCurrentAlarm || _currentIt == _activeAlarms.end())
+  {
+    // Se abbiamo fatto un buco sotto i piedi dell'iteratore, lo riportiamo al sicuro all'inizio
+    _currentIt = _activeAlarms.begin();
+  }
+  // Se invece abbiamo cancellato un allarme che era "indietro" o "avanti" rispetto a dove 
+  // si trova il LED adesso, non tocchiamo _currentIt. Rimane dove si trova e continua a ciclare!
 }
 
-void AlarmHandler::setAllAlarmAcked()
+void AlarmHandler::setErrorsAcked()
 {
+  bool resettareIteratore = false;
+
   for (auto &[alarmType, state] : _alarmStates)
   {
     if (state.isPresent && !state.isAcked)
     {
-      state.isAcked = true;
+      MessageType infoTipo = getAlarmMessage(alarmType).type;
 
-      // Se NON dobbiamo spammare sull'LCD, rimuoviamo il messaggio adesso
-      if (!_config.keepSpammingAfterAck)
+      // Agiamo TASSETTIVAMENTE solo sugli ERROR
+      if (infoTipo == MessageType::ERROR)
       {
-        auto msg = getAlarmMessage(alarmType);
-        _lcd.removeMessage(msg.first, msg.second);
-      }
+        state.isAcked = true;
 
-      // IL LED SI SPEGNE SEMPRE: Cancelliamo tassativamente l'allarme dal ciclo LED
-      _activeAlarms.erase(alarmType);
+        if (!_config.keepSpammingAfterAck)
+        {
+          auto msg = getAlarmMessage(alarmType);
+          _lcd.removeMessage(msg.firstLine, msg.secondLine);
+        }
+
+        // Se l'errore che stiamo ackando è quello che il LED sta mostrando ora,
+        // dovremo riallineare l'iteratore
+        if (_currentIt != _activeAlarms.end() && *_currentIt == alarmType)
+        {
+          resettareIteratore = true;
+        }
+
+        // Rimuoviamo l'errore confermato dal ciclo visivo del LED
+        _activeAlarms.erase(alarmType);
+      }
     }
   }
-  _currentIt = _activeAlarms.begin();
+
+  // Resettiamo l'iteratore solo se abbiamo rimosso l'allarme corrente o se è diventato invalido
+  if (resettareIteratore || _currentIt == _activeAlarms.end())
+  {
+    _currentIt = _activeAlarms.begin();
+  }
 }
 
 void AlarmHandler::clearAlarms()
@@ -149,6 +205,11 @@ void AlarmHandler::clearAlarms()
 std::vector<AlarmType> AlarmHandler::getActiveAlarms()
 {
   return std::vector<AlarmType>(_activeAlarms.begin(), _activeAlarms.end());
+}
+
+const std::map<AlarmType, AlarmState>& AlarmHandler::getAlarmStatus()
+{
+  return _alarmStates;
 }
 
 void AlarmHandler::begin(AlarmConfig config)
@@ -196,25 +257,27 @@ void AlarmHandler::setLedRGB(uint8_t r, uint8_t g, uint8_t b)
 
 AlarmConfig &AlarmHandler::getConfig() { return _config; }
 
-std::pair<const char *, const char *> AlarmHandler::getAlarmMessage(AlarmType type)
+LCDMsg AlarmHandler::getAlarmMessage(AlarmType type)
 {
   switch (type)
   {
   case AlarmType::ALL_OK:
-    return {"All OK!", ""};
+    return LCDMsg { "Status", "All OK", MessageType::INFO };
+  case AlarmType::NEED_SETTINGS:
+    return LCDMsg {"Status", "Need settings", MessageType::INFO};
   case AlarmType::SOME_THRESHOLDS_OUT:
-    return {"Some thresholds", "O.O.R"};
+    return LCDMsg{"WARNING: Some", "thresholds O.O.R", MessageType::WARNING};
   case AlarmType::ALL_THRESHOLDS_OUT:
-    return {"All thresholds", "O.O.R"};
+    return LCDMsg{"WARNING: All", "thresholds O.O.R", MessageType::WARNING};
   case AlarmType::SENSOR_ERROR:
-    return {"Error", "Sensor error"};
+    return LCDMsg{"ERROR", "Sensor error", MessageType::ERROR};
   case AlarmType::CONNECTION_ERROR:
-    return {"Error", "Connection error"};
+    return LCDMsg{"ERROR", "Connection error", MessageType::ERROR};
   case AlarmType::INFLUX_ERROR:
-    return {"Error", "Influx error"};
+    return LCDMsg{"ERROR", "Influx error", MessageType::ERROR};
   case AlarmType::NO_SEND_DATA:
-    return {"Error", "Missing data"};
+    return LCDMsg{"ERROR", "Missing data", MessageType::ERROR};
   default:
-    return {"", ""};
+    return LCDMsg{"", "", MessageType::INFO};
   }
 }

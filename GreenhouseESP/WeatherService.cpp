@@ -42,7 +42,7 @@ bool WeatherService::getCoordinates(const char* cityName) {
   bool success = false;
 
   if (httpCode == HTTP_CODE_OK) {
-    StaticJsonDocument<1024> doc;
+    StaticJsonDocument<512> doc;
     DeserializationError error = deserializeJson(doc, http.getString());
 
     if (error) {
@@ -98,7 +98,7 @@ void WeatherService::updateForecast(const char* cityName) {
     
     // Il blocco JSON vive SOLO dentro queste graffe (Scope limitato per liberare RAM)
     {
-      StaticJsonDocument<1024> doc;
+      StaticJsonDocument<512> doc;
       DeserializationError error = deserializeJson(doc, http.getString());
       if (!error) {
         weatherCodeToSend = doc["daily"]["weather_code"][0];

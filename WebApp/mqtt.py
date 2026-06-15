@@ -72,12 +72,12 @@ class MQTTManager:
 
         if status == "CONNECTING":
             self._send_dynamic_topics_list(esp_id, esp_type)
-        
+            
 
         if status == "ONLINE":
             if esp_type == "SECURITY_SENSOR":
                 return
-            
+                
             self._restore_node_state(esp_id) # Ripristina soglie/timer
 
             if node_db and node_db.name:
@@ -87,10 +87,10 @@ class MQTTManager:
                 else:
                     # Sono un BACKUP: devo attivarmi o stare in standby?
                     main_id = self._get_partner_node(node_db.name, node_db.id)
-                    
+                        
                     # Se il main è ONLINE, io sto in standby. Altrimenti mi attivo.
                     should_standby = (main_id is not None and self.esp_list.get(main_id, {}).get("status") == "ONLINE")
-                    
+                        
                     msg = {"id": esp_id, "standby": should_standby}
                     self.client.publish(TOPIC_BACKUP, json.dumps(msg), qos=1)
                     print(f"[MQTT] Backup {esp_id} checked partner: standby={should_standby}")
@@ -98,10 +98,14 @@ class MQTTManager:
         elif status == "OFFLINE":
             if esp_type == "SECURITY_SENSOR":
                 return
-            
+                
             if node_db and not node_db.is_backup:
                 # Se un Main muore, svegliamo il backup
                 self._set_backup_standby(esp_id, in_standby=False)
+                    
+        elif status == "SLEEPING":
+            print(f"[MQTT] Il nodo Main {esp_id} è entrato in Light Sleep controllato. Il backup resta in standby.")
+
         
         
 

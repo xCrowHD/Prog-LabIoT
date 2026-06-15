@@ -9,7 +9,6 @@ class TelegramNotifier {
 private:
   const char* _botToken;
   const char* _chatId;
-  X509List _telegramCert;
   WiFiClientSecure _secureClient;
   UniversalTelegramBot _bot;
 

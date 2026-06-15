@@ -19,6 +19,7 @@ enum class AlarmType : uint8_t
 {
   NONE,
   ALL_OK,
+  NEED_SETTINGS,
   SENSOR_ERROR,
   ALL_THRESHOLDS_OUT,
   SOME_THRESHOLDS_OUT,
@@ -48,7 +49,6 @@ struct AlarmState {
 
 class AlarmHandler{
   private:
-
     std::set<AlarmType> _activeAlarms;
     std::set<AlarmType>::iterator _currentIt;
     
@@ -65,14 +65,16 @@ class AlarmHandler{
     void addAlarm(AlarmType type);
     void removeAlarm(AlarmType type);
     void clearAlarms();
-    void setAllAlarmAcked();
+    void setErrorsAcked();
     std::vector<AlarmType> getActiveAlarms();
+    const std::map<AlarmType, AlarmState>& getAlarmStatus();
     AlarmConfig& getConfig ();
+    LCDMsg getAlarmMessage(AlarmType type);
 
   private: 
     void ledOff();
     void setLedRGB(uint8_t r, uint8_t g, uint8_t b);
-    std::pair<const char*, const char*> getAlarmMessage(AlarmType type);
+    
 };
 
 #endif
