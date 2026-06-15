@@ -102,6 +102,7 @@ void loop()
 {
   mqtt.handle();
   mqtt.handleDeferredActions();
+  keepButtonAlive();
   
   if (millis() - lastLcdUpdate >= lcdInterval){
     lastLcdUpdate = millis();
@@ -245,7 +246,7 @@ void loop()
     }
   } // Chiusura corretta di if (flagCheckSensor)
  
-  keepButtonAlive();
+ 
 }
 
 void keepButtonAlive(){
@@ -324,7 +325,7 @@ void manageSleepTime(uint32_t sleepTimeMs)
   resetConnection();
 
   unsigned long startMqttWindow = millis();
-  while (millis() - startMqttWindow < 4000) {
+  while (millis() - startMqttWindow < 15000) {
     mqtt.handle();
     mqtt.handleDeferredActions();
     keepButtonAlive(); 
