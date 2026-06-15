@@ -100,8 +100,8 @@ void setup()
 
 void loop()
 {
-  mqtt.handleDeferredActions();
   mqtt.handle();
+  mqtt.handleDeferredActions();
   
   if (millis() - lastLcdUpdate >= lcdInterval){
     lastLcdUpdate = millis();
@@ -200,7 +200,7 @@ void loop()
       lcd.addMessage("System", "Going to sleep", MessageType::INFO);
       lcd.popAndDisplay();
 
-      mqtt.sendSleepingStatus();
+      
 
       // -- CICLO DI SVUOTAMENTO PRIMA DELLO SLEEP ---
       // Manteniamo LCD attivo fintanto che non ha mostrato tutti i messaggi una volta
@@ -278,7 +278,7 @@ void wakeupCallback()
 
 void manageSleepTime(uint32_t sleepTimeMs)
 {
-
+  
   uint32_t remainingSleepTime = sleepTimeMs;
   
   Serial.flush();
@@ -294,6 +294,8 @@ void manageSleepTime(uint32_t sleepTimeMs)
   wifi_set_opmode_current(NULL_MODE);
   yield();
   delay(50);
+
+  mqtt.sendSleepingStatus();
   
   extern os_timer_t *timer_list;
   timer_list = nullptr; 
@@ -320,11 +322,11 @@ void manageSleepTime(uint32_t sleepTimeMs)
   });
 
   resetConnection();
-  mqtt.sendWakeupStatus();
 
   unsigned long startMqttWindow = millis();
-  while (millis() - startMqttWindow < 2000) {
+  while (millis() - startMqttWindow < 4000) {
     mqtt.handle();
+    mqtt.handleDeferredActions();
     keepButtonAlive(); 
     lcd.addMessage("Status", "Waking up", MessageType::INFO);
     lcd.popAndDisplay();
@@ -359,9 +361,7 @@ void resetConnection() {
     // 2. Re-inizializziamo e connettiamo MQTT
     Serial.println(F("[MQTT] Riconnessione al broker..."));
     mqtt.begin(client, mqttBroker, 1883);
-    
-    // Forziamo un ciclo di handle per avviare la connessione MQTT
-    mqtt.handle(); 
+
   } else {
     Serial.println(F("\n[Wi-Fi] Errore: Timeout connessione fallita al risveglio."));
   }

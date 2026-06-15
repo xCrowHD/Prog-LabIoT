@@ -14,7 +14,7 @@ void AlarmHandler::manageRoutineErrors(AlarmType alarm)
     break; // Verde
   case AlarmType::NEED_SETTINGS:
     setLedRGB(HIGH, HIGH, HIGH);
-    break;
+    break; // Bianco
   case AlarmType::SOME_THRESHOLDS_OUT:
     setLedRGB(HIGH, LOW, HIGH);
     break; // Purple
