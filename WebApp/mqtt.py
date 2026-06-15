@@ -9,6 +9,7 @@ from paho.mqtt import client as mqtt_client
 from db.plants_db import plant_db_manager
 from db.node_settings_db import settings_db_manager
 import asyncio
+import time
 
 from config import (
     MQTT_IP, MQTT_PORT,
@@ -33,6 +34,7 @@ class MQTTManager:
         self.client.subscribe(TOPIC_SECURITY)
         self.client.message_callback_add(TOPIC_CONNECTION, self._on_node_status)
         self.client.message_callback_add(TOPIC_SECURITY, self._on_security_message)
+        asyncio.create_task(self._monitor_nodes_offline())
         self.client.publish(TOPIC_TEST, "MQTT Client ON")
         self.client.loop_start()
         print("[MQTT] Client connesso e loop avviato correttamente!")
@@ -61,6 +63,7 @@ class MQTTManager:
         if esp_id not in self.esp_list:
             self.esp_list[esp_id] = {}
         self.esp_list[esp_id]["status"] = status
+        self.esp_list[esp_id]["last_seen"] = time.time()
         self.esp_list[esp_id]["type"] = esp_type
 
         settings_db_manager.ensure_node_exists(esp_id)
@@ -121,6 +124,31 @@ class MQTTManager:
                 )
         except Exception as e:
             print(f"[MQTT] Errore nel parsing del messaggio di sicurezza: {e}")
+
+    async def _monitor_nodes_offline(self):
+        while True:
+            await asyncio.sleep(5) # Controllo frequente
+            now = time.time()
+            
+            for esp_id, info in list(self.esp_list.copy().items()):
+                last_seen = info.get("last_seen", 0)
+                status = info.get("status")
+                node_db = settings_db_manager.get_node_settings_by_id(esp_id)
+                
+                # Calcoliamo il timeout dinamico
+                timer = node_db.timer if node_db and node_db.timer else 30
+                # Aggiungiamo un margine (es. 10s) per evitare falsi positivi durante lo sleep
+                threshold = timer + 10 
+                
+                if (now - last_seen) > threshold and status == "SLEEPING":
+                    print(f"[Watchdog] Nodo {esp_id} ({status}) non risponde. Impostato come OFFLINE.")
+                    self.esp_list[esp_id]["status"] = "OFFLINE"
+                    
+                    # --- LOGICA DI FAILOVER AGGIUNTA ---
+                    # Se il nodo che è appena andato offline è un MAIN, attiva il suo backup
+                    if node_db and not node_db.is_backup:
+                        print(f"[Watchdog] Il Main {esp_id} è offline. Innesco il backup...")
+                        self._set_backup_standby(esp_id, in_standby=False)
 
     # ── Internal helper functions ────────────────────────────────────────────────────
     def _send_dynamic_topics_list(self, esp_id: str, esp_type: str):
