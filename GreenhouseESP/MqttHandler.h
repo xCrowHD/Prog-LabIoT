@@ -89,7 +89,7 @@ public:
   void handleDeferredActions();
   bool isStandBy();
   void sendSleepingStatus();
-  void sendWakeupStatus();
+  void clearWill();
 
 private:
   const char* statusToString(Status s);

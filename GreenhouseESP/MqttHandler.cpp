@@ -342,10 +342,6 @@ void MqttHandler::sendSleepingStatus() {
   }
 }
 
-void MqttHandler::sendWakeupStatus() {
-    Serial.println(F("[MQTT] Notifico il risveglio al broker..."));
-    // Essendo un metodo della classe, può chiamare sendStatus privato
-    sendStatus(Status::CONNECTING); 
-    yield();
-    delay(25);
+void MqttHandler::clearWill() {
+  _client.clearWill();
 }
