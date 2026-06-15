@@ -124,10 +124,10 @@ void loop()
   alarm.removeAlarm(AlarmType::NEED_SETTINGS);
 
   if(!mqtt.isRunning()){
-   lcd.addMessage("Status", "Offline", MessageType::INFO);
+   lcd.addMessage("Status", "Stop", MessageType::INFO);
    return;
   } else{
-    lcd.addMessage("Status", "Online", MessageType::INFO);
+    lcd.addMessage("Status", "Running", MessageType::INFO);
   }
 
   if (flagCheckSensor){
