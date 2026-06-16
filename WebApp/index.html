@@ -148,7 +148,8 @@
           <div class="md:col-span-8 grid grid-cols-1 sm:grid-cols-3 gap-6">
             <!-- Temperature -->
             <div
-              class="bg-surface-container-high p-6 rounded-xl hover:bg-surface-container-highest transition-colors duration-200"
+              id="card-temp"
+              class="bg-surface-container-high p-6 rounded-xl border-l-4 border-transparent hover:bg-surface-container-highest transition-colors duration-200"
             >
               <div class="flex justify-between items-start mb-4">
                 <span
@@ -165,18 +166,19 @@
                   class="font-headline text-5xl font-light text-on-surface"
                   >24.8</span
                 >
+                <span
+                  id="plant-temp-badge"
+                  class="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/15 text-primary"
+                  >OK</span
+                >
                 <span class="text-on-surface-variant text-xl">°C</span>
-              </div>
-              <div
-                class="mt-4 h-1 bg-surface-container-lowest rounded-full overflow-hidden"
-              >
-                <div class="h-full bg-primary w-[10%]"></div>
               </div>
             </div>
 
             <!-- Humidity -->
             <div
-              class="bg-surface-container-high p-6 rounded-xl hover:bg-surface-container-highest transition-colors duration-200"
+              id="card-hum"
+              class="bg-surface-container-high p-6 rounded-xl border-l-4 border-transparent hover:bg-surface-container-highest transition-colors duration-200"
             >
               <div class="flex justify-between items-start mb-4">
                 <span
@@ -193,18 +195,19 @@
                   class="font-headline text-5xl font-light text-on-surface"
                   >62</span
                 >
+                <span
+                  id="plant-hum-badge"
+                  class="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/15 text-primary"
+                  >OK</span
+                >
                 <span class="text-on-surface-variant text-xl">%</span>
-              </div>
-              <div
-                class="mt-4 h-1 bg-surface-container-lowest rounded-full overflow-hidden"
-              >
-                <div class="h-full bg-secondary w-[80%]"></div>
               </div>
             </div>
 
             <!-- Light Intensity -->
             <div
-              class="bg-surface-container-high p-6 rounded-xl hover:bg-surface-container-highest transition-colors duration-200"
+              id="card-lux"
+              class="bg-surface-container-high p-6 rounded-xl border-l-4 border-transparent hover:bg-surface-container-highest transition-colors duration-200"
             >
               <div class="flex justify-between items-start mb-4">
                 <span
@@ -221,12 +224,12 @@
                   class="font-headline text-5xl font-light text-on-surface"
                   >12.4</span
                 >
+                <span
+                  id="plant-lux-badge"
+                  class="ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/15 text-primary"
+                  >OK</span
+                >
                 <span class="text-on-surface-variant text-xl">kLux</span>
-              </div>
-              <div
-                class="mt-4 h-1 bg-surface-container-lowest rounded-full overflow-hidden"
-              >
-                <div class="h-full bg-tertiary w-[45%]"></div>
               </div>
             </div>
           </div>

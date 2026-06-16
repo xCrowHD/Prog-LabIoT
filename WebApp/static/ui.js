@@ -73,7 +73,7 @@ export async function loadPlantThresholds(plantId) {
     document.getElementById("hum-range").innerText =
       `${data.hum_min}% - ${data.hum_max}%`;
     document.getElementById("light-range").innerText =
-      `${data.light_min} - ${data.light_max} (LDR)`;
+      `${adcToKlux(data.light_min)} - ${adcToKlux(data.light_max)} (LDR)`;
   } catch (err) {
     console.error("[ui] loadPlantThresholds:", err);
     document.getElementById("plant-name").innerText = "Errore Caricamento";
@@ -83,13 +83,53 @@ export async function loadPlantThresholds(plantId) {
 /** Populate the live sensor reading badges. */
 export async function loadLatestSensorData(plantId) {
   try {
-    const data = await fetchLatestPlantData(plantId);
+    const [data, thr] = await Promise.all([
+      fetchLatestPlantData(plantId),
+      fetchPlantThresholds(plantId),
+    ]);
+
     document.getElementById("plant-temp").innerText = data.temp;
     document.getElementById("plant-hum").innerText = data.hum;
     document.getElementById("plant-lux").innerText = data.klux;
+
+    if (thr) {
+      const tempOk = data.temp >= thr.temp_min && data.temp <= thr.temp_max;
+      const humOk = data.hum >= thr.hum_min && data.hum <= thr.hum_max;
+      const luxMinKlux = adcToKlux(thr.light_min);
+      const luxMaxKlux = adcToKlux(thr.light_max);
+      const luxOk = data.klux >= luxMinKlux && data.klux <= luxMaxKlux;
+
+      setSensorStatus("card-temp", "plant-temp-badge", tempOk);
+      setSensorStatus("card-hum", "plant-hum-badge", humOk);
+      setSensorStatus("card-lux", "plant-lux-badge", luxOk);
+    }
   } catch (err) {
     console.error("[ui] loadLatestSensorData:", err);
   }
+}
+
+function setSensorStatus(cardId, badgeId, isOk) {
+  const card = document.getElementById(cardId);
+  const badge = document.getElementById(badgeId);
+  if (isOk) {
+    card.style.borderLeftColor = "#4de082"; // primary (verde)
+    badge.textContent = "OK";
+    badge.className =
+      "ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-primary/15 text-primary";
+  } else {
+    card.style.borderLeftColor = "#f59e0b"; // amber (giallo)
+    badge.textContent = "OUT";
+    badge.className =
+      "ml-2 text-[10px] font-bold px-2 py-0.5 rounded-full bg-amber-400/15 text-amber-400";
+  }
+}
+
+function adcToKlux(adc) {
+  if (adc <= 0) return 0;
+  if (adc >= 1023) return 1000;
+  const vOut = (adc * 3.3) / 1024;
+  const rLdr = (10000 * (3.3 - vOut)) / vOut;
+  return Math.round((500 / (rLdr / 1000) / 1000) * 100) / 100;
 }
 
 // ── MCU panel ─────────────────────────────────────────────────────────────────
