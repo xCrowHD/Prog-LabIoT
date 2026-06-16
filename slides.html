@@ -897,11 +897,11 @@
         </div>
       </section>
 
-      <!-- ══ 6 · LIGHT SLEEP MODE ══ -->
+      <!-- ══ 5a · LIGHT SLEEP – MECCANISMO ══ -->
       <section class="slide" style="overflow-y: auto; padding-right: 8px">
         <div class="sh">
           <span class="snum">05</span>
-          <h1 class="stitle">Light Sleep Mode – Risparmio Energetico</h1>
+          <h1 class="stitle">Light Sleep Mode – Meccanismo</h1>
         </div>
         <div class="sb">
           <div class="cols">
@@ -918,8 +918,8 @@
                     energia
                   </li>
                   <li>
-                    Light Sleep sospende la CPU e la radio WiFi, mantenendo il
-                    <strong>RAM</strong> attivo
+                    Light Sleep sospende la CPU e la radio WiFi: da
+                    <strong>144 mA</strong> a <strong>8 mA</strong>
                   </li>
                   <li>
                     Risveglio rapido (~ms) senza bisogno di reinizializzare
@@ -980,7 +980,37 @@
               </div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- ══ 5b · LIGHT SLEEP – CONSUMI ══ -->
+      <section class="slide">
+        <div class="sh">
+          <span class="snum">05b</span>
+          <h1 class="stitle">Light Sleep Mode – Consumi &amp; Confronto</h1>
+        </div>
+        <div class="sb">
           <div class="cols">
+            <div class="card">
+              <div class="ctitle">⚡ Consumo Energetico</div>
+              <ul>
+                <li>
+                  <span class="led lg"></span>
+                  <strong>Attivo</strong> (WiFi + sensori + MQTT): ~<strong>144 mA</strong>
+                </li>
+                <li>
+                  <span class="led lb"></span>
+                  <strong>Light Sleep</strong> (CPU + radio OFF): ~<strong>8 mA</strong>
+                </li>
+                <li>
+                  Riduzione del <strong>94%</strong> del consumo istantaneo
+                </li>
+                <li>
+                  Il risparmio cresce con il timer: più è lungo il sleep, meno
+                  tempo si spende a 144 mA
+                </li>
+              </ul>
+            </div>
             <div class="card">
               <div class="ctitle">💡 Light Sleep vs Deep Sleep</div>
               <ul>
@@ -997,6 +1027,8 @@
                 </li>
               </ul>
             </div>
+          </div>
+          <div class="cols">
             <div class="card">
               <div class="ctitle">🖥️ Comportamento LCD durante Sleep</div>
               <ul>
@@ -1015,6 +1047,29 @@
                 <li>
                   Risveglio: LCD torna attivo con messaggio
                   <code>"Waking up"</code>
+                </li>
+              </ul>
+            </div>
+            <div class="card">
+              <div class="ctitle">🔋 Esempio: Batteria + Timer 4 min</div>
+              <ul>
+                <li>
+                  Batteria <strong>1000 mAh</strong> (es. LiPo 3.7V)
+                </li>
+                <li>
+                  Ciclo: ~10s attivo (144 mA) + 240s sleep (8 mA)
+                </li>
+                <li>
+                  Consumo medio ciclico: ~<strong>13.6 mA</strong>
+                </li>
+                <li>
+                  Autonomia stimata: <strong>~73 ore</strong> (~3 giorni)
+                </li>
+                <li>
+                  Senza sleep (sempre attivo): ~<strong>7 ore</strong>
+                </li>
+                <li>
+                  <strong>Fattore 10×</strong> di autonomia in più
                 </li>
               </ul>
             </div>
