@@ -1040,9 +1040,8 @@
                   svuota la coda LCD mostrando tutti i messaggi in attesa
                 </li>
                 <li>
-                  Il timer del sleep parte <strong>dopo</strong> lo svuotamento
-                  della coda: il tempo LCD viene sottratto dal tempo totale di
-                  sleep
+                  Il tempo di sleep tiene conto del tempo di svuotamento della
+                  coda del LCD
                 </li>
                 <li>
                   Durante lo sleep: messaggio statico
@@ -1079,7 +1078,7 @@
           <div class="cols">
             <div>
               <div class="box" style="margin-bottom: 10px">
-                <strong>Node Discovery</strong> – l'ESP si announce con tipo
+                <strong>Node Discovery</strong> – l'ESP si presenta con tipo
                 (<code>PLANT_SENSOR</code> / <code>SECURITY_SENSOR</code>), il
                 server risponde con i topic dinamici appropriati.
               </div>
@@ -1517,32 +1516,19 @@
                 <div class="ctitle">Realizzazione</div>
                 <ul>
                   <li>
-                    Sistema di monitoraggio ambientale continuo (temperatura,
-                    umidità, luce) con 3 piante e soglie indipendenti
+                    Monitoraggio continuo (temp, umidità, luce) con 3 piante e
+                    soglie indipendenti
                   </li>
                   <li>
-                    Sicurezza fisica con rilevamento porta e fiamma, doppio
-                    check NTC, buzzer e notifica Telegram immediata
+                    Sicurezza fisica: porta + fiamma con doppio check NTC,
+                    buzzer e notifica Telegram
                   </li>
                   <li>
-                    Due nodi ESP8266 indipendenti con ruoli dedicati (serra +
-                    sicurezza)
+                    Due ESP8266 indipendenti con backup failover automatico
                   </li>
+                  <li>Light Sleep Mode con risparmio energetico del 94%</li>
                   <li>
-                    Backup failover automatico: quando il nodo principale va
-                    offline, il backup si risveglia
-                  </li>
-                  <li>
-                    Light Sleep Mode: risparmio energetico con risveglio rapido
-                    e riconnessione automatica
-                  </li>
-                  <li>
-                    Dashboard web completa con vista piante e vista sicurezza,
-                    grafici storici e controllo remoto
-                  </li>
-                  <li>
-                    Bot Telegram per controllo totale da smartphone con grafici
-                    generati on-the-fly
+                    Dashboard web + Bot Telegram per controllo remoto completo
                   </li>
                 </ul>
               </div>
@@ -1550,50 +1536,41 @@
                 <div class="ctitle">Sfide Affrontate</div>
                 <ul>
                   <li>
-                    Ottimizzazione RAM su ESP8266: scope JSON limitato, memoria
-                    gestita manualmente
+                    Ottimizzazione RAM ESP8266 e gestione connessioni
+                    concorrenti
                   </li>
                   <li>
-                    Gestione connessioni concorrenti: MQTT + WiFi + HTTP +
-                    InfluxDB su microcontrollore
+                    Consistenza dati in tempo reale tra MQTT, InfluxDB,
+                    WebSocket e Telegram
                   </li>
                   <li>
-                    Coerenza dati in tempo reale tra MQTT, InfluxDB, WebSocket e
-                    Telegram
-                  </li>
-                  <li>
-                    Implementazione Light Sleep: gestione stato radio WiFi,
-                    riconnessione post-sleep, coda LCD
+                    Implementazione Light Sleep con riconnessione e gestione
+                    coda LCD
                   </li>
                 </ul>
               </div>
             </div>
             <div>
               <div class="card" style="margin-bottom: 12px">
-                <div class="ctitle">Stack Completo</div>
+                <div class="ctitle">Stack</div>
                 <ul>
                   <li>
-                    <strong>Edge</strong> – ESP8266 × 2, sensori
-                    analogici/digitali, attuatori (LED, LCD, buzzer)
+                    <strong>HW</strong> – ESP8266 × 2, DHT11, KY-018, LED RGB,
+                    LCD I²C, NTC, fiamma, buzzer
                   </li>
                   <li>
-                    <strong>Firmware</strong> – Arduino C++, 9 moduli OOP,
-                    WiFiManager, Ticker, Light Sleep
+                    <strong>FW</strong> – Arduino C++, 9 moduli OOP, Light Sleep
                   </li>
                   <li>
-                    <strong>Comunicazione</strong> – MQTT pub/sub con LWT, QoS
-                    1, node discovery
+                    <strong>BE</strong> – FastAPI, SQLite, InfluxDB, MQTT
+                    (EMQX), WebSocket
                   </li>
                   <li>
-                    <strong>Backend</strong> – FastAPI, SQLite (config),
-                    InfluxDB (time-series), WebSocket
+                    <strong>FE</strong> – HTML + Tailwind CSS + JS vanilla
                   </li>
                   <li>
-                    <strong>Frontend</strong> – HTML + Tailwind CSS + JS vanilla
-                  </li>
-                  <li>
-                    <strong>Integrazioni</strong> – Telegram Bot, Open-Meteo
-                    API, matplotlib
+                    <strong>Bot</strong> – python-telegram-bot, Open-Meteo API,
+                    matplotlib
                   </li>
                 </ul>
               </div>
@@ -1601,18 +1578,16 @@
                 <div class="ctitle">Possibili Evoluzioni</div>
                 <ul>
                   <li>
-                    Deep sleep per cicli di risveglio ancora più lunghi
-                    (minuti/ora)
-                  </li>
-                  <li>Notifiche push / e-mail per allarmi non critici</li>
-                  <li>
-                    Nodi aggiuntivi: irrigazione automatica, pH suolo, ventole
+                    Sensore CO₂ / Qualità Aria – monitoraggio ventilazione con
+                    MQ-135
                   </li>
                   <li>
-                    Reclamo piante interattivo via Telegram con consigli di cura
+                    Notifiche smart – suggerimenti contestuali basati su trend
+                    storici
                   </li>
                   <li>
-                    Storico allarmi con statistiche e trend sulla dashboard
+                    Energia solare – pannello solare + gestione carica per
+                    autonomia outdoor
                   </li>
                 </ul>
               </div>
