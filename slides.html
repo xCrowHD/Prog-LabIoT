@@ -753,7 +753,45 @@
 
           <div class="cols">
             <div class="card">
-              <div class="ctitle">Gestione Allarmi</div>
+              <div class="ctitle">Gestione dati e connessioni</div>
+              <ul>
+                <li>
+                  <code>InfluxHandler</code> –
+                  <code>sendDataToInflux()</code> con RSSI e soglie;
+                  <code>isReadyToWrite()</code> con intervallo configurable via
+                  <code>updateInterval()</code>; ticker per write periodiche
+                </li>
+                <li>
+                  <code>WiFiHandler</code> (static) – <code>begin()</code> con
+                  WiFiManager per auto-connect; <code>getRSSI()</code>,
+                  <code>getMacAddress()</code> per ID univoco;
+                  <code>resetCredentials()</code> per reset WiFi
+                </li>
+              </ul>
+            </div>
+            <div class="card">
+              <div class="ctitle">Sensori &amp; Comunicazione</div>
+              <ul>
+                <li>
+                  <code>SensorManager</code> –
+                  <code>getAllData()</code> restituisce
+                  <code>struct PlantData</code> (temperatura, umidità, luce,
+                  validità); legge DHT11 + fotoresistenza KY-018
+                </li>
+                <li>
+                  <code>MqttHandler</code> – <code>begin()</code>,
+                  <code>handle()</code>, <code>reconnect()</code>; espone
+                  <code>getThresholds()</code>, <code>getSettings()</code>,
+                  <code>isRunning()</code>, <code>isStandBy()</code>; gestisce
+                  azioni differite con <code>handleDeferredActions()</code>
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div class="cols">
+            <div class="card">
+              <div class="ctitle">Gestione Notifiche e eccezioni</div>
               <ul>
                 <li>
                   <code>AlarmHandler</code> –
@@ -791,44 +829,6 @@
                   messaggi tipo DATA, ERROR, INFO;
                   <code>popAndDisplay()</code> mostra il prossimo messaggio;
                   <code>addMessagePlantData()</code> formatta letture sensore
-                </li>
-              </ul>
-            </div>
-          </div>
-
-          <div class="cols">
-            <div class="card">
-              <div class="ctitle">Sensori &amp; Comunicazione</div>
-              <ul>
-                <li>
-                  <code>SensorManager</code> –
-                  <code>getAllData()</code> restituisce
-                  <code>struct PlantData</code> (temperatura, umidità, luce,
-                  validità); legge DHT11 + fotoresistenza KY-018
-                </li>
-                <li>
-                  <code>MqttHandler</code> – <code>begin()</code>,
-                  <code>handle()</code>, <code>reconnect()</code>; espone
-                  <code>getThresholds()</code>, <code>getSettings()</code>,
-                  <code>isRunning()</code>, <code>isStandBy()</code>; gestisce
-                  azioni differite con <code>handleDeferredActions()</code>
-                </li>
-              </ul>
-            </div>
-            <div class="card">
-              <div class="ctitle">Infrastruttura</div>
-              <ul>
-                <li>
-                  <code>InfluxHandler</code> –
-                  <code>sendDataToInflux()</code> con RSSI e soglie;
-                  <code>isReadyToWrite()</code> con intervallo configurable via
-                  <code>updateInterval()</code>; ticker per write periodiche
-                </li>
-                <li>
-                  <code>WiFiHandler</code> (static) – <code>begin()</code> con
-                  WiFiManager per auto-connect; <code>getRSSI()</code>,
-                  <code>getMacAddress()</code> per ID univoco;
-                  <code>resetCredentials()</code> per reset WiFi
                 </li>
               </ul>
             </div>
@@ -882,15 +882,23 @@
 <span class="dim">│    → publish door/flame events</span>
 <span class="hi">├─</span> InfluxHandler
 <span class="dim">│    → DoorAlarm + FlameAlarm measurements</span>
-<span class="hi">├─</span> TelegramNotifier
-<span class="dim">│    → alert fiamma su Telegram</span>
-<span class="hi">└─</span> loop() @ 500ms
-<span class="dim">     → checkDoor() + checkFlame()</span></pre>
+<span class="hi">└─</span> TelegramNotifier
+<span class="dim">     → alert fiamma su Telegram</span></pre>
               <div class="box" style="margin-top: 14px">
                 Il SecurityESP pubblica sul topic
                 <code>lab_iot/mafogani/connection</code> con tipo
                 <code>SECURITY_SENSOR</code>. Il server risponde con la lista
                 topic appropriata.
+              </div>
+              <div class="box" style="margin-top: 10px">
+                Il <code>loop()</code> mantiene attiva la connessione MQTT e
+                ogni <strong>500 ms</strong> legge i sensori con
+                <code>checkCollisioneState()</code> e
+                <code>checkIncendioState()</code>. Gli eventi vengono inviati
+                solo al <strong>cambio di stato</strong>: porta aperta/chiusa
+                oppure fiamma attiva + temperatura &gt; 30°C. A ogni cambio →
+                payload MQTT, scrittura InfluxDB e (per la fiamma) attivazione
+                buzzer + notifica Telegram.
               </div>
             </div>
           </div>
@@ -973,11 +981,6 @@
    → CPU + radio WiFi spente
    → RAM e stato preservati</pre>
               </div>
-              <div class="box">
-                <strong>Stato MQTT:</strong> prima di dormire l'ESP pubblica
-                <code>SLEEPING</code> sul connection topic, così il server sa
-                che il nodo non è raggiungibile, ma tornerà automaticamente.
-              </div>
             </div>
           </div>
         </div>
@@ -996,11 +999,15 @@
               <ul>
                 <li>
                   <span class="led lg"></span>
-                  <strong>Attivo</strong> (WiFi + sensori + MQTT): ~<strong>144 mA</strong>
+                  <strong>Attivo</strong> (WiFi + sensori + MQTT): ~<strong
+                    >144 mA</strong
+                  >
                 </li>
                 <li>
                   <span class="led lb"></span>
-                  <strong>Light Sleep</strong> (CPU + radio OFF): ~<strong>8 mA</strong>
+                  <strong>Light Sleep</strong> (CPU + radio OFF): ~<strong
+                    >8 mA</strong
+                  >
                 </li>
                 <li>
                   Riduzione del <strong>94%</strong> del consumo istantaneo
@@ -1021,10 +1028,6 @@
                 <li>
                   Light Sleep: mantiene RAM, risveglio in ~ms, nessun reinizio
                 </li>
-                <li>
-                  Light Sleep adatto a cicli frequenti (es. ogni 20s); Deep
-                  Sleep per cicli lunghi (minuti/ora)
-                </li>
               </ul>
             </div>
           </div>
@@ -1033,16 +1036,17 @@
               <div class="ctitle">🖥️ Comportamento LCD durante Sleep</div>
               <ul>
                 <li>
-                  Prima dello sleep: vengono mostrati tutti i messaggi della
-                  coda LCD fino allo svuotamento
+                  Dopo l'invio a InfluxDB, se non ci sono errori, il sistema
+                  svuota la coda LCD mostrando tutti i messaggi in attesa
+                </li>
+                <li>
+                  Il timer del sleep parte <strong>dopo</strong> lo svuotamento
+                  della coda: il tempo LCD viene sottratto dal tempo totale di
+                  sleep
                 </li>
                 <li>
                   Durante lo sleep: messaggio statico
-                  <code>"Sleep Mode {ID}"</code>
-                </li>
-                <li>
-                  Alla seconda riga: rimane impresso l'ID del nodo per
-                  identificazione visiva
+                  <code>"Sleep Mode {ID}"</code> sulla seconda riga
                 </li>
                 <li>
                   Risveglio: LCD torna attivo con messaggio
@@ -1053,24 +1057,12 @@
             <div class="card">
               <div class="ctitle">🔋 Esempio: Batteria + Timer 4 min</div>
               <ul>
-                <li>
-                  Batteria <strong>1000 mAh</strong> (es. LiPo 3.7V)
-                </li>
-                <li>
-                  Ciclo: ~10s attivo (144 mA) + 240s sleep (8 mA)
-                </li>
-                <li>
-                  Consumo medio ciclico: ~<strong>13.6 mA</strong>
-                </li>
-                <li>
-                  Autonomia stimata: <strong>~73 ore</strong> (~3 giorni)
-                </li>
-                <li>
-                  Senza sleep (sempre attivo): ~<strong>7 ore</strong>
-                </li>
-                <li>
-                  <strong>Fattore 10×</strong> di autonomia in più
-                </li>
+                <li>Batteria <strong>1000 mAh</strong> (es. LiPo 3.7V)</li>
+                <li>Ciclo: ~10s attivo (144 mA) + 240s sleep (8 mA)</li>
+                <li>Consumo medio ciclico: ~<strong>13.6 mA</strong></li>
+                <li>Autonomia stimata: <strong>~73 ore</strong> (~3 giorni)</li>
+                <li>Senza sleep (sempre attivo): ~<strong>7 ore</strong></li>
+                <li><strong>Fattore 10×</strong> di autonomia in più</li>
               </ul>
             </div>
           </div>
@@ -1287,10 +1279,6 @@
                     running, plant_id, location
                   </li>
                 </ul>
-              </div>
-              <div class="box" style="margin-top: 10px">
-                Conversione ADC → kLux server-side:
-                <code>Lux = 500 / R_LDR_kΩ</code>
               </div>
             </div>
           </div>
